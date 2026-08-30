@@ -69,7 +69,10 @@ are not a measurement of total system memory saved. MView is not yet ahead on CP
 no end-to-end latency advantage has been established.
 
 `Tools/MotionBench.swift` puts the same 960×540 scrolling colored-row window on every
-screen, including the built-in reference. Trials alternate DisplayLink and MView, with
+screen, including the built-in reference. That is what it did when these numbers were
+taken. It has since changed defaults to a full-screen always-on-top surface and gained
+other patterns, so reproducing this table needs `--windowed --pattern scroll`; the numbers
+below are not comparable with a run of the current default. Trials alternate DisplayLink and MView, with
 three seconds of motion warmup followed by at least twenty seconds of sampling. The final
 MView trials use `serve --takeover --stats`, including its supervisor process. Each trial
 must finish without a worker restart to qualify.
@@ -159,7 +162,7 @@ Raw local evidence is in `logs/latency-20260830/` (gitignored):
 
 Rebuild the workload with `xcrun swiftc -O -module-cache-path build/ModuleCache
 Tools/MotionBench.swift -o build/MotionBench`. Start either driver, run `build/MotionBench
-27`, wait three seconds, then run `python3 Tools/measure_processes.py output.json --seconds
+27 --windowed --pattern scroll`, wait three seconds, then run `python3 Tools/measure_processes.py output.json --seconds
 20`. Repeat under the same display layout. Do not run builds or test suites during CPU
 sampling. Confirm the actual panels independently; do not use `mview confirm` solely
 because USB and capture checks pass.

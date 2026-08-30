@@ -26,6 +26,13 @@ final class MviewApp: NSObject, NSApplicationDelegate {
     private var workspace: URL!
     private let logView = NSTextView()
     private let profileBox = NSButton(checkboxWithTitle: "Fine profiler on next start (adds measurement overhead)", target: nil, action: nil)
+    // Developer controls. This window is only built into diagnostic variants, so it can
+    // expose the driver's own vocabulary rather than a simplified one: the same pattern
+    // names MotionBench takes, and the same keys `mview config set` takes.
+    private let patternMenu = NSPopUpButton(frame: .zero, pullsDown: false)
+    private let stressSeconds = NSTextField(string: "60")
+    private let configKey = NSTextField(string: "")
+    private let configValue = NSTextField(string: "")
     private var diagnostics: [Process] = []
     private var diagnosticTimers: [Int32: Timer] = [:]
     private let info = Bundle.main.infoDictionary ?? [:]
@@ -115,11 +122,31 @@ final class MviewApp: NSObject, NSApplicationDelegate {
             diagnosticButton("Settings", #selector(checkSettings)),
             diagnosticButton("Self tests", #selector(selfTests)),
             diagnosticButton("Encoder benchmark", #selector(benchmark)),
-            diagnosticButton("Stress: 60 seconds", #selector(stress)),
             diagnosticButton("Stop tests", #selector(stopTests)),
             diagnosticButton("Export report", #selector(exportReport))
         ])
         diagnosticsRow.orientation = .horizontal; diagnosticsRow.spacing = 6
+        patternMenu.addItems(withTitles: ["cycle", "scroll", "text", "noise", "gradient",
+                                          "flash", "scatter", "still"])
+        patternMenu.controlSize = .small
+        patternMenu.toolTip = "cycle runs every pattern in turn. Each one is the worst case for a different stage; see the header of Tools/MotionBench.swift."
+        stressSeconds.controlSize = .small
+        stressSeconds.widthAnchor.constraint(equalToConstant: 52).isActive = true
+        let stressRow = NSStackView(views: [
+            smallLabel("Stress pattern"), patternMenu,
+            smallLabel("seconds"), stressSeconds,
+            diagnosticButton("Run stress", #selector(stress))])
+        stressRow.orientation = .horizontal; stressRow.spacing = 6
+        configKey.placeholderString = "capture.fps"
+        configValue.placeholderString = "30"
+        configKey.controlSize = .small; configValue.controlSize = .small
+        configKey.widthAnchor.constraint(equalToConstant: 190).isActive = true
+        configValue.widthAnchor.constraint(equalToConstant: 110).isActive = true
+        let configRow = NSStackView(views: [
+            smallLabel("config set"), configKey, configValue,
+            diagnosticButton("Apply", #selector(applySetting)),
+            diagnosticButton("Reset all", #selector(resetSettings))])
+        configRow.orientation = .horizontal; configRow.spacing = 6
         let scroll = NSScrollView()
         scroll.hasVerticalScroller = true; scroll.borderType = .bezelBorder
         logView.isEditable = false; logView.isSelectable = true
@@ -131,7 +158,7 @@ final class MviewApp: NSObject, NSApplicationDelegate {
         scroll.heightAnchor.constraint(greaterThanOrEqualToConstant: 320).isActive = true
         let notice = NSTextField(wrappingLabelWithString: "Live capture, queue and driver logs. Buffer capped at 256 KiB; disk log rotates at 10 MiB. Reports stay local. Stress tests animate all screens; Stop tests ends them. No screenshots are collected automatically.")
         notice.font = .systemFont(ofSize: 11); notice.textColor = .secondaryLabelColor
-        let stack = NSStackView(views: [title, variant, statusLabel, detailLabel, buttons, profileBox, diagnosticsRow, scroll, notice, footer])
+        let stack = NSStackView(views: [title, variant, statusLabel, detailLabel, buttons, profileBox, diagnosticsRow, stressRow, configRow, scroll, notice, footer])
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 12
@@ -299,6 +326,13 @@ final class MviewApp: NSObject, NSApplicationDelegate {
         if quitting { NSApp.reply(toApplicationShouldTerminate: true) }
     }
 
+    private func smallLabel(_ text: String) -> NSTextField {
+        let label = NSTextField(labelWithString: text)
+        label.font = .systemFont(ofSize: 11)
+        label.textColor = .secondaryLabelColor
+        return label
+    }
+
     private func diagnosticButton(_ title: String, _ selector: Selector) -> NSButton {
         let button = NSButton(title: title, target: self, action: selector)
         button.bezelStyle = .rounded; button.controlSize = .small
@@ -344,8 +378,25 @@ final class MviewApp: NSObject, NSApplicationDelegate {
     @objc private func benchmark() { diagnostic(["bench"]) }
     @objc private func stress() {
         guard worker != nil else { appendLog("Start Mview before stress testing its displays.\n"); return }
-        diagnostic(["60"], executable: Bundle.main.executableURL?.deletingLastPathComponent().appendingPathComponent("MviewMotionBench"), timeout: 65)
+        // The workload covers every screen and sits above every window while it runs. It
+        // ignores the mouse, so the machine stays usable, and it ends on its own timer.
+        let seconds = max(1, min(600, Int(stressSeconds.stringValue) ?? 60))
+        let pattern = patternMenu.titleOfSelectedItem ?? "cycle"
+        diagnostic(["\(seconds)", "--pattern", pattern],
+                   executable: Bundle.main.executableURL?.deletingLastPathComponent().appendingPathComponent("MviewMotionBench"),
+                   timeout: TimeInterval(seconds + 5))
     }
+    @objc private func applySetting() {
+        let key = configKey.stringValue.trimmingCharacters(in: .whitespaces)
+        let value = configValue.stringValue.trimmingCharacters(in: .whitespaces)
+        guard !key.isEmpty, !value.isEmpty else { appendLog("Give both a config key and a value.\n"); return }
+        // The driver rereads its configuration when it starts, so a change made while it
+        // is running takes effect on the next start rather than now. It says so rather
+        // than looking like it did nothing.
+        diagnostic(["config", "set", key, value])
+        if worker != nil { appendLog("Applies when the driver next starts.\n") }
+    }
+    @objc private func resetSettings() { diagnostic(["config", "reset"]) }
     @objc private func stopTests() { for process in diagnostics where process.isRunning { process.terminate() } }
     @objc private func exportReport() {
         do {

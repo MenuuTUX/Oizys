@@ -150,6 +150,20 @@ Zone collection is in C, because the zones are tens of nanoseconds and a Python 
 would cost more than the work being measured. Attribution, presentation and baseline
 comparison are in Python.
 
+```bash
+build/MotionBench 60 --pattern cycle        # workload: every screen, above every window
+python3 Tools/measure_processes.py cpu.json --seconds 20
+python3 Tools/report.py logs/<run>          # one README.md with tables and charts
+```
+
+`report.py` reads driver logs, process samples and saved profiles out of a folder and
+writes a single `README.md` beside them: latency per head against the frame budget, strips
+sent against the strips a whole surface would be, zone timings, CPU and RSS, and the
+failure lines grouped by shape with a count. `MotionBench` is the workload it is usually
+reading; `--pattern` chooses which stage to pressurise, from scrolling rules through dense
+text, full-screen noise, a panning gradient, 10 Hz flashes and scattered blinking squares
+to a still desktop.
+
 ## Performance
 
 See [the hardware comparison and recovery report](Documentation/Performance-2026-08-30.md)
