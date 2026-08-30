@@ -4,7 +4,7 @@
     python3 Tools/test.py                 build, then run every suite
     python3 Tools/test.py -k damage       pass through to pytest
     python3 Tools/test.py --sanitize address
-    python3 Tools/test.py --coverage
+    python3 Tools/test.py --coverage [--coverage-floor 80]
     python3 Tools/test.py --mutate
 
 The tests drive libMViewCore.dylib through ctypes, so a sanitiser run means building the
@@ -14,6 +14,7 @@ tests changes.
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import pathlib
 import shutil
@@ -67,7 +68,7 @@ def run_pytest(python, extra_args, environment=None):
                           cwd=ROOT, env=env).returncode
 
 
-def coverage(python, passthrough):
+def coverage(python, passthrough, floor):
     """llvm-cov over the library while the Python suite drives it."""
     products = build("Debug", "-fprofile-instr-generate -fcoverage-mapping")
     raw = ROOT / "build" / "coverage"
@@ -111,7 +112,7 @@ def coverage(python, passthrough):
     print("\nusb_session.c, ddc_native.c, capture_frame.c and supervisor.c read 0% above "
           "because their tests compile them separately, through Tests/Support/*.c, rather "
           "than through this library. What genuinely has no test is driver.c, usb_probe.c, "
-          "display.c, config.c and bench.c.", flush=True)
+          "display.c and bench.c.", flush=True)
 
     swift = sorted((ROOT / "Sources/MViewPlatform").glob("*.swift")) + \
             sorted((ROOT / "Sources/MViewApp").glob("*.swift"))
@@ -124,6 +125,23 @@ def coverage(python, passthrough):
                     "-format=html", f"-output-dir={raw / 'html'}", *everything],
                    cwd=ROOT, capture_output=True)
     print(f"\nhtml report: {(raw / 'html' / 'index.html').relative_to(ROOT)}")
+
+    summary = json.loads(subprocess.run(
+        ["xcrun", "llvm-cov", "export", "--summary-only", str(library),
+         f"-instr-profile={merged}", *reachable],
+        cwd=ROOT, capture_output=True, text=True, check=True).stdout)
+    lines = summary["data"][0]["totals"]["lines"]
+    percent = lines["percent"]
+    (raw / "summary.json").write_text(json.dumps(summary["data"][0]["totals"], indent=2))
+    print(f"\nreachable line coverage: {percent:.2f}% "
+          f"({lines['covered']}/{lines['count']}), floor {floor:.2f}%")
+    # A crashed interpreter writes no counters at all, and every file then reports 0.00%
+    # while the run still exits through this function. That reads as "coverage collapsed"
+    # rather than "the suite died", so fail on it here instead of letting a green tick
+    # carry a report full of zeroes.
+    if percent < floor:
+        print(f"coverage {percent:.2f}% is below the {floor:.2f}% floor")
+        return code or 1
     return code
 
 
@@ -157,6 +175,9 @@ def main():
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--sanitize", choices=sorted(SANITIZERS))
     parser.add_argument("--coverage", action="store_true")
+    parser.add_argument("--coverage-floor", type=float, default=1.0,
+                        metavar="PERCENT",
+                        help="fail if reachable line coverage falls below this")
     parser.add_argument("--mutate", action="store_true")
     parser.add_argument("--configuration", default="Release")
     known, passthrough = parser.parse_known_args()
@@ -167,7 +188,7 @@ def main():
         return subprocess.run([str(python), str(ROOT / "Tools" / "mutate.py"),
                                *passthrough], cwd=ROOT).returncode
     if known.coverage:
-        return coverage(python, passthrough)
+        return coverage(python, passthrough, known.coverage_floor)
     if known.sanitize:
         # Address sanitiser runs as a native binary, not through the Python suite. macOS
         # refuses to load a sanitizer runtime into the Apple-signed interpreter ("Sanitizer
@@ -176,13 +197,27 @@ def main():
         # damage ledger under the sanitiser; see Tests/Support/asan_runner.c.
         if known.sanitize == "address":
             return native_sanitizer_run(SANITIZERS["address"])
-        # Undefined-behaviour has a minimal runtime that links in and needs no injection,
-        # so it can still ride the ctypes suite and reach every fuzzed input.
+        # Undefined-behaviour reaches every fuzzed input when the ctypes suite can host
+        # it, which is worth more than the native runner's fixed inputs -- so try that
+        # first. It only works where the interpreter is allowed to load a sanitizer
+        # runtime at all: a venv built on Apple's signed python3 is not, and the dlopen
+        # fails with "Sanitizer load violates platform policy" before a single test runs.
+        # Falling back to the native runner there keeps the command meaning the same
+        # thing on a laptop and on CI, instead of being red on one and green on the other.
         flags = SANITIZERS[known.sanitize]
         products = build("Debug", flags)
+        library = products / "libMViewCore.dylib"
+        probe = subprocess.run([str(python), "-c", f"import ctypes; ctypes.CDLL({str(library)!r})"],
+                               capture_output=True, text=True)
+        if probe.returncode != 0:
+            detail = next((line.strip() for line in probe.stderr.splitlines()
+                           if "policy" in line or "Library not loaded" in line), "dlopen failed")
+            print(f"this interpreter cannot load a {known.sanitize}-sanitised library: "
+                  f"{detail[:160]}")
+            print("falling back to the native runner, which covers the pure-logic sources only")
+            return native_sanitizer_run(flags)
         print(f"running the suite against a {known.sanitize}-sanitised library")
-        env = {"MVIEW_DYLIB": str(products / "libMViewCore.dylib")}
-        return run_pytest(python, passthrough, env)
+        return run_pytest(python, passthrough, {"MVIEW_DYLIB": str(library)})
 
     build(known.configuration)
     return run_pytest(python, passthrough)

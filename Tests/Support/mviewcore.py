@@ -127,6 +127,18 @@ _SIGNATURES = {
     "mview_damage_presented": (None, [ctypes.POINTER(DamageMap)]),
     "mview_damage_update": (ctypes.c_int, [
         ctypes.POINTER(DamageMap), _u8p, ctypes.c_size_t, ctypes.POINTER(Strip), ctypes.c_int]),
+    # config
+    "mview_config_selftest": (ctypes.c_int, []),
+    "mview_config_get": (ctypes.c_int, [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_size_t]),
+    "mview_config_set": (ctypes.c_int, [ctypes.c_char_p, ctypes.c_char_p]),
+    "mview_config_reset": (ctypes.c_int, []),
+    "mview_config_reload": (None, []),
+    "mview_config_path": (ctypes.c_char_p, []),
+    "mview_config_head_active": (ctypes.c_int, [ctypes.c_int]),
+    "mview_config_print": (None, [ctypes.c_void_p]),
+    # bench / profile drivers
+    "mview_bench_encoder": (ctypes.c_int, []),
+    "mview_profile_encoder": (ctypes.c_int, []),
     # crypto
     "mview_aes_cmac": (None, [_u8p, _u8p, ctypes.c_size_t, _u8p]),
     "mview_aes_ctr_xor": (None, [_u8p, _u8p, ctypes.c_uint32, _u8p, _u8p, ctypes.c_size_t]),

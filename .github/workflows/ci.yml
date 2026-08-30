@@ -28,12 +28,23 @@ jobs:
         run: python3 Tools/test.py --sanitize undefined
       - name: Address sanitiser
         run: python3 Tools/test.py --sanitize address
+      # pipefail, or the pipe into tee reports tee's exit status and a suite that
+      # segfaulted mid-run lands here as a green tick attached to a report of zeroes.
+      # --coverage-floor is the second half of the same guard: a crashed interpreter
+      # writes no counters, and 0.00% has to fail rather than read as a regression.
       - name: Coverage
-        run: python3 Tools/test.py --coverage | tee coverage.txt
+        shell: bash
+        run: |
+          set -o pipefail
+          python3 Tools/test.py --coverage --coverage-floor 80 | tee coverage.txt
       - uses: actions/upload-artifact@v5
+        if: always()
         with:
           name: coverage
-          path: coverage.txt
+          path: |
+            coverage.txt
+            build/coverage/summary.json
+            build/coverage/html
 
   variants:
     runs-on: macos-15
