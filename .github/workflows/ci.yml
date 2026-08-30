@@ -16,7 +16,7 @@ jobs:
     # uses ARM CRC32 and NEON intrinsics, so an Intel runner cannot build this at all.
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - run: xcodebuild -version && swift --version
       # Drives libMViewCore.dylib through ctypes. Nothing here needs a dock, a display or
       # Screen Recording permission; the hardware paths are covered by mock device
@@ -30,7 +30,7 @@ jobs:
         run: python3 Tools/test.py --sanitize address
       - name: Coverage
         run: python3 Tools/test.py --coverage | tee coverage.txt
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: coverage
           path: coverage.txt
@@ -42,7 +42,7 @@ jobs:
       matrix:
         variant: [debug-minimal, debug-verbose, debug-fallback, production, production-fallback]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       # build_app.py re-reads `mview build-info` out of the binary it just built and
       # refuses to package a bundle whose compiled-in policy disagrees with the variant
       # name. A production build that still had diagnostics in it fails here, not on a

@@ -127,6 +127,31 @@ def coverage(python, passthrough):
     return code
 
 
+def native_sanitizer_run(flags):
+    """Compile Tests/Support/asan_runner.c with the pure-logic sources under the sanitiser
+    and run it directly. Our own binary, so the sanitizer loads with no platform policy in
+    the way -- unlike injecting it into the Apple-signed Python host."""
+    pure = ["config.c", "encode.c", "wht.c", "crypto.c", "dl3.c", "profile.c", "log.c"]
+    sources = [str(ROOT / "Sources/MViewCore" / name) for name in pure]
+    binary = ROOT / "build" / "asan_runner"
+    binary.parent.mkdir(parents=True, exist_ok=True)
+    command = ["xcrun", "clang", "-std=c11", "-fblocks", "-g", "-O1",
+               "-mcpu=apple-m1", "-DMVIEW_LOG_IMPLEMENTATION",
+               "-I", str(ROOT / "Sources/MViewCore/include"),
+               *flags.split(), str(ROOT / "Tests/Support/asan_runner.c"), *sources,
+               # crypto.c calls SecKey for RSA-OAEP; dl3/log touch CoreFoundation.
+               "-framework", "Security", "-framework", "CoreFoundation",
+               "-o", str(binary)]
+    build_result = subprocess.run(command, capture_output=True, text=True)
+    if build_result.returncode != 0:
+        print(build_result.stderr[-4000:])
+        sys.exit("address-sanitiser runner failed to build")
+    print("running the address+undefined sanitiser runner")
+    env = dict(os.environ, ASAN_OPTIONS="detect_leaks=0:abort_on_error=1",
+               UBSAN_OPTIONS="halt_on_error=1:print_stacktrace=1")
+    return subprocess.run([str(binary)], cwd=ROOT, env=env).returncode
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -144,20 +169,19 @@ def main():
     if known.coverage:
         return coverage(python, passthrough)
     if known.sanitize:
+        # Address sanitiser runs as a native binary, not through the Python suite. macOS
+        # refuses to load a sanitizer runtime into the Apple-signed interpreter ("Sanitizer
+        # load violates platform policy"), so the ctypes path cannot host ASan at all. The
+        # runner compiles the pure-logic sources itself and drives the encoder and the
+        # damage ledger under the sanitiser; see Tests/Support/asan_runner.c.
+        if known.sanitize == "address":
+            return native_sanitizer_run(SANITIZERS["address"])
+        # Undefined-behaviour has a minimal runtime that links in and needs no injection,
+        # so it can still ride the ctypes suite and reach every fuzzed input.
         flags = SANITIZERS[known.sanitize]
         products = build("Debug", flags)
         print(f"running the suite against a {known.sanitize}-sanitised library")
         env = {"MVIEW_DYLIB": str(products / "libMViewCore.dylib")}
-        # ASan has to be first in the load order, so the interposed allocator is in place
-        # before anything else runs.
-        if known.sanitize == "address":
-            runtime = subprocess.run(
-                ["xcrun", "--find", "clang"], capture_output=True, text=True).stdout.strip()
-            lib = (pathlib.Path(runtime).parents[1] / "lib" / "clang").glob(
-                "*/lib/darwin/libclang_rt.asan_osx_dynamic.dylib")
-            found = next(iter(sorted(lib)), None)
-            if found:
-                env["DYLD_INSERT_LIBRARIES"] = str(found)
         return run_pytest(python, passthrough, env)
 
     build(known.configuration)
