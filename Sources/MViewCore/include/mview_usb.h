@@ -96,8 +96,8 @@ MViewSession *mview_session_open(int capture);
 #define MVIEW_BULK_MAX_PACKET 1024
 
 int mview_session_bulk_out(MViewSession *s, uint8_t ep, const void *data, size_t len);
-/* Send one complete video frame as a single transfer, with a trailing zero-length
- * packet when the length is an exact multiple of MVIEW_BULK_MAX_PACKET. */
+/* Send one complete video frame as one IOUSBHost request. Never append a separate
+ * zero-length request, including when the frame length is packet-aligned. */
 int mview_session_bulk_out_frame(MViewSession *s, uint8_t ep, const void *data, size_t len);
 int mview_session_bulk_outv(MViewSession *s, uint8_t ep, const MViewUSBChunk *chunks,
                             int chunk_count);

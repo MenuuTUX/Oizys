@@ -1,6 +1,7 @@
 #import <Foundation/Foundation.h>
 #import <CoreGraphics/CoreGraphics.h>
 #include "mview_display.h"
+#include "mview_ddc.h"
 #include <stdlib.h>
 
 @interface CGVirtualDisplayMode : NSObject
@@ -69,7 +70,7 @@ MViewVirtualDisplay *mview_virtual_display_create(const MViewVirtualDisplayDesc 
         if (![display applySettings:settings]) {
             return NULL;
         }
-        MViewVirtualDisplay *out = calloc(1, sizeof(*out));
+        MViewVirtualDisplay *out = (MViewVirtualDisplay *)calloc(1, sizeof(*out));
         if (!out) {
             return NULL;
         }
@@ -228,39 +229,68 @@ int mview_display_unit_is_shared(uint32_t id) {
 static int32_t g_seat_x[2], g_seat_y[2];
 static int g_seated;
 
-/* Already a contiguous left-right pair, in whole pixels: exactly touching, no gap and no
-   overlap, and level with each other. */
-static int heads_are_paired(uint32_t left_id, uint32_t right_id) {
-    CGRect left = CGDisplayBounds(left_id), right = CGDisplayBounds(right_id);
-    return (int32_t)right.origin.x == (int32_t)(left.origin.x + left.size.width) &&
-           (int32_t)right.origin.y == (int32_t)left.origin.y;
+/* Already a contiguous left-to-right run, in whole pixels: each head exactly touching the
+   next, no gap and no overlap, and all level with each other. A single head is trivially
+   a run of one. */
+static int heads_are_paired(const uint32_t *ids, int count) {
+    for (int i = 1; i < count; i++) {
+        CGRect previous = CGDisplayBounds(ids[i - 1]), current = CGDisplayBounds(ids[i]);
+        if ((int32_t)current.origin.x != (int32_t)(previous.origin.x + previous.size.width) ||
+            (int32_t)current.origin.y != (int32_t)previous.origin.y) {
+            return 0;
+        }
+    }
+    return 1;
 }
 
 /* Seated the way they should be and scanning out their own desktops. A freshly created
-   pair is neither — macOS drops new displays at the end of the bottom row — so this is
+   head is neither — macOS drops new displays at the end of the bottom row — so this is
    what tells a layout the user built from one nobody has arranged yet. */
-static int heads_are_healthy(uint32_t left_id, uint32_t right_id) {
-    return !head_in_mirror_set(left_id) && !head_in_mirror_set(right_id) &&
-           heads_are_paired(left_id, right_id);
+static int heads_are_healthy(const uint32_t *ids, int count) {
+    for (int i = 0; i < count; i++) {
+        if (head_in_mirror_set(ids[i])) {
+            return 0;
+        }
+    }
+    return heads_are_paired(ids, count);
 }
 
-static void remember_seats(uint32_t left_id, uint32_t right_id) {
-    CGRect left = CGDisplayBounds(left_id), right = CGDisplayBounds(right_id);
-    g_seat_x[0] = (int32_t)left.origin.x;
-    g_seat_y[0] = (int32_t)left.origin.y;
-    g_seat_x[1] = (int32_t)right.origin.x;
-    g_seat_y[1] = (int32_t)right.origin.y;
+static void remember_seats(const uint32_t *ids, int count) {
+    for (int i = 0; i < count && i < MVIEW_MAX_LAYOUT_HEADS; i++) {
+        CGRect bounds = CGDisplayBounds(ids[i]);
+        g_seat_x[i] = (int32_t)bounds.origin.x;
+        g_seat_y[i] = (int32_t)bounds.origin.y;
+    }
     g_seated = 1;
 }
 
-int mview_displays_arrange(uint32_t left_id, uint32_t right_id, uint32_t width, uint32_t height) {
-    if (!left_id || !right_id) {
+/*
+ * Use a verified native panel as the layout anchor. DisplayLink forwards Dell EDIDs,
+ * so excluding built-in and Apple virtual displays does not establish a native route.
+ */
+static int native_external_bounds(const uint32_t *ids, int count, CGRect *out) {
+    uint32_t native = mview_ddc_native_display_id();
+    if (!native) return 0;
+    for (int i = 0; i < count; i++) {
+        if (ids[i] == native) return 0;
+    }
+    *out = CGDisplayBounds(native);
+    return 1;
+}
+
+int mview_displays_arrange(const uint32_t *ids, int count, uint32_t width, uint32_t height) {
+    if (!ids || count <= 0 || count > MVIEW_MAX_LAYOUT_HEADS) {
         return -1;
+    }
+    for (int i = 0; i < count; i++) {
+        if (!ids[i]) {
+            return -1;
+        }
     }
     /* Leave a layout the user chose alone, and take a note of it: this is the only moment
        the heads are known to be seated the way the user wants them. */
-    if (heads_are_healthy(left_id, right_id)) {
-        remember_seats(left_id, right_id);
+    if (heads_are_healthy(ids, count)) {
+        remember_seats(ids, count);
         return 0;
     }
     CGDisplayConfigRef config;
@@ -272,40 +302,49 @@ int mview_displays_arrange(uint32_t left_id, uint32_t right_id, uint32_t width, 
      * display into an existing mirror set — with Sidecar active one head mirrored the
      * iPad, so the dock drove the iPad's framebuffer at the iPad's aspect ratio.
      */
-    detach_mirror_set(config, left_id);
-    detach_mirror_set(config, right_id);
+    for (int i = 0; i < count; i++) {
+        detach_mirror_set(config, ids[i]);
+    }
 
     int32_t x, y;
+    CGRect native;
     if (g_seated) {
         x = g_seat_x[0];
         y = g_seat_y[0];
+    } else if (native_external_bounds(ids, count, &native)) {
+        /* Immediately left of the natively attached panel, top-aligned with it. */
+        x = (int32_t)CGRectGetMinX(native) - (int32_t)width * count;
+        y = (int32_t)CGRectGetMinY(native);
     } else {
         /*
          * Side by side above the main display. macOS otherwise appends each new display to
-         * the end of one long row, which puts the two dock heads nowhere near each other and
+         * the end of one long row, which puts the dock heads nowhere near each other and
          * nowhere near where they physically sit.
          */
         CGRect main = CGDisplayBounds(CGMainDisplayID());
         x = (int32_t)CGRectGetMidX(main) - (int32_t)width;
         y = (int32_t)CGRectGetMinY(main) - (int32_t)height;
     }
-    /* Whole pixels, and the right head exactly one width along: a gap or an overlap of even
-       one pixel is a seam the cursor catches on. */
-    CGConfigureDisplayOrigin(config, left_id, x, y);
-    CGConfigureDisplayOrigin(config, right_id, x + (int32_t)width, y);
+    /* Whole pixels, each head exactly one width along from the last: a gap or an overlap of
+       even one pixel is a seam the cursor catches on. */
+    for (int i = 0; i < count; i++) {
+        CGConfigureDisplayOrigin(config, ids[i], x + (int32_t)width * i, y);
+    }
     if (CGCompleteDisplayConfiguration(config, kCGConfigurePermanently) != kCGErrorSuccess) {
         return -1;
     }
-    g_seat_x[0] = x;
-    g_seat_y[0] = y;
-    g_seat_x[1] = x + (int32_t)width;
-    g_seat_y[1] = y;
+    for (int i = 0; i < count; i++) {
+        g_seat_x[i] = x + (int32_t)width * i;
+        g_seat_y[i] = y;
+    }
     g_seated = 1;
     return 0;
 }
 
 struct WatchState {
-    uint32_t left, right, width, height;
+    uint32_t ids[MVIEW_MAX_LAYOUT_HEADS];
+    int count;
+    uint32_t width, height;
 };
 static struct WatchState g_watch;
 
@@ -318,7 +357,7 @@ static void reconfigured(CGDirectDisplayID display, CGDisplayChangeSummaryFlags 
     if (flags & kCGDisplayBeginConfigurationFlag) {
         return;
     }
-    if (!g_watch.left || !g_watch.right) {
+    if (g_watch.count <= 0) {
         return;
     }
     struct WatchState watch = g_watch;
@@ -326,13 +365,20 @@ static void reconfigured(CGDirectDisplayID display, CGDisplayChangeSummaryFlags 
        in place until the last of them. Re-asserting a beat later sees the final state. */
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 400 * NSEC_PER_MSEC),
                    dispatch_get_main_queue(), ^{
-                     mview_displays_arrange(watch.left, watch.right, watch.width, watch.height);
+                     struct WatchState settled = watch;
+                     mview_displays_arrange(settled.ids, settled.count, settled.width,
+                                            settled.height);
                    });
 }
 
-void mview_displays_watch(uint32_t left_id, uint32_t right_id, uint32_t width, uint32_t height) {
-    g_watch.left = left_id;
-    g_watch.right = right_id;
+void mview_displays_watch(const uint32_t *ids, int count, uint32_t width, uint32_t height) {
+    if (!ids || count <= 0 || count > MVIEW_MAX_LAYOUT_HEADS) {
+        return;
+    }
+    for (int i = 0; i < count; i++) {
+        g_watch.ids[i] = ids[i];
+    }
+    g_watch.count = count;
     g_watch.width = width;
     g_watch.height = height;
     static int registered;

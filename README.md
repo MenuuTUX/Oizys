@@ -4,12 +4,13 @@ An open userspace driver for the DisplayLink Ridge dock. It presents two 1920×1
 displays to macOS, captures them, and encodes the result as Ridge colour strips over USB
 without loading DisplayLink Manager, vendor libraries, or firmware.
 
-The runtime is C. Objective-C appears only where Apple ships no C interface: IOUSBHost,
-CGVirtualDisplay, and ScreenCaptureKit. There is no Swift, no C++, and no Rust.
+The driver, encoder and recovery supervisor are C. The menu-bar app is Swift. Objective-C++ adapters call IOUSBHost, CGVirtualDisplay,
+ScreenCaptureKit, and Foundation. Renaming these adapters to `.mm` retains the Objective-C
+runtime calls required by Apple's APIs; it does not remove Objective-C or accelerate them.
 
 ## Overview
 
-The measured dock is USB `17e9:6000`, whose type-`0x40` configuration record names
+The measured ACASIS DS-0602 (DL-6950) adapter is USB `17e9:6000`; its type-`0x40` configuration record names
 `RidgeDoc`. Two Dell P2219H monitors sit on logical selectors `1` and `3`, with video
 endpoints `0x08` and `0x0b`.
 
@@ -32,23 +33,62 @@ the built binary. The encoder is NEON and is compiled for the host core.
 xcodebuild -project MView.xcodeproj -scheme mview -configuration Release build
 ```
 
-Or open `MView.xcodeproj`. Three targets: `MViewCore` is the static library, `mview` the
-command-line tool, and `MViewCoreDylib` the same sources as a dylib for the test suite to
-drive. Build settings live in `Configs/*.xcconfig` rather than inside the project file, so
+For the standalone Swift menu-bar app:
+
+```bash
+python3 Tools/build_app.py
+open build/Release/MView.app
+```
+
+Grant **MView** Screen Recording access, then use its Start/Stop button. Launch the bundle
+with `open` or Finder so macOS attributes capture to MView, rather than a terminal or the
+app that launched a bare executable. The bundle contains a Swift `MView` executable and a
+separate C `MViewDriver` helper. Diagnostics are in
+`~/Library/Application Support/MView/logs/`. This is an ad-hoc development build; a new
+build can require permission again. Distribution signing and notarization are not set up.
+
+Or open `MView.xcodeproj`. Two targets: `mview` is the command-line tool and
+`MViewCoreDylib` builds the core sources as a dylib for the test suite to drive.
+Build settings live in `Configs/*.xcconfig` rather than inside the project file, so
 a setting is reviewable in a diff and the IDE and command line cannot drift apart.
 
 ## Running
 
 ```bash
 build/Release/mview probe                      # identify the hub, read-only
+build/Release/mview routes                     # configured routes and native I2C matches, read-only
 build/Release/mview diagnose --takeover        # authenticate both heads, read EDIDs
 build/Release/mview verify --takeover          # measured pattern proof
-build/Release/mview run --takeover             # forward two desktops
+build/Release/mview run --takeover --stats     # one diagnostic session with capture metrics
+build/Release/mview serve --takeover --stats   # recover MView sessions after failures
 build/Release/mview confirm                    # record that you saw both panels
 ```
 
 `--takeover` stops DisplayLink Manager before claiming the USB interfaces; bounded commands
-restore it when they finish and `run` restores it on Ctrl-C.
+restore it when they finish and `run` restores it on Ctrl-C. `serve` owns a separate C
+worker, restarts MView after faults, and waits for a disconnected dock to return. It does
+not launch DisplayLink for recovery. On Stop it restores DisplayLink only if it was running
+before takeover. Virtual displays are recreated during recovery, so applications may move
+windows during that gap.
+
+## Dock and native routing
+
+Both Dell HDMI connections currently use the Ridge USB graphics path. Disabling one with
+`heads.active` stops MView driving that output. It does not connect it to the Mac's GPU.
+`heads.native` describes an intended native connection and cannot switch the dock's wiring.
+An explicit native configuration is checked before `run`, `patterns`, or `verify` stops
+DisplayLink Manager. Overlapping dock/native selections and unverified native connections
+are rejected.
+
+A hybrid setup needs a physical native route through USB-C DisplayPort Alt Mode or
+Thunderbolt. A dock can provide that alongside DisplayLink only if it has the additional
+hardware. The identified ACASIS adapter advertises both HDMI outputs through DisplayLink,
+with no separate native output. See [the routing investigation](Documentation/Routing.md).
+
+`mview ddc list` reports native I2C services matched to a unique online monitor EDID.
+DDC reads and writes over this backend still need validation on a natively connected
+monitor. Ridge USB DDC tunnelling is not implemented. The Swift app currently provides connection,
+recovery status, permission guidance and diagnostics; it does not yet expose monitor settings.
 
 ## Verification
 
@@ -89,6 +129,16 @@ See [Documentation/Testing.md](Documentation/Testing.md).
 
 ## Profiling
 
+`run --takeover --stats` reports capture cadence, pending-frame replacements, processing
+time and capture timestamp age when USB submission finishes. These do not measure panel
+latency. `--profile` additionally instruments the inner codec loops and has measurable
+overhead; do not use it for a CPU comparison against the vendor.
+
+Frame PNG/binary dumps are off by default. Set `capture.dump_frames` only for an explicit
+diagnostic capture: files in `logs/` can contain private screen content, including failure
+dumps. Normal operation does not write pixel dumps.
+
+
 ```bash
 python3 Tools/profile.py
 python3 Tools/profile.py --save baseline.json
@@ -101,8 +151,11 @@ comparison are in Python.
 
 ## Performance
 
-Everything outside the scanout path is USB latency. On a captured 1920×1080 desktop with
-the localised damage a moving cursor and a dragged window produce:
+See [the hardware comparison and recovery report](Documentation/Performance-2026-08-30.md)
+for the current motion workload, CPU/RSS measurements, and physical-test status. The table
+below is an earlier encoder microbenchmark, not an end-to-end latency measurement.
+
+Earlier measurements used a 1920×1080 desktop with cursor and window damage:
 
 | stage | at the start | now |
 | --- | --- | --- |
@@ -135,7 +188,8 @@ straight back.
 Configs/            xcconfig build settings
 Documentation/      architecture, protocol and testing notes
 Sources/MViewCore/  the driver
-Sources/mview/      command-line entry point
+Sources/mview/      command-line entry point and C supervisor
+Sources/MViewApp/   native Swift menu-bar app
 Tests/              pytest suites and the numpy reference model
 Tools/              build, test, profile and mutation scripts
 ```

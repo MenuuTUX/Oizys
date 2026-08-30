@@ -14,12 +14,13 @@ ScreenCaptureKit  ->  damage ledger  ->  strip encoder  ->  sealed frames  ->  U
 
 ## Transport
 
-`usb_session.m` claims `IOUSBHostInterface` ff/00/03 exclusively, which is what stops
+`usb_session.mm` claims `IOUSBHostInterface` ff/00/03 exclusively, which is what stops
 DisplayLink Manager reclaiming the dock mid-run. A frame goes out as a single bulk
-transfer; splitting one across transfers halts the endpoint. When a frame's length is a
-multiple of 1024 a zero-length packet terminates it.
+request, including lengths divisible by 1024. Splitting a frame or appending a separate
+zero-length request is not supported. The extra request was followed by resets in motion
+tests on this dock; removing it passed the subsequent sustained tests.
 
-`log.c` writes every control exchange to `logs/run.log`. The log is the only record of what
+`log.c` records control exchanges to `logs/run.log`. The log is the only record of what
 the dock actually said, and several of this driver's bugs were only visible there.
 
 ## Protocol
@@ -71,12 +72,54 @@ statement of the format.
 
 ## Display
 
-`display.m` wraps `CGVirtualDisplay`, and also seats the two heads side by side above the
+`display.mm` wraps `CGVirtualDisplay`, and also seats the two heads side by side above the
 main display and breaks any mirror set macOS folded them into. Both are necessary: macOS
 appends new displays to the end of one row, and with Sidecar active it mirrored a head to
 an iPad, so the dock drove the iPad's framebuffer at the iPad's aspect ratio. A pair the
 user has already arranged as a contiguous block is left alone.
 
-`capture.m` runs the ScreenCaptureKit streams and the refresh clock. ScreenCaptureKit
+`capture.mm` runs the ScreenCaptureKit streams and the refresh clock. ScreenCaptureKit
 delivers frames only on change and stops entirely on a still desktop, so the clock carries
 both the control session's cadence and any transmission debt a strip still owes.
+
+
+Capture ingestion and encoding use separate serial queues. Ingestion retains at most one
+pending complete frame per head; a newer frame replaces it while encoding is busy. Idle,
+blank and suspended callbacks do not resend a stale surface. Both heads share one encoder
+queue because the protocol state is not thread-safe. The refresh timer repays cached strip
+debt only after two capture periods without a fresh presentation.
+
+## Recovery
+
+`mview serve --takeover` keeps a small C supervisor separate from the capture/USB worker.
+It restarts MView after worker failures, waits while the dock is absent or ambiguous, and
+uses a 1–8 second retry backoff. A worker must start within 45 seconds and then report its
+health every second; 15 seconds without a report triggers shutdown. Shutdown gets 10
+seconds before the supervisor terminates an unresponsive worker. No encoding runs in the
+supervisor, and no vendor binary is used for recovery.
+
+A per-user file lock prevents duplicate services. Screen Recording permission and head
+selection are checked before takeover. Stopping the service restores DisplayLink only if
+it was running beforehand. `run --takeover` remains the single-session diagnostic command
+and restores DisplayLink when it ends.
+
+This first recovery implementation recreates virtual displays when its worker restarts;
+applications may move windows during that gap. Preserving virtual-display identity and
+window placement across worker replacement remains work for the persistent display host.
+The menu-bar user interface is Swift; capture/framework adapters are Objective-C++, and
+protocol, encoding and process supervision are C. The encoder uses ARM CRC instructions
+and NEON intrinsics where measured.
+
+
+## App and privacy identity
+
+`Sources/MViewApp/Main.swift` owns the menu-bar controls and starts the bundled
+`MViewDriver` supervisor with `Process`. It receives text status, not pixels. The capture
+path stays in the C/Objective-C++ worker. `Tools/build_app.py` creates `MView.app`, which
+must be launched through LaunchServices or Finder to establish its own app identity.
+
+The Swift executable is named `MView`; the helper is `MViewDriver`. They cannot be named
+`MView` and `mview`, since those collide on the usual case-insensitive macOS filesystem.
+App Stop allows the C supervisor to clean up; Quit waits for that cleanup. A bounded
+benchmark launch (`open MView.app --args --benchmark`) starts after permission and stops
+the driver automatically 75 seconds after it first becomes ready.

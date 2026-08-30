@@ -1,10 +1,15 @@
 #include "mview.h"
 #include "mview_capture.h"
 #include "mview_profile.h"
+#include "supervisor.h"
 
 #include <CoreGraphics/CoreGraphics.h>
 
 #include <dispatch/dispatch.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <limits.h>
+#include <mach-o/dyld.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -89,14 +94,20 @@ static void iso8601_now(char *out, size_t capacity) {
 static void print_usage(void) {
     puts("mview — open-source DisplayLink Ridge driver (C)\n\n"
          "  mview probe              identify the USB hub (read-only)\n"
+         "  mview routes             report configured heads and native I2C paths (read-only)\n"
          "  mview displays           two 1920x1080 virtual heads until Ctrl-C\n"
          "  mview diagnose --takeover  authenticate both heads and read physical EDIDs\n"
          "  mview patterns --takeover [--seconds N]  unique physical test patterns\n"
          "  mview verify --takeover [--seconds N]  measured pattern proof -> logs/verify.json\n"
          "  mview bench              encoder throughput on a synthetic surface\n"
          "  mview profile            per-zone profile of a scanout sequence\n"
-         "  mview run --takeover [--profile]  stop DLM and forward two Haar-encoded desktops\n"
+         "  mview run --takeover [--stats | --profile]  forward two encoded desktops\n"
+         "                           --stats: capture cadence/age; --profile: fine codec timing\n"
+         "  mview serve --takeover [--stats]  restart MView after faults or reconnects\n"
          "  mview confirm            you looked at both panels and they were right\n\n"
+         "  mview config list | get <key> | set <key> <value> | reset | selftest\n"
+         "  mview ddc list | caps | dump | get <code> | set <code> <value>\n"
+         "                           monitor menu over DDC/CI (needs a native display pipe)\n\n"
          "  overall_pass in logs/verify.json is only ever set by `mview confirm`,\n"
          "  or by --confirmed on patterns/verify. Nothing this process can measure\n"
          "  distinguishes a faithfully encoded black frame from a broken encoder.\n\n"
@@ -143,24 +154,104 @@ static MViewVirtualDisplay *make_head(const char *name, uint32_t serial) {
  * so a colliding pair kept open while a fresh pair is created walks the new heads onto free
  * units, and they keep those units once the old pair is released.
  */
-static int make_head_pair(MViewVirtualDisplay **left, MViewVirtualDisplay **right) {
-    *left = make_head("MView Left", 0x4d560001);
-    *right = make_head("MView Right", 0x4d560002);
-    if (!*left || !*right) {
-        mview_virtual_display_destroy(*left);
-        mview_virtual_display_destroy(*right);
-        *left = *right = NULL;
+/* Physical head indices driven over USB. An omitted head is disabled here; this does
+   not switch a dock HDMI port to a native GPU connection. */
+static int active_heads(int *out) {
+    int count = 0;
+    for (int head = 0; head < MVIEW_HEADS; head++) {
+        if (mview_config_head_active(head)) {
+            out[count++] = head;
+        }
+    }
+    return count;
+}
+
+static const char *HEAD_NAME[MVIEW_HEADS] = {"MView Left", "MView Right"};
+static const uint32_t HEAD_SERIAL[MVIEW_HEADS] = {0x4d560001, 0x4d560002};
+static const char *SPARE_NAME[MVIEW_HEADS] = {"MView Spare A", "MView Spare B"};
+static const uint32_t SPARE_SERIAL[MVIEW_HEADS] = {0xdead0001, 0xdead0002};
+
+/* Check before takeover so an impossible route does not blank the user's displays. */
+static int check_native_route(void) {
+    const MViewConfig *config = mview_config();
+    if (config->heads_native < 0) return 1;
+    if (mview_config_head_active(config->heads_native)) {
+        fputs("heads.native overlaps heads.active; select distinct dock and native heads\n", stderr);
+        return 0;
+    }
+    if (!mview_ddc_native_display_id()) {
+        fputs("cannot verify the native display requested by heads.native; leaving DisplayLink "
+              "Manager untouched\n"
+              "heads.native cannot reroute a DisplayLink HDMI port. A native connection must\n"
+              "already exist. Run `mview routes` to inspect the current setup.\n", stderr);
+        return 0;
+    }
+    return 1;
+}
+
+static int cmd_routes(void) {
+    const MViewConfig *config = mview_config();
+    for (int head = 0; head < MVIEW_HEADS; head++) {
+        printf("%s: %s\n", HEAD_NAME[head], mview_config_head_active(head)
+               ? "virtual desktop -> capture/encode -> DisplayLink USB -> dock output"
+               : "disabled on the dock; no native route is created by this setting");
+    }
+    printf("heads.native: %s\n\n", config->heads_native < 0 ? "none"
+                                                    : HEAD_NAME[config->heads_native]);
+    mview_ddc_list(stdout);
+    puts("\nBoth dock HDMI outputs may use DisplayLink. A native output requires a physical\n"
+         "GPU path through DP Alt Mode or Thunderbolt, possibly on a separate dock port.\n"
+         "DDC/CI monitor control does not change the video route.");
+    return check_native_route();
+}
+
+/* Indexed by physical head; a slot this run is not driving stays NULL. */
+static void destroy_heads(MViewVirtualDisplay **heads) {
+    for (int head = 0; head < MVIEW_HEADS; head++) {
+        mview_virtual_display_destroy(heads[head]);
+        heads[head] = NULL;
+    }
+}
+
+static int create_heads(MViewVirtualDisplay **heads, const int *active, int count,
+                        const char *const *names, const uint32_t *serials) {
+    for (int i = 0; i < count; i++) {
+        heads[active[i]] = make_head(names[active[i]], serials[active[i]]);
+        if (!heads[active[i]]) {
+            destroy_heads(heads);
+            return -1;
+        }
+    }
+    return 0;
+}
+
+static int any_head_unit_shared(MViewVirtualDisplay **heads, const int *active, int count) {
+    for (int i = 0; i < count; i++) {
+        if (mview_display_unit_is_shared(mview_virtual_display_id(heads[active[i]]))) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static int make_heads(MViewVirtualDisplay **heads) {
+    int active[MVIEW_HEADS];
+    int count = active_heads(active);
+    if (count == 0) {
+        fputs("heads.active selects no head; nothing to drive over the dock\n", stderr);
+        return -1;
+    }
+    if (create_heads(heads, active, count, HEAD_NAME, HEAD_SERIAL) != 0) {
         return -1;
     }
     /* macOS needs a moment to publish a freshly created virtual display before its bounds,
        mode and unit number can be read. */
     sleep_seconds(0.5);
-    if (!mview_display_unit_is_shared(mview_virtual_display_id(*left)) &&
-        !mview_display_unit_is_shared(mview_virtual_display_id(*right))) {
+    if (!any_head_unit_shared(heads, active, count)) {
         return 0;
     }
     printf("  a head landed on a display unit another display already holds; "
-           "recreating both on free units\n");
+           "recreating on free units\n");
     /*
      * Decoys go first and take the contested low units, so the heads that follow are given
      * free ones and keep them after the decoys are released. The decoys are the pair that
@@ -168,26 +259,24 @@ static int make_head_pair(MViewVirtualDisplay **left, MViewVirtualDisplay **righ
      * vendor, product and serial, so the heads the user actually arranges have to keep
      * theirs or their positions come back as defaults every session.
      */
-    mview_virtual_display_destroy(*left);
-    mview_virtual_display_destroy(*right);
-    *left = *right = NULL;
-    MViewVirtualDisplay *decoy_left = make_head("MView Spare A", 0xdead0001);
-    MViewVirtualDisplay *decoy_right = make_head("MView Spare B", 0xdead0002);
+    destroy_heads(heads);
+    MViewVirtualDisplay *decoys[MVIEW_HEADS] = {NULL, NULL};
+    /* Decoys take every contested unit, not just the ones this run needs, so a head that
+       would have landed on one is pushed past it. */
+    int all[MVIEW_HEADS];
+    for (int head = 0; head < MVIEW_HEADS; head++) {
+        all[head] = head;
+    }
+    (void)create_heads(decoys, all, MVIEW_HEADS, SPARE_NAME, SPARE_SERIAL);
     sleep_seconds(0.5);
-    *left = make_head("MView Left", 0x4d560001);
-    *right = make_head("MView Right", 0x4d560002);
+    int created = create_heads(heads, active, count, HEAD_NAME, HEAD_SERIAL);
     sleep_seconds(0.5);
-    mview_virtual_display_destroy(decoy_left);
-    mview_virtual_display_destroy(decoy_right);
-    if (!*left || !*right) {
-        mview_virtual_display_destroy(*left);
-        mview_virtual_display_destroy(*right);
-        *left = *right = NULL;
+    destroy_heads(decoys);
+    if (created != 0) {
         return -1;
     }
     sleep_seconds(0.5);
-    if (mview_display_unit_is_shared(mview_virtual_display_id(*left)) ||
-        mview_display_unit_is_shared(mview_virtual_display_id(*right))) {
+    if (any_head_unit_shared(heads, active, count)) {
         fputs("a head is still sharing a display unit; ScreenCaptureKit will scan out the "
               "wrong desktop\n",
               stderr);
@@ -218,26 +307,61 @@ static void report_head_modes(const uint32_t *ids, int count) {
     for (int head = 0; head < count; head++) {
         uint32_t width = 0, height = 0;
         double hz = 0;
+        if (!ids[head]) {
+            continue;
+        }
         if (mview_display_mode(ids[head], &width, &height, &hz) == 0) {
             printf("  head %d: %ux%u @ %.1f Hz\n", head, width, height, hz == 0 ? 60.0 : hz);
         }
     }
 }
 
+/* CGDirectDisplayIDs indexed by physical head; a head this run is not driving is 0.
+   Returns how many heads are being driven. */
+static int head_display_ids(MViewVirtualDisplay **heads, uint32_t *ids) {
+    int count = 0;
+    for (int head = 0; head < MVIEW_HEADS; head++) {
+        ids[head] = heads[head] ? mview_virtual_display_id(heads[head]) : 0;
+        count += ids[head] != 0;
+    }
+    return count;
+}
+
+/* The driven ids, packed left to right, for the layout code. */
+static int packed_display_ids(const uint32_t *ids, uint32_t *packed) {
+    int count = 0;
+    for (int head = 0; head < MVIEW_HEADS; head++) {
+        if (ids[head]) {
+            packed[count++] = ids[head];
+        }
+    }
+    return count;
+}
+
+static int arrange_heads(const uint32_t *ids) {
+    uint32_t packed[MVIEW_HEADS];
+    int count = packed_display_ids(ids, packed);
+    return count ? mview_displays_arrange(packed, count, MVIEW_HEAD_W, MVIEW_HEAD_H) : -1;
+}
+
 static void cmd_displays(void) {
-    puts("creating two 1920x1080@60 virtual displays (CGVirtualDisplay)");
+    puts("creating 1920x1080@60 virtual displays (CGVirtualDisplay) for heads.active");
     puts("they live only while this process runs — Ctrl-C to drop them");
-    MViewVirtualDisplay *left = NULL, *right = NULL;
+    static MViewVirtualDisplay *heads[MVIEW_HEADS];
     mview_displays_snapshot();
-    if (make_head_pair(&left, &right) != 0) {
+    if (make_heads(heads) != 0) {
         fputs("CGVirtualDisplay failed\n", stderr);
         exit(1);
     }
-    uint32_t ids[MVIEW_HEADS] = {mview_virtual_display_id(left), mview_virtual_display_id(right)};
-    printf("  MView Left   CGDirectDisplayID %u\n", ids[0]);
-    printf("  MView Right  CGDirectDisplayID %u\n", ids[1]);
+    uint32_t ids[MVIEW_HEADS];
+    head_display_ids(heads, ids);
+    for (int head = 0; head < MVIEW_HEADS; head++) {
+        if (ids[head]) {
+            printf("  %-12s CGDirectDisplayID %u\n", HEAD_NAME[head], ids[head]);
+        }
+    }
     mview_displays_restore();
-    mview_displays_arrange(ids[0], ids[1], MVIEW_HEAD_W, MVIEW_HEAD_H);
+    arrange_heads(ids);
     report_head_modes(ids, MVIEW_HEADS);
     report_sidecar_displays();
 
@@ -245,8 +369,7 @@ static void cmd_displays(void) {
     dispatch_source_t interrupt =
         dispatch_source_create(DISPATCH_SOURCE_TYPE_SIGNAL, SIGINT, 0, dispatch_get_main_queue());
     dispatch_source_set_event_handler(interrupt, ^{
-      mview_virtual_display_destroy(left);
-      mview_virtual_display_destroy(right);
+      destroy_heads(heads);
       puts("virtual displays released");
       exit(0);
     });
@@ -343,23 +466,39 @@ static int write_verification(MViewSession *session, MViewDriver *driver,
     MViewHeadStatus heads[MVIEW_HEADS];
     int head_valid[MVIEW_HEADS];
     int head_pass[MVIEW_HEADS];
+    /* Only heads this run actually drove over the dock. One left on a real display pipe has
+       no EDID, no video writes and no capture stream, and none of that is a failure. */
     int heads_pass = 1;
+    int driven_heads = 0;
     for (int head = 0; head < MVIEW_HEADS; head++) {
         memset(&heads[head], 0, sizeof(heads[head]));
+        if (!mview_config_head_active(head)) {
+            head_valid[head] = 0;
+            head_pass[head] = 0;
+            continue;
+        }
+        driven_heads++;
         head_valid[head] = mview_driver_get_head(driver, (uint8_t)head, &heads[head]) == 0;
         head_pass[head] = head_valid[head] && heads[head].authenticated && heads[head].present &&
                           heads[head].edid_len >= 256 && strcmp(heads[head].manufacturer, "DEL") == 0;
         heads_pass = heads_pass && head_pass[head];
     }
+    heads_pass = heads_pass && driven_heads > 0;
 
     unsigned head0_writes = native_valid ? native.video_writes[0] : 0;
     unsigned head1_writes = native_valid ? native.video_writes[1] : 0;
-    int video_pass = head0_writes > 0 && head1_writes > 0;
+    int video_pass = 1;
+    for (int head = 0; head < MVIEW_HEADS; head++) {
+        if (mview_config_head_active(head)) {
+            video_pass = video_pass && (native_valid && native.video_writes[head] > 0);
+        }
+    }
     int capture_pass = 1;
     if (capture_frames) {
-        capture_pass = capture_head_count == MVIEW_HEADS;
-        for (int head = 0; head < capture_head_count; head++) {
-            capture_pass = capture_pass && capture_frames[head] > 0;
+        for (int head = 0; head < capture_head_count && head < MVIEW_HEADS; head++) {
+            if (mview_config_head_active(head)) {
+                capture_pass = capture_pass && capture_frames[head] > 0;
+            }
         }
     }
     int identity_pass = identity_valid && strcmp(identity.platform, "RidgeDoc") == 0;
@@ -398,7 +537,8 @@ static int write_verification(MViewSession *session, MViewDriver *driver,
                 head_valid[head] ? heads[head].edid_len : (size_t)0);
         fputs("\"manufacturer\": ", file);
         json_puts(file, head_valid[head] ? heads[head].manufacturer : "");
-        fprintf(file, ", \"pass\": %s}%s\n", json_bool(head_pass[head]),
+        fprintf(file, ", \"driven_over_dock\": %s, \"pass\": %s}%s\n",
+                json_bool(mview_config_head_active(head)), json_bool(head_pass[head]),
                 head + 1 < MVIEW_HEADS ? "," : "");
     }
     fputs("  ],\n", file);
@@ -503,6 +643,7 @@ static int cmd_patterns(int takeover, int seconds, int confirmed) {
         puts("re-run: mview patterns --takeover --seconds 90");
         return 0;
     }
+    if (!check_native_route()) return 0;
     ensure_logs_dir();
     mview_log_open("logs/native-patterns.log");
     puts("stopping DisplayLink Manager and claiming the Ridge dock…");
@@ -521,6 +662,10 @@ static int cmd_patterns(int takeover, int seconds, int confirmed) {
         goto release;
     }
     for (int head = 0; head < MVIEW_HEADS; head++) {
+        if (!mview_config_head_active(head)) {
+            printf("head %d is disabled on the dock; no video sent\n", head);
+            continue;
+        }
         if (mview_driver_fetch_edid(driver, (uint8_t)head) != 0) {
             fprintf(stderr, "head %d did not return a valid physical EDID\n", head);
             goto destroy;
@@ -535,12 +680,17 @@ static int cmd_patterns(int takeover, int seconds, int confirmed) {
     time_t deadline = time(NULL) + (seconds > 0 ? seconds : 1);
     int phase = 0;
     while (time(NULL) < deadline) {
-        uint8_t h0[3] = {phase ? 0 : 255, 0, phase ? 255 : 0};
-        uint8_t h1[3] = {phase ? 255 : 0, 255, 0};
-        if (mview_driver_present_solid(driver, 0, h0[0], h0[1], h0[2]) < 0 ||
-            mview_driver_present_solid(driver, 1, h1[0], h1[1], h1[2]) < 0) {
-            fputs("video presentation failed; see logs/native-patterns.log\n", stderr);
-            goto destroy;
+        uint8_t colour[MVIEW_HEADS][3] = {{(uint8_t)(phase ? 0 : 255), 0, (uint8_t)(phase ? 255 : 0)},
+                                          {(uint8_t)(phase ? 255 : 0), 255, 0}};
+        for (int head = 0; head < MVIEW_HEADS; head++) {
+            if (!mview_config_head_active(head)) {
+                continue;
+            }
+            if (mview_driver_present_solid(driver, (uint8_t)head, colour[head][0], colour[head][1],
+                                           colour[head][2]) < 0) {
+                fputs("video presentation failed; see logs/native-patterns.log\n", stderr);
+                goto destroy;
+            }
         }
         phase = !phase;
         sleep_seconds(1);
@@ -557,14 +707,14 @@ release:
     return ok;
 }
 
-/* run() owns these so the signal and watchdog handlers can tear down from any thread. */
+/* Startup owns these until dispatch_main; signal/watchdog teardown then stays on main. */
 static struct {
     MViewCapture *capture;
-    MViewVirtualDisplay *left;
-    MViewVirtualDisplay *right;
+    MViewVirtualDisplay *heads[MVIEW_HEADS];
     MViewDriver *driver;
     MViewSession *session;
     int shutting_down;
+    int supervisor_fd;
 } g_run;
 
 static void run_shutdown(const char *reason, int code) {
@@ -577,9 +727,7 @@ static void run_shutdown(const char *reason, int code) {
         mview_capture_stop(g_run.capture);
         g_run.capture = NULL;
     }
-    mview_virtual_display_destroy(g_run.left);
-    mview_virtual_display_destroy(g_run.right);
-    g_run.left = g_run.right = NULL;
+    destroy_heads(g_run.heads);
     if (g_run.driver) {
         mview_driver_destroy(g_run.driver);
         g_run.driver = NULL;
@@ -588,38 +736,59 @@ static void run_shutdown(const char *reason, int code) {
         mview_session_close(g_run.session);
         g_run.session = NULL;
     }
-    mview_start_displaylink();
-    puts("released hub, DisplayLink Manager relaunched");
+    if (g_run.supervisor_fd < 0) {
+        mview_start_displaylink();
+        puts("released hub, DisplayLink Manager relaunched");
+    } else {
+        close(g_run.supervisor_fd);
+        puts("released hub; MView supervisor owns recovery");
+    }
     exit(code);
 }
 
-static int cmd_run(int takeover, int profile) {
+static int cmd_run(int takeover, int profile, int stats, int supervisor_fd) {
     if (!takeover) {
         puts("refusing to claim USB while DisplayLink Manager may own it");
         puts("re-run: mview run --takeover");
         return 0;
     }
+    if (!check_native_route()) return 0;
+    g_run.supervisor_fd = supervisor_fd;
+    if (supervisor_fd >= 0) signal(SIGPIPE, SIG_IGN);
     ensure_logs_dir();
     mview_log_open("logs/run.log");
     puts("logging to logs/run.log");
-    puts("stopping DisplayLink Manager…");
-    mview_stop_displaylink();
-    sleep_seconds(0.6);
+    if (supervisor_fd < 0) {
+        puts("stopping DisplayLink Manager…");
+        mview_stop_displaylink();
+        sleep_seconds(0.6);
+    }
 
     g_run.session = mview_session_open(1);
     if (!g_run.session) {
         fputs("failed to claim IOUSBHostInterface ff/00/03\n", stderr);
-        mview_start_displaylink();
+        if (supervisor_fd < 0) mview_start_displaylink();
         return 0;
     }
     g_run.driver = mview_driver_engage(g_run.session, 0x6000);
     if (!g_run.driver) {
         fputs("native encrypted-session engagement failed; see logs/run.log\n", stderr);
         mview_session_close(g_run.session);
-        mview_start_displaylink();
+        if (supervisor_fd < 0) mview_start_displaylink();
         return 0;
     }
+    /*
+     * Only the heads this run drives over the dock. An omitted head is disabled here.
+     * Never getting its mode activated is exactly what keeps the encoder, the
+     * capture stream and the video endpoint off it -- mview_driver_present_bgra_mosaic and
+     * mview_driver_refresh_head both refuse a head that was never armed.
+     */
     for (int head = 0; head < MVIEW_HEADS; head++) {
+        if (!mview_config_head_active(head)) {
+            printf("head %d (%s) is disabled on the dock; no video sent\n",
+                   head, HEAD_NAME[head]);
+            continue;
+        }
         if (mview_driver_fetch_edid(g_run.driver, (uint8_t)head) != 0 ||
             mview_driver_activate_1080p60(g_run.driver, (uint8_t)head) != 0) {
             fprintf(stderr, "physical head %d failed EDID or mode activation; see logs/run.log\n",
@@ -630,17 +799,18 @@ static int cmd_run(int takeover, int profile) {
     /* Creating virtual displays re-lays-out the whole desktop, the iPad included. Take the
        arrangement first so it can be put back. */
     mview_displays_snapshot();
-    if (make_head_pair(&g_run.left, &g_run.right) != 0) {
+    if (make_heads(g_run.heads) != 0) {
         fputs("could not create the MView CGVirtualDisplays on unshared display units\n", stderr);
         run_shutdown("aborting", 1);
     }
-    uint32_t ids[MVIEW_HEADS] = {mview_virtual_display_id(g_run.left),
-                                 mview_virtual_display_id(g_run.right)};
+    uint32_t ids[MVIEW_HEADS];
+    int driven = head_display_ids(g_run.heads, ids);
     mview_displays_restore();
-    if (mview_displays_arrange(ids[0], ids[1], MVIEW_HEAD_W, MVIEW_HEAD_H) != 0) {
+    if (arrange_heads(ids) != 0) {
         fputs("could not seat the MView heads; check System Settings > Displays\n", stderr);
     }
-    printf("physical endpoints trained; virtual displays %u, %u\n", ids[0], ids[1]);
+    printf("physical endpoints trained; %d virtual display%s (%u, %u)\n", driven,
+           driven == 1 ? "" : "s", ids[0], ids[1]);
     report_head_modes(ids, MVIEW_HEADS);
     /* Sidecar reports through several reconfiguration callbacks as it attaches and the
        mirror set is not in place until the last of them, so one arrange at startup can land
@@ -648,26 +818,31 @@ static int cmd_run(int takeover, int profile) {
     for (int attempt = 0; attempt < 5; attempt++) {
         int mirrored = 0;
         for (int head = 0; head < MVIEW_HEADS; head++) {
-            mirrored = mirrored || mview_display_is_mirrored(ids[head]);
+            mirrored = mirrored || (ids[head] && mview_display_is_mirrored(ids[head]));
         }
         if (!mirrored) {
             break;
         }
         sleep_seconds(0.4);
-        mview_displays_arrange(ids[0], ids[1], MVIEW_HEAD_W, MVIEW_HEAD_H);
+        arrange_heads(ids);
     }
     for (int head = 0; head < MVIEW_HEADS; head++) {
         /* Encoding a mirror would drive the dock with some other display's desktop, at that
            display's aspect ratio. */
-        if (mview_display_is_mirrored(ids[head])) {
+        if (ids[head] && mview_display_is_mirrored(ids[head])) {
             fprintf(stderr, "head %d is still in a mirror set; turn mirroring off for it\n", head);
             run_shutdown("aborting", 1);
         }
     }
-    mview_displays_watch(ids[0], ids[1], MVIEW_HEAD_W, MVIEW_HEAD_H);
+    uint32_t packed[MVIEW_HEADS];
+    mview_displays_watch(packed, packed_display_ids(ids, packed), MVIEW_HEAD_W, MVIEW_HEAD_H);
     report_sidecar_displays();
 
     puts("starting ScreenCaptureKit desktop forwarding…");
+    if (profile) {
+        mview_profile_reset();
+        mview_profile_enable(1);
+    }
     char capture_error[256] = "";
     g_run.capture =
         mview_capture_start(ids, MVIEW_HEADS, g_run.driver, capture_error, sizeof(capture_error));
@@ -679,7 +854,7 @@ static int cmd_run(int takeover, int profile) {
     for (int waited = 0; waited < 50; waited++) {
         int ready = 1;
         for (int head = 0; head < MVIEW_HEADS; head++) {
-            ready = ready && mview_capture_frames(g_run.capture, head) > 0;
+            ready = ready && (!ids[head] || mview_capture_frames(g_run.capture, head) > 0);
         }
         if (ready) {
             break;
@@ -688,24 +863,36 @@ static int cmd_run(int takeover, int profile) {
     }
     int frames[MVIEW_HEADS];
     for (int head = 0; head < MVIEW_HEADS; head++) {
-        frames[head] = mview_capture_frames(g_run.capture, head);
-        if (frames[head] == 0) {
-            fputs("ScreenCaptureKit delivered no initial frame for both heads\n", stderr);
+        frames[head] = ids[head] ? mview_capture_frames(g_run.capture, head) : 0;
+        if (ids[head] && frames[head] == 0) {
+            fprintf(stderr, "ScreenCaptureKit delivered no initial frame for head %d\n", head);
             run_shutdown("aborting", 1);
         }
     }
-    mview_capture_start_refresh_clock(g_run.capture, g_run.driver, MVIEW_HEADS, 100);
-    write_verification(g_run.session, g_run.driver,
-                       "head 0 MView Left Haar desktop; head 1 MView Right Haar desktop", frames,
-                       MVIEW_HEADS, 0);
+    mview_capture_start_refresh_clock(g_run.capture, g_run.driver, MVIEW_HEADS,
+                                      mview_config()->refresh_clock_hz);
+    char summary[160] = "";
+    for (int head = 0; head < MVIEW_HEADS; head++) {
+        if (ids[head]) {
+            snprintf(summary + strlen(summary), sizeof(summary) - strlen(summary),
+                     "%shead %d %s Haar desktop", summary[0] ? "; " : "", head, HEAD_NAME[head]);
+        }
+    }
+    write_verification(g_run.session, g_run.driver, summary, frames, MVIEW_HEADS, 0);
     puts("");
-    puts("live extended desktop active. Look at both Dells now:");
-    puts("  - each panel shows its own half of the desktop, not a copy of the other");
+    if (driven == MVIEW_HEADS) {
+        puts("live extended desktop active. Look at both Dells now:");
+        puts("  - each panel shows its own half of the desktop, not a copy of the other");
+    } else {
+        puts("live extended desktop active. Look at the dock-driven Dell now:");
+        puts("  - it shows its own part of the desktop, not a copy of another display");
+    }
     puts("  - dragging a window across updates without smearing or stale blocks");
     puts("  - the picture survives a still desktop for a minute (that is the keepalive)");
     puts("");
-    puts("Ctrl-C restores DisplayLink Manager. If both panels were right, then run:");
-    puts("  build/mview confirm");
+    puts(supervisor_fd < 0 ? "Ctrl-C restores DisplayLink Manager. If the panels were right, run:"
+                          : "MView owns recovery. Ctrl-C stops the service. To confirm the panels, run:");
+    puts("  build/Release/mview confirm");
 
     signal(SIGINT, SIG_IGN);
     signal(SIGTERM, SIG_IGN);
@@ -732,9 +919,13 @@ static int cmd_run(int takeover, int profile) {
           if (mview_capture_failure(g_run.capture, head)) {
               char reason[96];
               snprintf(reason, sizeof(reason),
-                       "head %d forwarding failed; restoring vendor driver", head);
+                       "head %d forwarding failed; releasing the session", head);
               run_shutdown(reason, 1);
           }
+      }
+      if (g_run.supervisor_fd >= 0 && write(g_run.supervisor_fd, ".", 1) < 0 &&
+          errno != EAGAIN && errno != EINTR) {
+          run_shutdown("MView supervisor disappeared", 1);
       }
     });
     dispatch_resume(watchdog);
@@ -744,9 +935,7 @@ static int cmd_run(int takeover, int profile) {
        serial queue, and it is the sum of their wall time against the wall clock that says
        whether that queue is saturated. */
     dispatch_source_t reporter = NULL;
-    if (profile) {
-        mview_profile_enable(1);
-        mview_profile_reset();
+    if (profile || stats) {
         reporter = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, main_queue);
         dispatch_source_set_timer(reporter, dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC),
                                   5 * NSEC_PER_SEC, 100 * NSEC_PER_MSEC);
@@ -757,8 +946,7 @@ static int cmd_run(int takeover, int profile) {
           int frames1 = mview_capture_frames(g_run.capture, 1);
           snprintf(title, sizeof(title), "5 s window %d — capture frames %d / %d", ++window,
                    frames0, frames1);
-          mview_profile_report(title);
-          mview_profile_reset();
+          mview_capture_profile_report(g_run.capture, title);
         });
         dispatch_resume(reporter);
     }
@@ -766,15 +954,187 @@ static int cmd_run(int takeover, int profile) {
     return 1;
 }
 
+static int cmd_config(int argc, char **argv) {
+    const char *action = argc > 0 ? argv[0] : "list";
+    if (strcmp(action, "list") == 0) {
+        mview_config_print(stdout);
+        return 1;
+    }
+    if (strcmp(action, "selftest") == 0) {
+        int failures = mview_config_selftest();
+        if (failures) {
+            fprintf(stderr, "config self-test: %d check(s) failed\n", failures);
+            return 0;
+        }
+        puts("config self-test passed");
+        return 1;
+    }
+    if (strcmp(action, "reset") == 0) {
+        if (mview_config_reset() != 0) {
+            return 0;
+        }
+        printf("removed %s\n", mview_config_path());
+        return 1;
+    }
+    if (strcmp(action, "get") == 0 && argc > 1) {
+        char value[64];
+        if (mview_config_get(argv[1], value, sizeof(value)) != 0) {
+            fprintf(stderr, "unknown key %s\n", argv[1]);
+            return 0;
+        }
+        puts(value);
+        return 1;
+    }
+    if (strcmp(action, "set") == 0 && argc > 2) {
+        int rc = mview_config_set(argv[1], argv[2]);
+        if (rc == -1) {
+            fprintf(stderr, "unknown key %s\n", argv[1]);
+            return 0;
+        }
+        if (rc == -2) {
+            fprintf(stderr, "%s will not take the value %s\n", argv[1], argv[2]);
+            return 0;
+        }
+        char stored[64];
+        mview_config_get(argv[1], stored, sizeof(stored));
+        printf("%s = %s\n", argv[1], stored);
+        return 1;
+    }
+    fputs("mview config list | get <key> | set <key> <value> | reset | selftest\n", stderr);
+    return 0;
+}
+
+static int worker_status_fd(int argc, char **argv) {
+    for (int i = 0; i < argc; i++) {
+        if (strncmp(argv[i], "--worker-fd=", 12)) continue;
+        char *end;
+        errno = 0;
+        long value = strtol(argv[i] + 12, &end, 10);
+        struct stat info;
+        if (errno || *end || value < 3 || value > INT_MAX ||
+            fstat((int)value, &info) || !S_ISFIFO(info.st_mode)) return -2;
+        fcntl((int)value, F_SETFD, FD_CLOEXEC);
+        return (int)value;
+    }
+    return -1;
+}
+
+static int cmd_serve(int takeover, int profile, int stats) {
+    if (!takeover) {
+        fputs("service takeover requires `mview serve --takeover`\n", stderr);
+        return 0;
+    }
+    if (!check_native_route()) return 0;
+    int active[MVIEW_HEADS];
+    if (!active_heads(active)) {
+        fputs("heads.active selects no head; leaving DisplayLink untouched\n", stderr);
+        return 0;
+    }
+    if (!CGPreflightScreenCaptureAccess()) {
+        fputs("Screen Recording permission is required before takeover; leaving DisplayLink untouched\n",
+              stderr);
+        CGRequestScreenCaptureAccess();
+        return 0;
+    }
+    char path[PATH_MAX], resolved[PATH_MAX];
+    uint32_t capacity = sizeof(path);
+    if (_NSGetExecutablePath(path, &capacity) || !realpath(path, resolved)) return 0;
+    return mview_supervise(resolved, profile, stats);
+}
+
+/* `0x10` or `16`; -1 when it is neither. */
+static int parse_vcp_code(const char *text) {
+    char *end = NULL;
+    long value = strtol(text, &end, 0);
+    if (end == text || *end || value < 0 || value > 0xff) {
+        return -1;
+    }
+    return (int)value;
+}
+
+static int cmd_ddc(int argc, char **argv) {
+    const char *action = argc > 0 ? argv[0] : "list";
+    if (strcmp(action, "list") == 0) {
+        mview_ddc_list(stdout);
+        return 1;
+    }
+    uint32_t id = mview_ddc_native_display_id();
+    if (!id) {
+        fputs("no display has an I2C path; run `mview ddc list`\n", stderr);
+        return 0;
+    }
+    MViewDDCDisplay *display = mview_ddc_open(id);
+    if (!display) {
+        fprintf(stderr, "display %u has no DDC/CI channel\n", id);
+        return 0;
+    }
+    int ok = 0;
+    if (strcmp(action, "caps") == 0) {
+        char caps[2048];
+        if (mview_ddc_capabilities(display, caps, sizeof(caps)) == 0 && caps[0]) {
+            printf("display %u capabilities:\n%s\n", id, caps);
+            ok = 1;
+        } else {
+            fputs("the display did not answer a capabilities request\n", stderr);
+        }
+    } else if (strcmp(action, "dump") == 0) {
+        printf("display %u, standard MCCS features it answers:\n", id);
+        mview_ddc_dump(display, stdout);
+        ok = 1;
+    } else if (strcmp(action, "get") == 0 && argc > 1) {
+        int code = parse_vcp_code(argv[1]);
+        uint16_t current = 0, maximum = 0;
+        if (code < 0) {
+            fprintf(stderr, "%s is not a VCP code\n", argv[1]);
+        } else if (mview_ddc_get_vcp(display, (uint8_t)code, &current, &maximum) == 0) {
+            const char *name = mview_ddc_vcp_name((uint8_t)code);
+            printf("0x%02x %s = %u (max %u)\n", code, name ? name : "(manufacturer-specific)",
+                   current, maximum);
+            ok = 1;
+        } else {
+            fprintf(stderr, "display %u did not answer VCP 0x%02x\n", id, code);
+        }
+    } else if (strcmp(action, "set") == 0 && argc > 2) {
+        int code = parse_vcp_code(argv[1]);
+        long value = strtol(argv[2], NULL, 0);
+        if (code < 0 || value < 0 || value > 0xffff) {
+            fputs("usage: mview ddc set <code> <value>\n", stderr);
+        } else if (mview_ddc_set_vcp(display, (uint8_t)code, (uint16_t)value) == 0) {
+            uint16_t current = 0, maximum = 0;
+            if (mview_ddc_get_vcp(display, (uint8_t)code, &current, &maximum) == 0) {
+                printf("0x%02x = %u (max %u)\n", code, current, maximum);
+            } else {
+                printf("0x%02x written; the display does not read it back\n", code);
+            }
+            ok = 1;
+        } else {
+            fprintf(stderr, "display %u refused VCP 0x%02x\n", id, code);
+        }
+    } else {
+        fputs("mview ddc list | caps | dump | get <code> | set <code> <value>\n", stderr);
+    }
+    mview_ddc_close(display);
+    return ok;
+}
+
 int main(int argc, char **argv) {
+    setvbuf(stdout, NULL, _IOLBF, 0);
     const char *command = argc > 1 ? argv[1] : "help";
     int rest_argc = argc > 2 ? argc - 2 : 0;
     char **rest = argv + 2;
     int takeover = has_flag(rest_argc, rest, "--takeover");
     int confirmed = has_flag(rest_argc, rest, "--confirmed");
 
+    if (strcmp(command, "config") == 0) {
+        return cmd_config(rest_argc, rest) ? 0 : 1;
+    }
+    if (strcmp(command, "ddc") == 0) {
+        return cmd_ddc(rest_argc, rest) ? 0 : 1;
+    }
     if (strcmp(command, "probe") == 0) {
         cmd_probe();
+    } else if (strcmp(command, "routes") == 0) {
+        return cmd_routes() ? 0 : 1;
     } else if (strcmp(command, "displays") == 0) {
         cmd_displays();
     } else if (strcmp(command, "diagnose") == 0) {
@@ -784,7 +1144,16 @@ int main(int argc, char **argv) {
     } else if (strcmp(command, "verify") == 0) {
         return cmd_patterns(takeover, seconds_argument(rest_argc, rest, 3), confirmed) ? 0 : 1;
     } else if (strcmp(command, "run") == 0) {
-        return cmd_run(takeover, has_flag(rest_argc, rest, "--profile")) ? 0 : 1;
+        int worker_fd = worker_status_fd(rest_argc, rest);
+        if (worker_fd == -2) {
+            fputs("invalid worker status descriptor\n", stderr);
+            return 1;
+        }
+        return cmd_run(takeover, has_flag(rest_argc, rest, "--profile"),
+                       has_flag(rest_argc, rest, "--stats"), worker_fd) ? 0 : 1;
+    } else if (strcmp(command, "serve") == 0) {
+        return cmd_serve(takeover, has_flag(rest_argc, rest, "--profile"),
+                         has_flag(rest_argc, rest, "--stats")) ? 0 : 1;
     } else if (strcmp(command, "confirm") == 0) {
         return cmd_confirm() ? 0 : 1;
     } else if (strcmp(command, "bench") == 0) {

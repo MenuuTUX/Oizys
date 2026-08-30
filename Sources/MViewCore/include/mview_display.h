@@ -6,6 +6,10 @@
 extern "C" {
 #endif
 
+/* The dock has two heads; the layout code never seats more than that. Kept here so
+   display.mm needs nothing from the DL3 protocol headers. */
+#define MVIEW_MAX_LAYOUT_HEADS 2
+
 typedef struct MViewVirtualDisplay MViewVirtualDisplay;
 
 typedef struct {
@@ -23,9 +27,11 @@ typedef struct {
 MViewVirtualDisplay *mview_virtual_display_create(const MViewVirtualDisplayDesc *desc);
 uint32_t mview_virtual_display_id(const MViewVirtualDisplay *display);
 void mview_virtual_display_destroy(MViewVirtualDisplay *display);
-/* Break any mirror set the heads were folded into and seat them side by side above the
- * main display. A pair the user has already arranged themselves is left alone. */
-int mview_displays_arrange(uint32_t left_id, uint32_t right_id, uint32_t width, uint32_t height);
+/* Break any mirror set the heads were folded into and seat them in a left-to-right run.
+ * A layout the user has already arranged themselves is left alone. With a single head and
+ * a natively attached external display present, the head is seated beside that display
+ * rather than above the main one. */
+int mview_displays_arrange(const uint32_t *ids, int count, uint32_t width, uint32_t height);
 /* The mode a display actually ended up in, which is not always the one it was asked for. */
 int mview_display_mode(uint32_t id, uint32_t *width, uint32_t *height, double *refresh_hz);
 /* Non-zero when this display is showing another display's framebuffer. */
@@ -37,7 +43,7 @@ int mview_display_is_sidecar(uint32_t id);
 /* Re-assert the arrangement whenever macOS reconfigures the displays. Sidecar attaching or
  * detaching mid-session is the case this exists for: it remirrors a head and reseats both,
  * and nothing else notices. */
-void mview_displays_watch(uint32_t left_id, uint32_t right_id, uint32_t width, uint32_t height);
+void mview_displays_watch(const uint32_t *ids, int count, uint32_t width, uint32_t height);
 /* Non-zero when another display shares this one's unit number. Two displays on one unit are
  * one framebuffer to the window server, and ScreenCaptureKit will hand back the other
  * display's desktop for a stream opened on this one. */

@@ -35,6 +35,9 @@ XCCONFIG = {
 }
 LIBRARY_XCCONFIG = "Configs/Library.xcconfig"
 
+# .mm is Objective-C++: C++ everywhere except the message sends Apple's frameworks force.
+SOURCE_SUFFIXES = (".c", ".m", ".mm")
+
 
 def oid(*parts):
     return hashlib.sha256("::".join(parts).encode()).hexdigest()[:24].upper()
@@ -42,19 +45,20 @@ def oid(*parts):
 
 def core_sources():
     directory = ROOT / "Sources" / "MViewCore"
-    return sorted((p for p in directory.iterdir() if p.suffix in (".c", ".m")),
+    return sorted((p for p in directory.iterdir() if p.suffix in SOURCE_SUFFIXES),
                   key=lambda p: p.name)
 
 
 def tool_sources():
     directory = ROOT / "Sources" / "mview"
-    return sorted((p for p in directory.iterdir() if p.suffix in (".c", ".m")),
+    return sorted((p for p in directory.iterdir() if p.suffix in SOURCE_SUFFIXES),
                   key=lambda p: p.name)
 
 
 def headers():
     directory = ROOT / "Sources" / "MViewCore" / "include"
-    return sorted(directory.glob("*.h"), key=lambda p: p.name)
+    cli = ROOT / "Sources" / "mview"
+    return sorted([*directory.glob("*.h"), *cli.glob("*.h")], key=lambda p: p.name)
 
 
 class Project:
@@ -72,6 +76,7 @@ def file_type(path):
     return {
         ".c": "sourcecode.c.c",
         ".m": "sourcecode.c.objc",
+        ".mm": "sourcecode.cpp.objcpp",
         ".h": "sourcecode.c.h",
         ".xcconfig": "text.xcconfig",
     }[path.suffix]

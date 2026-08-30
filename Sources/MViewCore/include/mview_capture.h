@@ -32,6 +32,8 @@ int mview_capture_frames(const MViewCapture *capture, int head);
 /* NULL while the head is healthy. */
 const char *mview_capture_failure(const MViewCapture *capture, int head);
 int mview_capture_head_count(const MViewCapture *capture);
+/* Snapshot/reset profiler counters only after capture and encoder work have quiesced. */
+void mview_capture_profile_report(MViewCapture *capture, const char *title);
 void mview_capture_stop(MViewCapture *capture);
 
 #ifdef __cplusplus

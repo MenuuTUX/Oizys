@@ -4,6 +4,8 @@
 #import <IOUSBHost/IOUSBHost.h>
 #include "mview_usb.h"
 #include <pthread.h>
+#include <limits.h>
+#include <stdatomic.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -27,7 +29,7 @@ struct MViewSession {
     int inbox_r, inbox_w, inbox_n;
     pthread_mutex_t mu;
     pthread_cond_t cv;
-    int closing;
+    atomic_int closing;
     uint8_t identity[64];
     int identity_len;
 };
@@ -183,7 +185,7 @@ static void inbox_push(MViewSession *s, const void *p, size_t n) {
 static void arm_in(MViewSession *s, NSMutableData *buf);
 
 static void in_complete(MViewSession *s, NSMutableData *buf, IOReturn status, NSUInteger n) {
-    if (s->closing) {
+    if (atomic_load(&s->closing)) {
         return;
     }
     if (status == kIOReturnSuccess && n > 0) {
@@ -194,7 +196,7 @@ static void in_complete(MViewSession *s, NSMutableData *buf, IOReturn status, NS
 
 static void arm_in(MViewSession *s, NSMutableData *buf) {
     IOUSBHostPipe *p = pipe_for_ep(s, MVIEW_EP_CTRL_IN);
-    if (!p || s->closing) {
+    if (!p || atomic_load(&s->closing)) {
         return;
     }
     buf.length = IN_BUF;
@@ -286,7 +288,7 @@ MViewSession *mview_session_open(int capture) {
             return NULL;
         }
 
-        MViewSession *s = calloc(1, sizeof(*s));
+        MViewSession *s = (MViewSession *)calloc(1, sizeof(*s));
         if (!s) {
             [iface destroy];
             if (dfu) {
@@ -299,6 +301,7 @@ MViewSession *mview_session_open(int capture) {
         }
         pthread_mutex_init(&s->mu, NULL);
         pthread_cond_init(&s->cv, NULL);
+        atomic_init(&s->closing, 0);
         s->queue = q;
         if (device) {
             s->device = CFBridgingRetain(device);
@@ -349,7 +352,7 @@ MViewSession *mview_session_open(int capture) {
 }
 
 int mview_session_bulk_out(MViewSession *s, uint8_t ep, const void *data, size_t len) {
-    if (!s || !data) {
+    if (!s || !data || len > INT_MAX) {
         return -1;
     }
     @autoreleasepool {
@@ -365,9 +368,10 @@ int mview_session_bulk_out(MViewSession *s, uint8_t ep, const void *data, size_t
                           bytesTransferred:&xfer
                          completionTimeout:2.0
                                      error:&err];
-        if (!ok) {
-            mview_log("bulk OUT 0x%02x %zu failed: %s", ep, len,
-                      err.localizedDescription.UTF8String ?: "?");
+        if (!ok || xfer != len) {
+            mview_log("bulk OUT 0x%02x %zu failed (%ld, transferred %lu): %s", ep, len,
+                      (long)err.code, (unsigned long)xfer,
+                      err.localizedDescription.UTF8String ?: "short transfer");
             return -1;
         }
         return (int)xfer;
@@ -375,42 +379,14 @@ int mview_session_bulk_out(MViewSession *s, uint8_t ep, const void *data, size_t
 }
 
 /*
- * One video frame, one transfer. Ridge treats a transfer boundary as a frame
- * delimiter, so splitting a frame into packet-multiple pieces makes the dock see
- * several malformed frames and halt the endpoint. A transfer whose length is an
- * exact multiple of the 1024-byte max packet size also needs a zero-length packet
- * to mark the end; without it the dock waits for a continuation that never comes.
- * Large buffers are fine here — the USB stack segments internally without
- * introducing the short packets that a manual split would.
+ * Submit each encoded frame in one IOUSBHost request, including packet-aligned
+ * lengths. Do not split it or append a separate zero-length request: on the local
+ * Ridge dock the latter was followed by endpoint resets during motion. The USB
+ * stack owns packetization; an extra request is not part of the encoded frame.
  */
 int mview_session_bulk_out_frame(MViewSession *s, uint8_t ep, const void *data, size_t len) {
-    if (!s || !data || len == 0) {
-        return -1;
-    }
-    int sent = mview_session_bulk_out(s, ep, data, len);
-    if (sent < 0) {
-        return -1;
-    }
-    if (len % MVIEW_BULK_MAX_PACKET == 0) {
-        @autoreleasepool {
-            IOUSBHostPipe *p = pipe_for_ep(s, ep);
-            if (!p) {
-                return -1;
-            }
-            NSMutableData *empty = [NSMutableData dataWithLength:0];
-            NSUInteger xfer = 0;
-            NSError *err = nil;
-            if (![p sendIORequestWithData:empty
-                         bytesTransferred:&xfer
-                        completionTimeout:2.0
-                                    error:&err]) {
-                mview_log("ZLP after %zu-byte frame on 0x%02x failed: %s", len, ep,
-                          err.localizedDescription.UTF8String ?: "?");
-                return -1;
-            }
-        }
-    }
-    return sent;
+    if (len == 0) return -1;
+    return mview_session_bulk_out(s, ep, data, len);
 }
 
 int mview_session_bulk_outv(MViewSession *s, uint8_t ep, const MViewUSBChunk *chunks,
@@ -486,7 +462,7 @@ int mview_session_recv(MViewSession *s, void *data, size_t cap, size_t *got, dou
         ts.tv_sec++;
         ts.tv_nsec -= 1000000000L;
     }
-    while (s->inbox_n == 0 && !s->closing) {
+    while (s->inbox_n == 0 && !atomic_load(&s->closing)) {
         if (pthread_cond_timedwait(&s->cv, &s->mu, &ts) != 0) {
             pthread_mutex_unlock(&s->mu);
             return -1;
@@ -604,14 +580,22 @@ void mview_session_close(MViewSession *s) {
     if (!s) {
         return;
     }
-    s->closing = 1;
+    pthread_mutex_lock(&s->mu);
+    atomic_store(&s->closing, 1);
     pthread_cond_broadcast(&s->cv);
+    pthread_mutex_unlock(&s->mu);
     @autoreleasepool {
+        // A callback may have passed its closing check just before the flag changed.
+        // Let that callback finish enqueueing before aborting the outstanding reads.
+        if (s->queue) dispatch_sync(s->queue, ^{});
         if (s->ctrl_in) {
             NSError *err = nil;
             [pipe_for_ep(s, MVIEW_EP_CTRL_IN) abortWithOption:IOUSBHostAbortOptionSynchronous
                                                        error:&err];
         }
+        // Aborted completions still run on the interface queue and read the session.
+        // Drain them before releasing buffers or freeing their callback context.
+        if (s->queue) dispatch_sync(s->queue, ^{});
         if (s->inbufs) {
             CFRelease(s->inbufs);
             s->inbufs = NULL;
@@ -648,5 +632,6 @@ void mview_session_close(MViewSession *s) {
     }
     pthread_mutex_destroy(&s->mu);
     pthread_cond_destroy(&s->cv);
+    s->queue = NULL;
     free(s);
 }

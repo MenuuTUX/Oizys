@@ -113,6 +113,9 @@ int mview_driver_fetch_edid(MViewDriver *driver, uint8_t head);
 int mview_driver_fetch_edids(MViewDriver *driver);
 int mview_driver_get_head(const MViewDriver *driver, uint8_t head, MViewHeadStatus *status);
 int mview_driver_get_verification(const MViewDriver *driver, MViewDriverVerification *status);
+/* Non-zero once this head's mode is activated and its decoder armed. A head left off the
+ * dock for this run never arms, and skipping it is not a failure. */
+int mview_driver_head_is_armed(const MViewDriver *driver, uint8_t head);
 int mview_driver_activate_1080p60(MViewDriver *driver, uint8_t head);
 int mview_driver_present_solid(MViewDriver *driver, uint8_t head, uint8_t red, uint8_t green,
                                uint8_t blue);

@@ -19,6 +19,11 @@ GCC_C_LANGUAGE_STANDARD = c11
 CLANG_ENABLE_OBJC_ARC = YES
 CLANG_ENABLE_MODULES = YES
 
+// The Apple-framework adapters use Objective-C++. Their message sends still require
+// the Objective-C runtime; the protocol and encoder remain C. ARC also applies to .mm.
+CLANG_CXX_LANGUAGE_STANDARD = c++20
+CLANG_CXX_LIBRARY = libc++
+
 HEADER_SEARCH_PATHS = $(SRCROOT)/Sources/MViewCore/include
 
 // Warnings the driver has actually been bitten by. Return-type is an error because a C

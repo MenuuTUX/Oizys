@@ -1,3 +1,4 @@
+#include "mview_config.h"
 #include "mview_dl3.h"
 #include "mview_encode.h"
 #include "mview_profile.h"
@@ -47,7 +48,13 @@ struct MViewDriver {
      * surface and no second pass over the codec. */
     uint8_t *strip_body[MVIEW_DL3_MAX_HEADS][MVIEW_MAX_STRIPS];
     uint16_t strip_body_len[MVIEW_DL3_MAX_HEADS][MVIEW_MAX_STRIPS];
+    uint16_t strip_body_capacity[MVIEW_DL3_MAX_HEADS][MVIEW_MAX_STRIPS];
     uint64_t strip_body_hash[MVIEW_DL3_MAX_HEADS][MVIEW_MAX_STRIPS];
+    struct {
+        uint32_t sequence;
+        size_t length;
+    } recent_video[MVIEW_DL3_MAX_HEADS][8];
+    unsigned recent_next[MVIEW_DL3_MAX_HEADS];
 };
 
 static uint16_t read_u16(const uint8_t *p) {
@@ -785,6 +792,17 @@ int mview_driver_get_head(const MViewDriver *driver, uint8_t head, MViewHeadStat
     return 0;
 }
 
+/*
+ * Non-zero once the head has had its mode activated and its decoder armed. A head this run
+ * is not driving over the dock never gets there, and asking it to scan out is not an error.
+ */
+int mview_driver_head_is_armed(const MViewDriver *driver, uint8_t head) {
+    if (!driver || head >= driver->profile->head_count) {
+        return 0;
+    }
+    return driver->active[head] != 0;
+}
+
 int mview_driver_get_verification(const MViewDriver *driver, MViewDriverVerification *status) {
     if (!driver || !status) {
         return -1;
@@ -1384,12 +1402,28 @@ static int submit_video(MViewDriver *driver, uint8_t head, const ByteBuffer *str
     if (stream->length == 0) {
         return 0;
     }
+    unsigned recent = driver->recent_next[head]++ % 8;
+    driver->recent_video[head][recent].sequence = driver->frame_seq[head];
+    driver->recent_video[head][recent].length = stream->length;
     MVIEW_PROFILE_BEGIN(usb, MVIEW_ZONE_USB_WRITE);
     int wrote = mview_session_bulk_out_frame(driver->session, endpoint, stream->bytes,
                                              stream->length);
     MVIEW_PROFILE_END(usb, MVIEW_ZONE_USB_WRITE);
     if (wrote < 0) {
         mview_log("video endpoint 0x%02x rejected %zu-byte frame", endpoint, stream->length);
+        for (unsigned i = 0; i < 8; i++) {
+            unsigned slot = (driver->recent_next[head] + i) % 8;
+            mview_log("recent head %u sequence=%u bytes=%zu", head,
+                      driver->recent_video[head][slot].sequence,
+                      driver->recent_video[head][slot].length);
+        }
+        char path[96];
+        snprintf(path, sizeof(path), "logs/failed-frame-head%u.bin", head);
+        FILE *failed = mview_config()->capture_dump_frames ? fopen(path, "wb") : NULL;
+        if (failed) {
+            fwrite(stream->bytes, 1, stream->length, failed);
+            fclose(failed);
+        }
         drain_control_debug(driver, 64, 0.01);
         return -1;
     }
@@ -1486,7 +1520,7 @@ static void wait_offset(uint64_t anchor, unsigned milliseconds) {
     }
 }
 
-int mview_driver_activate_1080p60(MViewDriver *driver, uint8_t head) {
+static int activate_1080p60_once(MViewDriver *driver, uint8_t head) {
     if (!driver || head >= driver->profile->head_count || !driver->head[head].authenticated ||
         !driver->head[head].present || !driver->head[head].edid_len) {
         return -1;
@@ -1519,7 +1553,7 @@ int mview_driver_activate_1080p60(MViewDriver *driver, uint8_t head) {
     if (send_random_tail(driver, 0x14, 0x0c, "mode status poll") < 0) return -1;
     if (monotonic_ns() - anchor > 300000000ull) {
         mview_log("head %u activation bracket overran before first video", head);
-        return -1;
+        return -2;
     }
     driver->frame_seq[head] = 0;
     if (send_solid_frame(driver, head, 1, 0, 0, 0) < 0 ||
@@ -1541,6 +1575,17 @@ int mview_driver_activate_1080p60(MViewDriver *driver, uint8_t head) {
     driver->active[head] = 1;
     mview_log("head %u 1920x1080p60 video endpoint trained", head);
     return 0;
+}
+
+int mview_driver_activate_1080p60(MViewDriver *driver, uint8_t head) {
+    for (int attempt = 0; attempt < 3; attempt++) {
+        int result = activate_1080p60_once(driver, head);
+        if (result != -2) return result;
+        // No video was submitted if the timing bracket overran. Start a new mode
+        // sequence rather than continuing the expired one or widening its deadline.
+        mview_log("head %u retrying mode activation after scheduler delay (%d/3)", head, attempt + 1);
+    }
+    return -1;
 }
 
 int mview_driver_present_solid(MViewDriver *driver, uint8_t head, uint8_t red, uint8_t green,
@@ -1605,12 +1650,16 @@ static int encode_strip_body(MViewDriver *driver, uint8_t head, const MViewDamag
     if (!length) {
         return -1;
     }
-    uint8_t *body = realloc(driver->strip_body[head][index], length);
-    if (!body) {
-        return -1;
+    if (length > driver->strip_body_capacity[head][index]) {
+        // Motion changes encoded lengths every frame. Retain capacity instead of
+        // making all encoder workers resize their allocations for every strip.
+        size_t capacity = (length + 255) & ~(size_t)255;
+        uint8_t *body = realloc(driver->strip_body[head][index], capacity);
+        if (!body) return -1;
+        driver->strip_body[head][index] = body;
+        driver->strip_body_capacity[head][index] = (uint16_t)capacity;
     }
-    memcpy(body, encoded, length);
-    driver->strip_body[head][index] = body;
+    memcpy(driver->strip_body[head][index], encoded, length);
     driver->strip_body_len[head][index] = (uint16_t)length;
     driver->strip_body_hash[head][index] = map->pending[index];
     return 0;
@@ -1619,14 +1668,12 @@ static int encode_strip_body(MViewDriver *driver, uint8_t head, const MViewDamag
 /* Below this, the dispatch handshake costs more than the encoding it would spread. A
    moved window charges a few macro tiles; only a keyframe or a full-screen change is
    large enough to be worth splitting. */
-#define MVIEW_PARALLEL_MIN_STRIPS 64
-
 static int refresh_strip_bodies(MViewDriver *driver, uint8_t head, const uint8_t *bgra,
                                 size_t stride, uint32_t width, uint32_t height,
                                 const MViewStrip *strips, int count) {
     const MViewDamageMap *map = &driver->damage[head];
     MVIEW_PROFILE_BEGIN(encode, MVIEW_ZONE_ENCODE_STRIPS);
-    if (count < MVIEW_PARALLEL_MIN_STRIPS) {
+    if (count < mview_config()->encode_parallel_threshold) {
         for (int i = 0; i < count; i++) {
             if (encode_strip_body(driver, head, map, bgra, stride, width, height, strips[i]) < 0) {
                 MVIEW_PROFILE_END(encode, MVIEW_ZONE_ENCODE_STRIPS);
@@ -1778,12 +1825,13 @@ static int service_control(MViewDriver *driver) {
     if (send_random_tail(driver, 0x14, 0x0c, NULL) < 0) {
         return -1;
     }
-    driver->next_keepalive = now + 13000000ull;
+    const MViewConfig *config = mview_config();
+    driver->next_keepalive = now + (uint64_t)config->control_poll_ms * 1000000ull;
     if (now >= driver->next_heartbeat) {
         if (send_heartbeat(driver) < 0) {
             return -1;
         }
-        driver->next_heartbeat = now + 3000000000ull;
+        driver->next_heartbeat = now + (uint64_t)config->control_heartbeat_s * 1000000000ull;
     }
     /* Keep the IN endpoint from backing up behind the replies these provoke. */
     drain_control_quiet(driver, 4, 0.0);
