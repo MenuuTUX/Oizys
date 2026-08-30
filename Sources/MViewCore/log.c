@@ -1,6 +1,8 @@
+#define MVIEW_LOG_IMPLEMENTATION
 #include "mview_usb.h"
 
 #include <stdarg.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
@@ -11,14 +13,18 @@ void mview_log_open(const char *path) {
     if (g_log && g_log != stdout) {
         fclose(g_log);
     }
-    g_log = path ? fopen(path, "a") : stdout;
+    // Stream to the debug UI. Only direct CLI sessions also need their own file.
+    const char *stream = getenv("MVIEW_LOG_STDOUT");
+    g_log = stream && strcmp(stream, "1") == 0 ? stdout : path ? fopen(path, "a") : stdout;
     if (g_log) {
         setvbuf(g_log, NULL, _IONBF, 0);
     }
 }
 
 void mview_log(const char *fmt, ...) {
+    if (!MVIEW_DIAGNOSTICS) return;
     FILE *f = g_log ? g_log : stdout;
+    flockfile(f);
     time_t t = time(NULL);
     struct tm tm;
     localtime_r(&t, &tm);
@@ -31,4 +37,5 @@ void mview_log(const char *fmt, ...) {
     if (n == 0 || fmt[n - 1] != '\n') {
         fputc('\n', f);
     }
+    funlockfile(f);
 }

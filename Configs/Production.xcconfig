@@ -1,0 +1,4 @@
+#include "Release.xcconfig"
+// Optimized even with diagnostics: -O0 changes timing-sensitive USB behavior.
+GCC_PREPROCESSOR_DEFINITIONS = $(inherited) MVIEW_DIAGNOSTICS=0 MVIEW_VERBOSE=0 MVIEW_ALLOW_DISPLAYLINK=0
+SWIFT_ACTIVE_COMPILATION_CONDITIONS = MVIEW_PRODUCTION

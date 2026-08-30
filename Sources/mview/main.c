@@ -29,7 +29,7 @@ static void sleep_seconds(double seconds) {
 }
 
 static void ensure_logs_dir(void) {
-    mkdir("logs", 0755);
+    if (MVIEW_DIAGNOSTICS) mkdir("logs", 0700);
 }
 
 static int has_flag(int argc, char **argv, const char *flag) {
@@ -878,7 +878,7 @@ static int cmd_run(int takeover, int profile, int stats, int supervisor_fd) {
                      "%shead %d %s Haar desktop", summary[0] ? "; " : "", head, HEAD_NAME[head]);
         }
     }
-    write_verification(g_run.session, g_run.driver, summary, frames, MVIEW_HEADS, 0);
+    if (MVIEW_DIAGNOSTICS) write_verification(g_run.session, g_run.driver, summary, frames, MVIEW_HEADS, 0);
     puts("");
     if (driven == MVIEW_HEADS) {
         puts("live extended desktop active. Look at both Dells now:");
@@ -1121,10 +1121,26 @@ int main(int argc, char **argv) {
     setvbuf(stdout, NULL, _IOLBF, 0);
     const char *command = argc > 1 ? argv[1] : "help";
     int rest_argc = argc > 2 ? argc - 2 : 0;
-    char **rest = argv + 2;
+    char **rest = argc > 2 ? argv + 2 : argv + argc;
     int takeover = has_flag(rest_argc, rest, "--takeover");
     int confirmed = has_flag(rest_argc, rest, "--confirmed");
 
+    if (strcmp(command, "build-info") == 0) {
+        printf("{\"product\":\"Mview\",\"diagnostics\":%s,\"verbose\":%s,\"displaylink_fallback\":%s}\n",
+               MVIEW_DIAGNOSTICS ? "true" : "false", MVIEW_VERBOSE ? "true" : "false",
+               MVIEW_ALLOW_DISPLAYLINK ? "true" : "false");
+        return 0;
+    }
+    if (!MVIEW_DIAGNOSTICS && (has_flag(rest_argc, rest, "--stats") ||
+        has_flag(rest_argc, rest, "--profile") || strcmp(command, "profile") == 0 ||
+        strcmp(command, "bench") == 0 || strcmp(command, "verify") == 0 || strcmp(command, "patterns") == 0 ||
+        strcmp(command, "diagnose") == 0 || strcmp(command, "confirm") == 0)) {
+        fputs("This Mview build excludes developer diagnostics. Use a debug build.\n", stderr);
+        return 2;
+    }
+    if (!MVIEW_ALLOW_DISPLAYLINK && strcmp(command, "start-dlm") == 0) {
+        fputs("DisplayLink fallback is excluded from this Mview build.\n", stderr); return 2;
+    }
     if (strcmp(command, "config") == 0) {
         return cmd_config(rest_argc, rest) ? 0 : 1;
     }

@@ -394,5 +394,9 @@ int mview_stop_displaylink(void) {
 }
 
 int mview_start_displaylink(void) {
+#if MVIEW_ALLOW_DISPLAYLINK
     return system("open -a 'DisplayLink Manager' 2>/dev/null");
+#else
+    return -1;
+#endif
 }

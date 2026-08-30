@@ -1,7 +1,11 @@
 #include "mview_config.h"
 #include "mview_usb.h"
 
-#import <Foundation/Foundation.h>
+#include "mview_platform.h"
+#include "mview_build.h"
+#include <math.h>
+#include <pwd.h>
+#include <unistd.h>
 
 #include <assert.h>
 #include <stddef.h>
@@ -173,7 +177,7 @@ static int apply(MViewConfig *config, const Field *field, const char *text) {
     case FIELD_INT: {
         char *end = NULL;
         double value = strtod(text, &end);
-        if (end == text) {
+        if (end == text || *end || !isfinite(value)) {
             return -2;
         }
         *(int *)member(config, field->offset) = (int)clamp(value, field, field->key, &clamped);
@@ -182,7 +186,7 @@ static int apply(MViewConfig *config, const Field *field, const char *text) {
     case FIELD_DOUBLE: {
         char *end = NULL;
         double value = strtod(text, &end);
-        if (end == text) {
+        if (end == text || *end || !isfinite(value)) {
             return -2;
         }
         *(double *)member(config, field->offset) = clamp(value, field, field->key, &clamped);
@@ -268,71 +272,24 @@ static void load_defaults(MViewConfig *config) {
 
 /* -- file ----------------------------------------------------------------------------- */
 
-static NSString *config_path_ns(void) {
-    NSArray<NSString *> *roots = NSSearchPathForDirectoriesInDomains(
-        NSApplicationSupportDirectory, NSUserDomainMask, YES);
-    NSString *root = roots.firstObject
-                         ?: [NSHomeDirectory() stringByAppendingPathComponent:
-                                                   @"Library/Application Support"];
-    return [[root stringByAppendingPathComponent:@"MView"]
-        stringByAppendingPathComponent:@"config.json"];
-}
-
 const char *mview_config_path(void) {
-    static char cached[1024];
-    if (cached[0] == '\0') {
-        snprintf(cached, sizeof(cached), "%s", config_path_ns().fileSystemRepresentation);
+    static char cached[4096];
+    if (!cached[0]) {
+        const char *override = getenv("MVIEW_CONFIG_PATH");
+        struct passwd *user = getpwuid(getuid());
+        const char *home = user ? user->pw_dir : getenv("HOME");
+        if (override && *override) snprintf(cached, sizeof(cached), "%s", override);
+        else snprintf(cached, sizeof(cached), "%s/Library/Application Support/MView/config.json",
+                      home ? home : "/nonexistent");
     }
     return cached;
 }
 
-/* Every stored value funnels through one string parser, whichever JSON type carries it. */
-static NSString *scalar_string(id value) {
-    if ([value isKindOfClass:[NSString class]]) {
-        return (NSString *)value;
-    }
-    if ([value isKindOfClass:[NSNumber class]]) {
-        return ((NSNumber *)value).stringValue;
-    }
-    return nil;
-}
-
-static NSMutableDictionary *read_file(void) {
-    NSData *data = [NSData dataWithContentsOfFile:config_path_ns()];
-    if (!data) {
-        return [NSMutableDictionary dictionary];
-    }
-    NSError *error = nil;
-    id parsed = [NSJSONSerialization JSONObjectWithData:data options:0 error:&error];
-    if (![parsed isKindOfClass:[NSDictionary class]]) {
-        mview_log("config file is not a JSON object, using defaults: %s",
-                  error ? error.localizedDescription.UTF8String : "unexpected top-level type");
-        return [NSMutableDictionary dictionary];
-    }
-    return [(NSDictionary *)parsed mutableCopy];
-}
-
-static int write_file(NSDictionary *values) {
-    NSString *path = config_path_ns();
-    NSError *error = nil;
-    if (![NSFileManager.defaultManager createDirectoryAtPath:path.stringByDeletingLastPathComponent
-                                withIntermediateDirectories:YES
-                                                 attributes:nil
-                                                      error:&error]) {
-        mview_log("could not create the config directory: %s",
-                  error.localizedDescription.UTF8String);
-        return -1;
-    }
-    NSData *data = [NSJSONSerialization
-        dataWithJSONObject:values
-                   options:NSJSONWritingPrettyPrinted | NSJSONWritingSortedKeys
-                     error:&error];
-    if (!data || ![data writeToFile:path atomically:YES]) {
-        mview_log("could not write %s: %s", path.UTF8String,
-                  error.localizedDescription.UTF8String);
-        return -1;
-    }
-    return 0;
+static void read_value(void *context, const char *key, const char *value) {
+    MViewConfig *config = context;
+    const Field *field = find_field(key);
+    if (!field || apply(config, field, value) != 0)
+        mview_log("config: ignoring invalid key/value for %s", key);
 }
 
 /* -- public --------------------------------------------------------------------------- */
@@ -345,20 +302,13 @@ const MViewConfig *mview_config(void) {
         return &g_config;
     }
     load_defaults(&g_config);
-    NSDictionary *values = read_file();
-    for (NSString *key in values) {
-        const Field *field = find_field(key.UTF8String);
-        if (!field) {
-            mview_log("config: ignoring unknown key %s", key.UTF8String);
-            continue;
-        }
-        NSString *text = scalar_string(values[key]);
-        if (!text || apply(&g_config, field, text.UTF8String) != 0) {
-            char fallback[64];
-            render(&g_config, field, fallback, sizeof(fallback));
-            mview_log("config: %s has an unusable value, keeping %s", key.UTF8String, fallback);
-        }
-    }
+    mview_settings_read(mview_config_path(), &g_config, read_value);
+#if !MVIEW_DIAGNOSTICS
+    g_config.capture_dump_frames = 0;
+    snprintf(g_config.log_level, sizeof(g_config.log_level), "error");
+#elif MVIEW_VERBOSE
+    snprintf(g_config.log_level, sizeof(g_config.log_level), "debug");
+#endif
     g_loaded = 1;
     return &g_config;
 }
@@ -412,41 +362,15 @@ int mview_config_set(const char *key, const char *value) {
     }
     char canonical[64];
     render(&scratch, field, canonical, sizeof(canonical));
-    /* Numbers and booleans go in as JSON numbers and booleans. The file is meant to be
-     * hand-edited, and the read path takes either form back. */
-    id stored = nil;
-    switch (field->type) {
-    case FIELD_INT:
-        stored = @(atoi(canonical));
-        break;
-    case FIELD_DOUBLE:
-        stored = @(atof(canonical));
-        break;
-    case FIELD_BOOL:
-        stored = @(strcmp(canonical, "true") == 0);
-        break;
-    default:
-        stored = @(canonical);
-        break;
-    }
-    NSMutableDictionary *values = read_file();
-    values[@(key)] = stored;
-    if (write_file(values) != 0) {
-        return -1;
-    }
+    if (mview_settings_write(mview_config_path(), key, canonical,
+                             field->type == FIELD_INT || field->type == FIELD_DOUBLE ? 1 :
+                             field->type == FIELD_BOOL ? 2 : 0) != 0) return -1;
     mview_config_reload();
     return 0;
 }
 
 int mview_config_reset(void) {
-    NSError *error = nil;
-    NSString *path = config_path_ns();
-    if (![NSFileManager.defaultManager removeItemAtPath:path error:&error] &&
-        [NSFileManager.defaultManager fileExistsAtPath:path]) {
-        mview_log("could not remove %s: %s", path.UTF8String,
-                  error.localizedDescription.UTF8String);
-        return -1;
-    }
+    if (mview_settings_reset(mview_config_path()) != 0) return -1;
     mview_config_reload();
     return 0;
 }

@@ -1,6 +1,6 @@
 // Compile the shipping backend with synthetic display identities, never live I2C.
-#import <CoreGraphics/CoreGraphics.h>
-#import <Foundation/Foundation.h>
+#include <CoreGraphics/CoreGraphics.h>
+#include <CoreFoundation/CoreFoundation.h>
 #include <stdint.h>
 #include <stddef.h>
 
@@ -15,17 +15,17 @@ static boolean_t test_builtin(uint32_t id) { return test_displays[(id - 1) * 5 +
 #define CGDisplayModelNumber test_model
 #define CGDisplaySerialNumber test_serial
 #define CGDisplayIsBuiltin test_builtin
-#include "../../Sources/MViewCore/ddc_native.mm"
+#include "../../Sources/MViewCore/ddc_native.c"
 
-void mview_log(const char *, ...) {}
+void mview_log(const char *format, ...) {}
 int mview_display_is_sidecar(uint32_t id) { return test_displays[(id - 1) * 5 + 4]; }
 
-static IOReturn test_copy_edid(IOAVServiceRef, CFDataRef *out) {
+static IOReturn test_copy_edid(IOAVServiceRef service, CFDataRef *out) {
     *out = (CFDataRef)CFRetain(test_edid);
     return kIOReturnSuccess;
 }
 
-extern "C" uint32_t test_match(const uint8_t *edid, size_t length,
+uint32_t test_match(const uint8_t *edid, size_t length,
                                 const uint32_t *displays, uint32_t count) {
     if (count > 16) return 0;
     test_displays = displays;
@@ -38,6 +38,6 @@ extern "C" uint32_t test_match(const uint8_t *edid, size_t length,
     return id;
 }
 
-extern "C" int test_reply(const uint8_t *reply, size_t length) {
+int test_reply(const uint8_t *reply, size_t length) {
     return valid_ddc_reply(reply, length);
 }

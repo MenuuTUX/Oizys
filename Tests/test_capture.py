@@ -10,9 +10,9 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 
 def test_capture_keeps_latest_frame_and_drops_pending_work_on_shutdown(tmp_path):
     output = tmp_path / "capture-tests.dylib"
-    command = ["xcrun", "clang++", "-std=c++20", "-fobjc-arc", "-dynamiclib",
+    command = ["xcrun", "clang", "-std=c11", "-fblocks", "-dynamiclib",
                "-I", str(ROOT / "Sources/MViewCore/include"),
-               str(ROOT / "Tests/Support/capture_test.mm"), str(core.LIBRARY_PATH),
+               str(ROOT / "Tests/Support/capture_test.c"), str(core.LIBRARY_PATH),
                "-o", str(output)]
     for framework in ("Foundation", "CoreGraphics", "CoreMedia", "CoreVideo", "ScreenCaptureKit",
                       "ImageIO", "UniformTypeIdentifiers"):

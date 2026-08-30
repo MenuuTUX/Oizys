@@ -155,10 +155,10 @@ int mview_supervise(const char *executable, int profile, int stats) {
     stopping = 0;
     sigaction(SIGINT, &action, &previous_int);
     sigaction(SIGTERM, &action, &previous_term);
-    int restore_vendor = displaylink_running();
+    int restore_vendor = MVIEW_ALLOW_DISPLAYLINK && displaylink_running();
     mview_stop_displaylink();
     puts("MView service started; failures will restart MView, not DisplayLink");
-    int backoff = 1, waiting = 0, ok = 1;
+    int backoff = 1, waiting = 0, ok = 1, failures = 0;
     while (!stopping) {
         if (!supported_dock_present()) {
             if (!waiting) puts("waiting for one supported Ridge dock; Ctrl-C stops MView");
@@ -200,7 +200,12 @@ int mview_supervise(const char *executable, int profile, int stats) {
         if (!reaped) stop_worker(child);
         close(status_fd);
         if (stopping) break;
-        if (ready && monotonic_seconds() - ready >= 30) backoff = 1;
+        if (ready && monotonic_seconds() - ready >= 30) { backoff = 1; failures = 0; }
+        failures++;
+        if (MVIEW_ALLOW_DISPLAYLINK && restore_vendor && failures >= 3) {
+            fputs("Mview failed three recovery attempts; handing back to DisplayLink\n", stderr);
+            ok = 0; break;
+        }
         printf("retrying MView in %ds\n", backoff);
         double retry = monotonic_seconds() + backoff;
         while (!stopping && monotonic_seconds() < retry) pause_briefly();

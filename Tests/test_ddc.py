@@ -12,9 +12,9 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 def ddc(tmp_path_factory):
     output = tmp_path_factory.mktemp("ddc") / "ddc-tests.dylib"
     subprocess.run([
-        "xcrun", "clang++", "-std=c++20", "-fobjc-arc", "-dynamiclib",
+        "xcrun", "clang", "-std=c11", "-dynamiclib",
         "-I", str(ROOT / "Sources/MViewCore/include"),
-        str(ROOT / "Tests/Support/ddc_native_test.mm"),
+        str(ROOT / "Tests/Support/ddc_native_test.c"),
         "-framework", "Foundation", "-framework", "CoreGraphics", "-framework", "IOKit",
         "-o", str(output),
     ], check=True, capture_output=True, text=True)

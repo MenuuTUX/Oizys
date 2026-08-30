@@ -1,6 +1,8 @@
 #ifndef MVIEW_PROFILE_H
 #define MVIEW_PROFILE_H
 
+#include "mview_build.h"
+
 #include <mach/mach_time.h>
 #include <stdint.h>
 
@@ -58,6 +60,7 @@ int mview_profile_zone_count(void);
 uint64_t mview_profile_push(MViewZone zone);
 void mview_profile_pop(MViewZone zone, uint64_t start_ticks);
 
+#if MVIEW_DIAGNOSTICS
 #define MVIEW_PROFILE_BEGIN(name, zone)                                                            \
     uint64_t mview_zone_##name = mview_profile_active ? mview_profile_push(zone) : 0
 #define MVIEW_PROFILE_END(name, zone)                                                              \
@@ -66,6 +69,11 @@ void mview_profile_pop(MViewZone zone, uint64_t start_ticks);
             mview_profile_pop((zone), mview_zone_##name);                                          \
         }                                                                                          \
     } while (0)
+
+#else
+#define MVIEW_PROFILE_BEGIN(name, zone) ((void)0)
+#define MVIEW_PROFILE_END(name, zone) ((void)0)
+#endif
 
 #ifdef __cplusplus
 }

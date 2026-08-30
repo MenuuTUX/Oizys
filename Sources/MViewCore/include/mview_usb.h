@@ -1,5 +1,6 @@
 #pragma once
 
+#include "mview_build.h"
 #include <stddef.h>
 #include <stdint.h>
 
@@ -112,4 +113,9 @@ int mview_start_displaylink(void);
 
 #ifdef __cplusplus
 }
+#endif
+
+#if !MVIEW_DIAGNOSTICS && !defined(MVIEW_LOG_IMPLEMENTATION)
+#define mview_log(...) ((void)0)
+#define mview_log_open(...) ((void)0)
 #endif

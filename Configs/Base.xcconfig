@@ -16,7 +16,12 @@ SYMROOT = $(SRCROOT)/build
 OBJROOT = $(SRCROOT)/build/Intermediates
 
 GCC_C_LANGUAGE_STANDARD = c11
-CLANG_ENABLE_OBJC_ARC = YES
+SWIFT_VERSION = 5.0
+SWIFT_OBJC_BRIDGING_HEADER = $(SRCROOT)/Sources/MViewPlatform/Bridge.h
+SWIFT_INSTALL_OBJC_HEADER = NO
+SWIFT_OPTIMIZATION_LEVEL = -O
+SWIFT_COMPILATION_MODE = wholemodule
+OTHER_LDFLAGS = $(inherited) -Wl,-rpath,/usr/lib/swift
 CLANG_ENABLE_MODULES = YES
 
 // The Apple-framework adapters use Objective-C++. Their message sends still require
@@ -41,4 +46,5 @@ WARNING_CFLAGS = -Wall -Wextra -Wpointer-arith -Wcast-align -Wwrite-strings -Wno
 
 // -mcpu names the actual core so clang emits the full NEON set for this machine rather
 // than a portable arm64 baseline. The encoder depends on it.
-MVIEW_CPU = -mcpu=apple-m3
+MVIEW_CPU = -mcpu=apple-m1
+// Bridging header imports C only. Swift is limited to Apple framework integration.

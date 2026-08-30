@@ -27,16 +27,17 @@ FRAMEWORKS = [
     "Foundation", "CoreFoundation", "CoreGraphics", "CoreMedia", "CoreVideo", "IOKit",
     "IOUSBHost", "Security", "ScreenCaptureKit", "ImageIO", "UniformTypeIdentifiers",
 ]
-CONFIGS = ["Debug", "Release", "Profile"]
+CONFIGS = ["Debug", "Release", "Profile", "DebugMinimal", "DebugVerbose", "DebugFallback", "Production", "ProductionFallback"]
 XCCONFIG = {
     "Debug": "Configs/Debug.xcconfig",
     "Release": "Configs/Release.xcconfig",
     "Profile": "Configs/Profile.xcconfig",
 }
+XCCONFIG.update({name: f"Configs/{name}.xcconfig" for name in CONFIGS if name not in XCCONFIG})
 LIBRARY_XCCONFIG = "Configs/Library.xcconfig"
 
-# .mm is Objective-C++: C++ everywhere except the message sends Apple's frameworks force.
-SOURCE_SUFFIXES = (".c", ".m", ".mm")
+# C/C++ driver and Swift framework integration. No Objective-C source files.
+SOURCE_SUFFIXES = (".c", ".cpp", ".swift")
 
 
 def oid(*parts):
@@ -45,7 +46,7 @@ def oid(*parts):
 
 def core_sources():
     directory = ROOT / "Sources" / "MViewCore"
-    return sorted((p for p in directory.iterdir() if p.suffix in SOURCE_SUFFIXES),
+    return sorted((p for p in [*directory.iterdir(), *(ROOT / "Sources/MViewPlatform").glob("*.swift")] if p.suffix in SOURCE_SUFFIXES),
                   key=lambda p: p.name)
 
 
@@ -75,6 +76,8 @@ class Project:
 def file_type(path):
     return {
         ".c": "sourcecode.c.c",
+        ".cpp": "sourcecode.cpp.cpp",
+        ".swift": "sourcecode.swift",
         ".m": "sourcecode.c.objc",
         ".mm": "sourcecode.cpp.objcpp",
         ".h": "sourcecode.c.h",

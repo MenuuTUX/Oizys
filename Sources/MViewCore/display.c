@@ -1,91 +1,8 @@
-#import <Foundation/Foundation.h>
-#import <CoreGraphics/CoreGraphics.h>
+#include <CoreGraphics/CoreGraphics.h>
+#include <dispatch/dispatch.h>
 #include "mview_display.h"
 #include "mview_ddc.h"
 #include <stdlib.h>
-
-@interface CGVirtualDisplayMode : NSObject
-- (instancetype)initWithWidth:(unsigned int)width
-                       height:(unsigned int)height
-                  refreshRate:(double)refreshRate;
-@end
-
-@interface CGVirtualDisplaySettings : NSObject
-- (instancetype)init;
-@property(retain, nonatomic) NSArray *modes;
-@property(nonatomic) unsigned int hiDPI;
-@end
-
-@interface CGVirtualDisplayDescriptor : NSObject
-- (void)setDispatchQueue:(dispatch_queue_t)queue;
-@property(copy, nonatomic) NSString *name;
-@property(nonatomic) unsigned int maxPixelsWide;
-@property(nonatomic) unsigned int maxPixelsHigh;
-@property(nonatomic) CGSize sizeInMillimeters;
-@property(nonatomic) unsigned int productID;
-@property(nonatomic) unsigned int vendorID;
-@property(nonatomic) unsigned int serialNum;
-@property(copy, nonatomic) void (^terminationHandler)(id, id);
-@end
-
-@interface CGVirtualDisplay : NSObject
-- (instancetype)initWithDescriptor:(CGVirtualDisplayDescriptor *)descriptor;
-- (BOOL)applySettings:(CGVirtualDisplaySettings *)settings;
-@property(readonly, nonatomic) unsigned int displayID;
-@end
-
-struct MViewVirtualDisplay {
-    CFTypeRef display;
-};
-
-MViewVirtualDisplay *mview_virtual_display_create(const MViewVirtualDisplayDesc *desc) {
-    if (!desc || desc->width == 0 || desc->height == 0) {
-        return NULL;
-    }
-    if (NSClassFromString(@"CGVirtualDisplay") == Nil) {
-        return NULL;
-    }
-    @autoreleasepool {
-        CGVirtualDisplayDescriptor *descriptor = [CGVirtualDisplayDescriptor new];
-        descriptor.dispatchQueue = dispatch_queue_create("mview.display", DISPATCH_QUEUE_SERIAL);
-        descriptor.name = desc->name ? [NSString stringWithUTF8String:desc->name] : @"MView";
-        descriptor.maxPixelsWide = desc->width;
-        descriptor.maxPixelsHigh = desc->height;
-        descriptor.sizeInMillimeters = CGSizeMake(desc->mm_width, desc->mm_height);
-        descriptor.productID = desc->product_id;
-        descriptor.vendorID = desc->vendor_id;
-        descriptor.serialNum = desc->serial;
-        descriptor.terminationHandler = ^(id __unused reason, id __unused display) {
-        };
-
-        CGVirtualDisplay *display = [[CGVirtualDisplay alloc] initWithDescriptor:descriptor];
-        if (display == nil) {
-            return NULL;
-        }
-        CGVirtualDisplaySettings *settings = [CGVirtualDisplaySettings new];
-        settings.hiDPI = 0;
-        settings.modes = @[ [[CGVirtualDisplayMode alloc] initWithWidth:desc->width
-                                                                height:desc->height
-                                                           refreshRate:desc->refresh_hz] ];
-        if (![display applySettings:settings]) {
-            return NULL;
-        }
-        MViewVirtualDisplay *out = (MViewVirtualDisplay *)calloc(1, sizeof(*out));
-        if (!out) {
-            return NULL;
-        }
-        out->display = CFBridgingRetain(display);
-        return out;
-    }
-}
-
-uint32_t mview_virtual_display_id(const MViewVirtualDisplay *display) {
-    if (!display || !display->display) {
-        return 0;
-    }
-    CGVirtualDisplay *obj = (__bridge CGVirtualDisplay *)display->display;
-    return obj.displayID;
-}
 
 /*
  * Apple's own virtual panels: Sidecar iPads and AirPlay receivers both report the vendor
@@ -410,13 +327,3 @@ int mview_display_is_mirrored(uint32_t id) {
     return CGDisplayMirrorsDisplay(id) != kCGNullDirectDisplay;
 }
 
-void mview_virtual_display_destroy(MViewVirtualDisplay *display) {
-    if (!display) {
-        return;
-    }
-    if (display->display) {
-        CFRelease(display->display);
-        display->display = NULL;
-    }
-    free(display);
-}

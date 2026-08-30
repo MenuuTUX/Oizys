@@ -65,7 +65,7 @@ static double ticks_to_ms(uint64_t ticks) {
 }
 
 void mview_profile_enable(int enabled) {
-    mview_profile_active = enabled ? 1 : 0;
+    mview_profile_active = MVIEW_DIAGNOSTICS && enabled ? 1 : 0;
 }
 
 void mview_profile_reset(void) {

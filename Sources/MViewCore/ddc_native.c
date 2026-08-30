@@ -2,8 +2,8 @@
 #include "mview_display.h"
 #include "mview_usb.h"
 
-#import <CoreGraphics/CoreGraphics.h>
-#import <Foundation/Foundation.h>
+#include <CoreGraphics/CoreGraphics.h>
+#include <CoreFoundation/CoreFoundation.h>
 
 #include <IOKit/IOKitLib.h>
 #include <dlfcn.h>

@@ -50,3 +50,24 @@ __pycache__/
 *.pyc
 .pytest_cache/
 .hypothesis/
+
+# Local diagnostic exports, installers and signing material.
+/reports/
+/releases/
+/dist/
+*.xcresult/
+*.trace/
+*.gcda
+*.gcno
+*.p12
+*.p8
+*.mobileprovision
+*.provisionprofile
+.env
+.env.*
+!.env.example
+/.swiftpm/
+/.cache/
+/.ruff_cache/
+*.xcscmblueprint
+*.xccheckout

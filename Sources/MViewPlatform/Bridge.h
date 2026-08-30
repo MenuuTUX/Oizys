@@ -1,0 +1,5 @@
+#include "mview.h"
+#include "mview_capture.h"
+#include "mview_profile.h"
+#include "mview_platform.h"
+#include "mview_capture_frame.h"
