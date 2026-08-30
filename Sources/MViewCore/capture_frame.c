@@ -27,6 +27,9 @@ struct MViewCaptureOutput {
     bool scheduled;
     uint64_t last_present, samples, age_samples, age_ticks, max_age_ticks;
     uint64_t present_ticks, max_present_ticks, dropped;
+    /* How often the compositor's rectangles were usable, and how many arrived. A frame
+       with none falls back to fingerprinting the whole surface. */
+    uint64_t rect_frames, rect_total, full_pass_frames;
 };
 
 MViewCaptureOutput *mview_output_create(MViewDriver *driver, uint8_t head, dispatch_queue_t queue) {
@@ -131,6 +134,8 @@ static void present(MViewCaptureOutput *o, CMSampleBufferRef sample, uint64_t di
                 sampled ? total / sampled : 0, peak);
     }
 
+    if (rect_count > 0) { o->rect_frames++; o->rect_total += (uint64_t)rect_count; }
+    else { o->full_pass_frames++; }
     int result = mview_driver_present_bgra_dirty(o->driver, o->head, base, stride, width, height,
                                                 rects, rect_count);
     if (result < 0 && MVIEW_DIAGNOSTICS && mview_config()->capture_dump_frames) {
@@ -227,11 +232,16 @@ void mview_output_report(MViewCaptureOutput *o) {
     uint64_t dropped = o->dropped; o->dropped = 0;
     os_unfair_lock_unlock(&o->lock);
     printf("head %u latency: samples=%llu replaced=%llu capture-age-at-USB samples=%llu mean=%.2fms max=%.2fms "
-           "processing mean=%.2fms max=%.2fms\n", o->head,
+           "processing mean=%.2fms max=%.2fms dirty-rect frames=%llu (mean %.1f rects) "
+           "full-pass frames=%llu\n", o->head,
            (unsigned long long)o->samples, (unsigned long long)dropped,
            (unsigned long long)o->age_samples,
            o->age_samples ? o->age_ticks * ms / o->age_samples : 0, o->max_age_ticks * ms,
-           o->samples ? o->present_ticks * ms / o->samples : 0, o->max_present_ticks * ms);
+           o->samples ? o->present_ticks * ms / o->samples : 0, o->max_present_ticks * ms,
+           (unsigned long long)o->rect_frames,
+           o->rect_frames ? (double)o->rect_total / (double)o->rect_frames : 0.0,
+           (unsigned long long)o->full_pass_frames);
     o->samples = o->age_samples = o->age_ticks = o->max_age_ticks = o->present_ticks = o->max_present_ticks = 0;
+    o->rect_frames = o->rect_total = o->full_pass_frames = 0;
 #endif
 }

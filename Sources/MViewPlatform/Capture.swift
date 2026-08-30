@@ -42,10 +42,18 @@ private func dirtyRects(_ info: [SCStreamFrameInfo: Any]) -> [MViewDirtyRect] {
     for entry in raw {
         guard let rect = CGRect(dictionaryRepresentation: entry as CFDictionary) else { return [] }
         let r = rect.integral
-        guard r.minX >= 0, r.minY >= 0, r.width > 0, r.height > 0 else { return [] }
+        // macOS reports a (0,0,0,0) rect on the first frame of a stream, and occasionally
+        // later. It means "this entry covers nothing", not "this list is wrong": dropping
+        // the whole list for it threw away every real rectangle in the frame and sent the
+        // driver back to fingerprinting all 8 MB.
+        if r.width <= 0 || r.height <= 0 { continue }
+        guard r.minX >= 0, r.minY >= 0 else { return [] }
         out.append(MViewDirtyRect(x: UInt32(r.minX), y: UInt32(r.minY),
                                   w: UInt32(r.width), h: UInt32(r.height)))
     }
+    // Every entry was empty, so the compositor said nothing changed anywhere. That is not
+    // the same as saying nothing about what changed, but an empty list means "full pass"
+    // downstream, which is the safe reading of an ambiguous frame.
     return out
 }
 

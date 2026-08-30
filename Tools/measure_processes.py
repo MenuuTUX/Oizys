@@ -25,8 +25,12 @@ def snapshot():
         if len(fields) != 4:
             continue
         pid, cpu, rss, name = fields
-        if any(part in name for part in ("DisplayLink", "mview", "WindowServer", "MotionBench",
-                                         "/MView.app/Contents/MacOS/MView")):
+        # Case-insensitive on the driver's own name. The app bundle ships its binaries as
+        # Mview/MviewDriver and the CLI is mview; a case-sensitive match silently dropped
+        # the bundled worker from the sample and reported a comparison with no driver in it.
+        lowered = name.lower()
+        if "mview" in lowered or any(part in name for part in
+                                     ("DisplayLink", "WindowServer", "MotionBench")):
             processes[pid] = {"name": name, "cpu_seconds": cpu_seconds(cpu), "rss_kib": int(rss)}
     return processes
 
