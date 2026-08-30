@@ -27,8 +27,23 @@ typedef struct {
    drags its whole macro tile onto the wire with it. */
 #define MVIEW_MACRO_STRIPS 4
 
+/* A rectangle the compositor reports as changed, in surface pixels, top-left origin. */
+typedef struct {
+    uint32_t x, y, w, h;
+} MViewDirtyRect;
+
+/* ScreenCaptureKit's dirty rectangles are a hint from the compositor, not a contract. A
+   rect it omits would leave a strip stale until something else happened to disturb it,
+   which is a failure this driver has already been through once. So one row in this many
+   is re-fingerprinted unconditionally on every frame, on a rotating phase: a missed rect
+   costs at most this many frames of staleness instead of never repairing, for an eighth
+   of the full-surface cost. */
+#define MVIEW_DAMAGE_SWEEP 8
+
 typedef struct {
     uint32_t width, height, cols, rows;
+    /* Rotating phase for the verification sweep above. */
+    uint32_t sweep;
     uint64_t hashes[MVIEW_MAX_STRIPS];
     /* This frame's hashes, published to `hashes` only once the frame reached the dock,
        so a failed transfer leaves the dock-visible state intact and the next frame
@@ -50,6 +65,14 @@ int mview_damage_update(MViewDamageMap *map, const uint8_t *bgra, size_t stride,
    frame actually reached the dock. */
 int mview_damage_plan(MViewDamageMap *map, const uint8_t *bgra, size_t stride,
                       MViewStrip *out, int max_out, int *presentations);
+/* As mview_damage_plan, but re-fingerprints only the strips `rects` covers plus this
+   frame's verification sweep, carrying every other strip's previous fingerprint forward.
+   Falls back to the full pass when a keyframe is owed, when no rects were supplied, or
+   when any rect falls outside the surface. Hashing the whole surface every frame is where
+   this driver's CPU went; the compositor already knows what moved. */
+int mview_damage_plan_dirty(MViewDamageMap *map, const uint8_t *bgra, size_t stride,
+                            const MViewDirtyRect *rects, int rect_count, MViewStrip *out,
+                            int max_out, int *presentations);
 /* The strips that still owe a transmission, without re-reading the surface. */
 int mview_damage_owed(const MViewDamageMap *map, MViewStrip *out, int max_out);
 void mview_damage_presented(MViewDamageMap *map);

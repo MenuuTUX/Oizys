@@ -22,6 +22,8 @@ struct MViewCaptureOutput {
     os_unfair_lock lock;
     CMSampleBufferRef pending;
     uint64_t pending_time;
+    MViewDirtyRect pending_rects[MVIEW_CAPTURE_MAX_RECTS];
+    int pending_rect_count;
     bool scheduled;
     uint64_t last_present, samples, age_samples, age_ticks, max_age_ticks;
     uint64_t present_ticks, max_present_ticks, dropped;
@@ -85,7 +87,8 @@ static void dump_frame(CVPixelBufferRef pixels, const char *path) {
     CGImageRelease(image);
 }
 
-static void present(MViewCaptureOutput *o, CMSampleBufferRef sample, uint64_t displayed) {
+static void present(MViewCaptureOutput *o, CMSampleBufferRef sample, uint64_t displayed,
+                    const MViewDirtyRect *rects, int rect_count) {
     uint64_t started = mach_absolute_time();
     CVPixelBufferRef pixels = CMSampleBufferGetImageBuffer(sample);
     if (!pixels || CVPixelBufferGetPixelFormatType(pixels) != kCVPixelFormatType_32BGRA) {
@@ -128,7 +131,8 @@ static void present(MViewCaptureOutput *o, CMSampleBufferRef sample, uint64_t di
                 sampled ? total / sampled : 0, peak);
     }
 
-    int result = mview_driver_present_bgra_mosaic(o->driver, o->head, base, stride, width, height);
+    int result = mview_driver_present_bgra_dirty(o->driver, o->head, base, stride, width, height,
+                                                rects, rect_count);
     if (result < 0 && MVIEW_DIAGNOSTICS && mview_config()->capture_dump_frames) {
         char path[96];
         snprintf(path, sizeof(path), "logs/failed-capture-head%u.png", o->head);
@@ -159,21 +163,41 @@ static void present(MViewCaptureOutput *o, CMSampleBufferRef sample, uint64_t di
 }
 
 static void consume(MViewCaptureOutput *o) {
+    MViewDirtyRect rects[MVIEW_CAPTURE_MAX_RECTS];
     os_unfair_lock_lock(&o->lock);
     CMSampleBufferRef sample = o->pending;
     uint64_t timestamp = o->pending_time;
-    o->pending = NULL; o->scheduled = false;
+    int rect_count = o->pending_rect_count < 0 ? 0 : o->pending_rect_count;
+    if (rect_count > 0) memcpy(rects, o->pending_rects, (size_t)rect_count * sizeof(rects[0]));
+    o->pending = NULL; o->scheduled = false; o->pending_rect_count = 0;
     os_unfair_lock_unlock(&o->lock);
     if (!sample) return;
-    if (atomic_load(&o->enabled)) present(o, sample, timestamp);
+    if (atomic_load(&o->enabled)) present(o, sample, timestamp, rects, rect_count);
     CFRelease(sample);
 }
 
-void mview_output_enqueue(MViewCaptureOutput *o, CMSampleBufferRef sample, int status, uint64_t timestamp) {
+void mview_output_enqueue(MViewCaptureOutput *o, CMSampleBufferRef sample, int status,
+                          uint64_t timestamp, const MViewDirtyRect *rects, int rect_count) {
     if (!o || status != 0 || !sample || !CMSampleBufferIsValid(sample)) return;
+    if (!rects || rect_count < 0 || rect_count > MVIEW_CAPTURE_MAX_RECTS) rect_count = 0;
     os_unfair_lock_lock(&o->lock);
     if (!atomic_load(&o->enabled)) { os_unfair_lock_unlock(&o->lock); return; }
+    /*
+     * A replaced frame's rects have to survive into the frame that replaces it. The
+     * dropped frame's changes were never fingerprinted, so forgetting where they were
+     * would leave those strips stale until the verification sweep reached them. Union the
+     * lists; if the union no longer fits, give up on rects for this frame and let the
+     * damage ledger read the whole surface, which is always correct.
+     */
     if (o->pending) { CFRelease(o->pending); o->dropped++; }
+    else o->pending_rect_count = 0;
+    if (rect_count == 0 || o->pending_rect_count + rect_count > MVIEW_CAPTURE_MAX_RECTS) {
+        o->pending_rect_count = -1;
+    } else if (o->pending_rect_count >= 0) {
+        memcpy(o->pending_rects + o->pending_rect_count, rects,
+               (size_t)rect_count * sizeof(o->pending_rects[0]));
+        o->pending_rect_count += rect_count;
+    }
     o->pending = (CMSampleBufferRef)CFRetain(sample); o->pending_time = timestamp;
     bool schedule = !o->scheduled; o->scheduled = true;
     os_unfair_lock_unlock(&o->lock);

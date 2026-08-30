@@ -4,9 +4,10 @@ An open userspace driver for the DisplayLink Ridge dock. It presents two 1920×1
 displays to macOS, captures them, and encodes the result as Ridge colour strips over USB
 without loading DisplayLink Manager, vendor libraries, or firmware.
 
-The driver, encoder and recovery supervisor are C. The menu-bar app is Swift. Objective-C++ adapters call IOUSBHost, CGVirtualDisplay,
-ScreenCaptureKit, and Foundation. Renaming these adapters to `.mm` retains the Objective-C
-runtime calls required by Apple's APIs; it does not remove Objective-C or accelerate them.
+The driver, encoder, transport and recovery supervisor are C. Swift is the glue and
+nothing more: it binds ScreenCaptureKit, `CGVirtualDisplay` and the menu-bar app, and hands
+every frame straight to C, which owns queueing, buffer lifetimes, pixel access, encoding
+and all scheduling decisions. No Objective-C or Objective-C++ remains in the tree.
 
 ## Overview
 

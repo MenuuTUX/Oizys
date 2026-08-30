@@ -14,7 +14,7 @@ ScreenCaptureKit  ->  damage ledger  ->  strip encoder  ->  sealed frames  ->  U
 
 ## Transport
 
-`usb_session.mm` claims `IOUSBHostInterface` ff/00/03 exclusively, which is what stops
+`usb_session.c` claims `IOUSBHostInterface` ff/00/03 exclusively, which is what stops
 DisplayLink Manager reclaiming the dock mid-run. A frame goes out as a single bulk
 request, including lengths divisible by 1024. Splitting a frame or appending a separate
 zero-length request is not supported. The extra request was followed by resets in motion
@@ -72,13 +72,13 @@ statement of the format.
 
 ## Display
 
-`display.mm` wraps `CGVirtualDisplay`, and also seats the two heads side by side above the
+`display.c` wraps `CGVirtualDisplay`, and also seats the two heads side by side above the
 main display and breaks any mirror set macOS folded them into. Both are necessary: macOS
 appends new displays to the end of one row, and with Sidecar active it mirrored a head to
 an iPad, so the dock drove the iPad's framebuffer at the iPad's aspect ratio. A pair the
 user has already arranged as a contiguous block is left alone.
 
-`capture.mm` runs the ScreenCaptureKit streams and the refresh clock. ScreenCaptureKit
+`Capture.swift` binds the ScreenCaptureKit streams and the refresh clock. ScreenCaptureKit
 delivers frames only on change and stops entirely on a still desktop, so the clock carries
 both the control session's cadence and any transmission debt a strip still owes.
 
@@ -88,6 +88,32 @@ pending complete frame per head; a newer frame replaces it while encoding is bus
 blank and suspended callbacks do not resend a stale surface. Both heads share one encoder
 queue because the protocol state is not thread-safe. The refresh timer repays cached strip
 debt only after two capture periods without a fresh presentation.
+
+### Dirty rectangles
+
+Each sample buffer carries `SCStreamFrameInfo.dirtyRects`, the compositor's own account of
+what moved. Swift copies it into `MViewDirtyRect` values and hands it to C with the frame;
+`mview_damage_plan_dirty` then fingerprints only the strips those rectangles cover and
+carries every other strip's previous fingerprint forward unchanged.
+
+Before this, every frame re-read all 8 MB of the surface to find out which 64×16 strips had
+changed, whether or not anything had. Two heads at ~57 fps is around 900 MB/s of reads that
+mostly confirmed nothing happened, and it is the main reason the driver cost more CPU than
+DisplayLink Manager, which gets its damage from the compositor instead of rediscovering it.
+
+Three things keep this from trading correctness for the saving:
+
+- A rectangle outside the surface impeaches the whole list for that frame, which falls back
+  to reading everything. Trusting a list that is already wrong about one rectangle is how a
+  stale tile gets onto a panel.
+- A replaced frame's rectangles are unioned into the frame that replaces it. The dropped
+  frame's pixels were never fingerprinted, so forgetting where they changed would strand
+  those strips. If the union no longer fits, the frame falls back to a full pass.
+- One strip row in `MVIEW_DAMAGE_SWEEP` is re-fingerprinted unconditionally every frame, on
+  a rotating phase. The rectangle list is a hint from the compositor, not a contract; a
+  rectangle it omits costs at most eight frames of staleness rather than a tile nothing
+  ever repairs. The sweep is an eighth of the old cost, and it is the reason the fast path
+  is safe to trust at all.
 
 ## Recovery
 
@@ -106,8 +132,10 @@ and restores DisplayLink when it ends.
 This first recovery implementation recreates virtual displays when its worker restarts;
 applications may move windows during that gap. Preserving virtual-display identity and
 window placement across worker replacement remains work for the persistent display host.
-The menu-bar user interface is Swift; capture/framework adapters are Objective-C++, and
-protocol, encoding and process supervision are C. The encoder uses ARM CRC instructions
+The menu-bar user interface and the Apple-framework adapters are Swift; protocol,
+encoding, transport and process supervision are C. The Swift layer never touches a pixel:
+it forwards the sample buffer and the compositor's dirty rectangles into C and stops
+there. The encoder uses ARM CRC instructions
 and NEON intrinsics where measured.
 
 
@@ -115,7 +143,7 @@ and NEON intrinsics where measured.
 
 `Sources/MViewApp/Main.swift` owns the menu-bar controls and starts the bundled
 `MViewDriver` supervisor with `Process`. It receives text status, not pixels. The capture
-path stays in the C/Objective-C++ worker. `Tools/build_app.py` creates `MView.app`, which
+path stays in the C worker. `Tools/build_app.py` creates `MView.app`, which
 must be launched through LaunchServices or Finder to establish its own app identity.
 
 The Swift executable is named `MView`; the helper is `MViewDriver`. They cannot be named

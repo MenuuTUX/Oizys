@@ -138,24 +138,17 @@ int mview_damage_owed(const MViewDamageMap *map, MViewStrip *out, int max_out) {
     return n;
 }
 
-int mview_damage_plan(MViewDamageMap *map, const uint8_t *bgra, size_t stride, MViewStrip *out,
-                      int max_out, int *presentations) {
-    /*
-     * Two passes, because they have different sharing. Fingerprinting writes one slot per
-     * strip and spreads across cores freely; charging writes a 4x4 neighbourhood of debt
-     * counters that neighbouring strips overlap, so it stays on one thread. The second
-     * pass touches no pixels and costs almost nothing next to the first.
-     */
-    MVIEW_PROFILE_BEGIN(plan, MVIEW_ZONE_DAMAGE_PLAN);
-    MVIEW_PROFILE_BEGIN(hash, MVIEW_ZONE_DAMAGE_HASH);
+/*
+ * Charge every macro tile whose fingerprint moved, then report what is owed. Shared by
+ * both plan entry points; it reads `pending` and touches no pixels.
+ *
+ * Split from fingerprinting because the two have different sharing. Fingerprinting writes
+ * one slot per strip and spreads across cores freely; charging writes a 4x4 neighbourhood
+ * of debt counters that neighbouring strips overlap, so it stays on one thread. This pass
+ * costs almost nothing next to the first.
+ */
+static int settle_plan(MViewDamageMap *map, MViewStrip *out, int max_out, int *presentations) {
     uint32_t cols = map->cols;
-    dispatch_apply(map->rows, DISPATCH_APPLY_AUTO, ^(size_t row) {
-      for (uint32_t col = 0; col < cols; col++) {
-          map->pending[row * cols + col] =
-              hash_strip(bgra, stride, mview_damage_geom(map, col, (uint32_t)row));
-      }
-    });
-    MVIEW_PROFILE_END(hash, MVIEW_ZONE_DAMAGE_HASH);
     for (uint32_t row = 0; row < map->rows; row++) {
         for (uint32_t col = 0; col < cols; col++) {
             if (map->pending[row * cols + col] != map->hashes[row * cols + col]) {
@@ -171,7 +164,85 @@ int mview_damage_plan(MViewDamageMap *map, const uint8_t *bgra, size_t stride, M
        frame and the panels alternated between the desktop and it. A delta goes once and
        its repeats ride on later frames. */
     *presentations = map->keyframe_owed ? MVIEW_DAMAGE_REPEATS : 1;
-    int owed = mview_damage_owed(map, out, max_out);
+    return mview_damage_owed(map, out, max_out);
+}
+
+int mview_damage_plan(MViewDamageMap *map, const uint8_t *bgra, size_t stride, MViewStrip *out,
+                      int max_out, int *presentations) {
+    MVIEW_PROFILE_BEGIN(plan, MVIEW_ZONE_DAMAGE_PLAN);
+    MVIEW_PROFILE_BEGIN(hash, MVIEW_ZONE_DAMAGE_HASH);
+    uint32_t cols = map->cols;
+    dispatch_apply(map->rows, DISPATCH_APPLY_AUTO, ^(size_t row) {
+      for (uint32_t col = 0; col < cols; col++) {
+          map->pending[row * cols + col] =
+              hash_strip(bgra, stride, mview_damage_geom(map, col, (uint32_t)row));
+      }
+    });
+    MVIEW_PROFILE_END(hash, MVIEW_ZONE_DAMAGE_HASH);
+    map->sweep++;
+    int owed = settle_plan(map, out, max_out, presentations);
+    MVIEW_PROFILE_END(plan, MVIEW_ZONE_DAMAGE_PLAN);
+    return owed;
+}
+
+/* Strips `rect` covers, clamped to the map. Returns 0 if the rect leaves the surface, in
+   which case the caller must not trust the rect list at all. */
+static int mark_rect(const MViewDamageMap *map, MViewDirtyRect rect, uint8_t *mark) {
+    if (rect.w == 0 || rect.h == 0) {
+        return 1; /* an empty rect marks nothing and impeaches nothing */
+    }
+    if (rect.x >= map->width || rect.y >= map->height || rect.w > map->width - rect.x ||
+        rect.h > map->height - rect.y) {
+        return 0;
+    }
+    uint32_t first_col = rect.x / MVIEW_STRIP_W;
+    uint32_t first_row = rect.y / MVIEW_STRIP_H;
+    uint32_t last_col = (rect.x + rect.w - 1) / MVIEW_STRIP_W;
+    uint32_t last_row = (rect.y + rect.h - 1) / MVIEW_STRIP_H;
+    for (uint32_t row = first_row; row <= last_row && row < map->rows; row++) {
+        for (uint32_t col = first_col; col <= last_col && col < map->cols; col++) {
+            mark[row * map->cols + col] = 1;
+        }
+    }
+    return 1;
+}
+
+int mview_damage_plan_dirty(MViewDamageMap *map, const uint8_t *bgra, size_t stride,
+                            const MViewDirtyRect *rects, int rect_count, MViewStrip *out,
+                            int max_out, int *presentations) {
+    /* A keyframe has no previous fingerprint to carry forward, and an absent rect list is
+       no information at all. Both mean read everything. */
+    if (map->keyframe_owed || !rects || rect_count <= 0) {
+        return mview_damage_plan(map, bgra, stride, out, max_out, presentations);
+    }
+    uint8_t mark[MVIEW_MAX_STRIPS];
+    memset(mark, 0, sizeof(mark));
+    for (int i = 0; i < rect_count; i++) {
+        if (!mark_rect(map, rects[i], mark)) {
+            return mview_damage_plan(map, bgra, stride, out, max_out, presentations);
+        }
+    }
+    /* This frame's share of the verification sweep. See MVIEW_DAMAGE_SWEEP. */
+    for (uint32_t row = map->sweep % MVIEW_DAMAGE_SWEEP; row < map->rows;
+         row += MVIEW_DAMAGE_SWEEP) {
+        memset(&mark[row * map->cols], 1, map->cols);
+    }
+    map->sweep++;
+
+    MVIEW_PROFILE_BEGIN(plan, MVIEW_ZONE_DAMAGE_PLAN);
+    MVIEW_PROFILE_BEGIN(hash, MVIEW_ZONE_DAMAGE_HASH);
+    uint32_t cols = map->cols;
+    const uint8_t *marked = mark; /* a block cannot capture an array by value */
+    dispatch_apply(map->rows, DISPATCH_APPLY_AUTO, ^(size_t row) {
+      for (uint32_t col = 0; col < cols; col++) {
+          uint32_t index = (uint32_t)row * cols + col;
+          map->pending[index] =
+              marked[index] ? hash_strip(bgra, stride, mview_damage_geom(map, col, (uint32_t)row))
+                            : map->hashes[index];
+      }
+    });
+    MVIEW_PROFILE_END(hash, MVIEW_ZONE_DAMAGE_HASH);
+    int owed = settle_plan(map, out, max_out, presentations);
     MVIEW_PROFILE_END(plan, MVIEW_ZONE_DAMAGE_PLAN);
     return owed;
 }

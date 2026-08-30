@@ -25,9 +25,15 @@ func runProduction() {
     // Normal production operation does not retain terminal output or diagnostic files.
     let null = open("/dev/null", O_RDWR)
     if null >= 0 { dup2(null, STDIN_FILENO); dup2(null, STDOUT_FILENO); dup2(null, STDERR_FILENO); if null > 2 { close(null) } }
-    let args = [executable.path, "serve", "--takeover"].map { strdup($0) } + [nil]
-    args.withUnsafeBufferPointer { _ = execv(executable.path, $0.baseAddress!) }
-    for arg in args { free(arg) }
+    // execv wants a NULL-terminated char *const[]. Written as one expression, Swift infers
+    // the literal's element type from execv's parameter and then cannot type-check the
+    // Strings against it, so the array is built and terminated in steps.
+    let arguments: [String] = [executable.path, "serve", "--takeover"]
+    var argv: [UnsafeMutablePointer<CChar>?] = arguments.map { strdup($0) }
+    argv.append(nil)
+    argv.withUnsafeBufferPointer { _ = execv(executable.path, $0.baseAddress!) }
+    // Only reached if execv failed; the launcher must not linger as a resident process.
+    for arg in argv { free(arg) }
     exit(1)
 }
 #endif

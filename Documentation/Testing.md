@@ -67,9 +67,25 @@ any behavioural change makes the C disagree with the model.
 
 ## Coverage
 
-Around 83% of regions across the code reachable without the dock plugged in. `driver.c`,
-`usb_probe.c` and the Objective-C transport need real hardware and are excluded from the
-report rather than counted as zero, which would bury the number that means something.
+`python3 Tools/test.py --coverage` prints two numbers, because one on its own misleads in
+one direction or the other.
+
+| Denominator | Line coverage |
+| --- | ---: |
+| Files the suite reaches through the instrumented library | 64.00% |
+| Every C file in the library | 20.96% |
+| Swift (779 lines, 6 files) | 0% |
+
+Four sources read 0% in the second table without being untested: `usb_session.c`,
+`ddc_native.c`, `capture_frame.c` and `supervisor.c` are driven by `Tests/Support/*.c`,
+which `#include`s the source and compiles it into a separate, uninstrumented dylib so it
+can be run against mock hardware. What genuinely has no test is `driver.c`, `usb_probe.c`,
+`display.c`, `config.c` and `bench.c` — between them the mode-set sequence, device
+discovery, the virtual-display layout and configuration parsing.
+
+Swift is 0% by construction. The suite drives the library through `ctypes` and never
+enters Swift; ScreenCaptureKit, the virtual displays and the menu-bar app are exercised
+only by a live run against the dock.
 
 ## What the suite cannot do
 

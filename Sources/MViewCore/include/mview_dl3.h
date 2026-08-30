@@ -121,6 +121,12 @@ int mview_driver_present_solid(MViewDriver *driver, uint8_t head, uint8_t red, u
                                uint8_t blue);
 /* Present a ScreenCaptureKit BGRA surface as Haar/WHT 64x16 colour strips. Unchanged
  * surfaces produce no video write. */
+/* As mview_driver_present_bgra_mosaic, but hands the compositor's changed rectangles to
+   the damage ledger so unchanged strips are never re-read. A NULL or empty list means the
+   whole surface is fingerprinted. */
+int mview_driver_present_bgra_dirty(MViewDriver *driver, uint8_t head, const uint8_t *bgra,
+                                    size_t stride, uint32_t width, uint32_t height,
+                                    const MViewDirtyRect *rects, int rect_count);
 int mview_driver_present_bgra_mosaic(MViewDriver *driver, uint8_t head, const uint8_t *bgra,
                                      size_t stride, uint32_t width, uint32_t height);
 /* Pay off any outstanding strip retransmissions from the cached strip bodies.

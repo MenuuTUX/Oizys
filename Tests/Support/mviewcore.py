@@ -22,6 +22,7 @@ MAX_STRIPS = 30 * 68
 DOCK_BUFFERS = 2
 DAMAGE_REPEATS = DOCK_BUFFERS + 1
 MACRO_STRIPS = 4
+DAMAGE_SWEEP = 8
 
 # Codebook ceilings, spelled out rather than read from the library. A decoder that imported
 # the encoder's constants could not catch the encoder using the wrong one, which is the bug
@@ -79,11 +80,17 @@ class DamageMap(ctypes.Structure):
     _fields_ = [
         ("width", ctypes.c_uint32), ("height", ctypes.c_uint32),
         ("cols", ctypes.c_uint32), ("rows", ctypes.c_uint32),
+        ("sweep", ctypes.c_uint32),
         ("hashes", ctypes.c_uint64 * MAX_STRIPS),
         ("pending", ctypes.c_uint64 * MAX_STRIPS),
         ("debt", ctypes.c_uint8 * MAX_STRIPS),
         ("keyframe_owed", ctypes.c_uint8),
     ]
+
+
+class DirtyRect(ctypes.Structure):
+    _fields_ = [("x", ctypes.c_uint32), ("y", ctypes.c_uint32),
+                ("w", ctypes.c_uint32), ("h", ctypes.c_uint32)]
 
 
 class DL3Profile(ctypes.Structure):
@@ -112,6 +119,9 @@ _SIGNATURES = {
     "mview_damage_plan": (ctypes.c_int, [
         ctypes.POINTER(DamageMap), _u8p, ctypes.c_size_t, ctypes.POINTER(Strip),
         ctypes.c_int, ctypes.POINTER(ctypes.c_int)]),
+    "mview_damage_plan_dirty": (ctypes.c_int, [
+        ctypes.POINTER(DamageMap), _u8p, ctypes.c_size_t, ctypes.POINTER(DirtyRect),
+        ctypes.c_int, ctypes.POINTER(Strip), ctypes.c_int, ctypes.POINTER(ctypes.c_int)]),
     "mview_damage_owed": (ctypes.c_int, [
         ctypes.POINTER(DamageMap), ctypes.POINTER(Strip), ctypes.c_int]),
     "mview_damage_presented": (None, [ctypes.POINTER(DamageMap)]),

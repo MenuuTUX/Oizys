@@ -1761,7 +1761,8 @@ int mview_driver_refresh_head(MViewDriver *driver, uint8_t head) {
 }
 
 static int present_bgra_mosaic(MViewDriver *driver, uint8_t head, const uint8_t *bgra,
-                               size_t stride, uint32_t width, uint32_t height) {
+                               size_t stride, uint32_t width, uint32_t height,
+                               const MViewDirtyRect *rects, int rect_count) {
     if (!driver || !bgra || head >= driver->profile->head_count || !driver->active[head] ||
         width != 1920 || height != 1080 || stride < (size_t)width * 4) {
         return -1;
@@ -1775,8 +1776,8 @@ static int present_bgra_mosaic(MViewDriver *driver, uint8_t head, const uint8_t 
      */
     MViewStrip owed[MVIEW_MAX_STRIPS];
     int presentations = 1;
-    int count = mview_damage_plan(&driver->damage[head], bgra, stride, owed, MVIEW_MAX_STRIPS,
-                                  &presentations);
+    int count = mview_damage_plan_dirty(&driver->damage[head], bgra, stride, rects, rect_count,
+                                        owed, MVIEW_MAX_STRIPS, &presentations);
     if (count > MVIEW_MAX_STRIPS) {
         return -1;
     }
@@ -1799,12 +1800,18 @@ static int present_bgra_mosaic(MViewDriver *driver, uint8_t head, const uint8_t 
     return 0;
 }
 
-int mview_driver_present_bgra_mosaic(MViewDriver *driver, uint8_t head, const uint8_t *bgra,
-                                     size_t stride, uint32_t width, uint32_t height) {
+int mview_driver_present_bgra_dirty(MViewDriver *driver, uint8_t head, const uint8_t *bgra,
+                                    size_t stride, uint32_t width, uint32_t height,
+                                    const MViewDirtyRect *rects, int rect_count) {
     MVIEW_PROFILE_BEGIN(present, MVIEW_ZONE_PRESENT);
-    int rc = present_bgra_mosaic(driver, head, bgra, stride, width, height);
+    int rc = present_bgra_mosaic(driver, head, bgra, stride, width, height, rects, rect_count);
     MVIEW_PROFILE_END(present, MVIEW_ZONE_PRESENT);
     return rc;
+}
+
+int mview_driver_present_bgra_mosaic(MViewDriver *driver, uint8_t head, const uint8_t *bgra,
+                                     size_t stride, uint32_t width, uint32_t height) {
+    return mview_driver_present_bgra_dirty(driver, head, bgra, stride, width, height, NULL, 0);
 }
 
 /*

@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    # Apple Silicon. Base.xcconfig pins ARCHS=arm64 and -mcpu=apple-m1, and the encoder
+    # uses ARM CRC32 and NEON intrinsics, so an Intel runner cannot build this at all.
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - run: xcodebuild -version && swift --version
+      # Drives libMViewCore.dylib through ctypes. Nothing here needs a dock, a display or
+      # Screen Recording permission; the hardware paths are covered by mock device
+      # discovery and real subprocesses. See Documentation/Testing.md for what that
+      # leaves untested.
+      - name: Unit and property tests
+        run: python3 Tools/test.py
+      - name: Undefined-behaviour sanitiser
+        run: python3 Tools/test.py --sanitize undefined
+      - name: Address sanitiser
+        run: python3 Tools/test.py --sanitize address
+      - name: Coverage
+        run: python3 Tools/test.py --coverage | tee coverage.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage.txt
+
+  variants:
+    runs-on: macos-15
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [debug-minimal, debug-verbose, debug-fallback, production, production-fallback]
+    steps:
+      - uses: actions/checkout@v4
+      # build_app.py re-reads `mview build-info` out of the binary it just built and
+      # refuses to package a bundle whose compiled-in policy disagrees with the variant
+      # name. A production build that still had diagnostics in it fails here, not on a
+      # trader's machine.
+      - name: Build ${{ matrix.variant }}
+        run: python3 Tools/build_app.py --variant ${{ matrix.variant }}

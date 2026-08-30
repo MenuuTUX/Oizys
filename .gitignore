@@ -44,6 +44,9 @@ PROMPT.md
 # Knowledge-graph tooling output.
 graphify-out/
 
+# Editor and agent scratch state.
+.freebuff/
+
 # Python test environment, created by Tools/test.py
 .venv/
 __pycache__/

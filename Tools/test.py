@@ -86,15 +86,42 @@ def coverage(python, passthrough):
     subprocess.run(["xcrun", "llvm-profdata", "merge", "-sparse", *map(str, profiles),
                     "-o", str(merged)], check=True)
     library = products / "libMViewCore.dylib"
-    # Only the files a test can reach without the dock plugged in. driver.c, usb_probe.c
-    # and the Objective-C transport need real hardware; reporting them as 0% would bury
-    # the number that means something.
-    testable = ["wht.c", "encode.c", "dl3.c", "crypto.c", "profile.c"]
-    sources = [str(ROOT / "Sources" / "MViewCore" / name) for name in testable]
+    core = ROOT / "Sources" / "MViewCore"
+    # The files a test can reach with no dock plugged in. driver.c, usb_probe.c,
+    # usb_session.c, ddc_native.c, display.c and capture_frame.c all need real hardware or
+    # a real display server to enter.
+    reachable = [str(core / name) for name in
+                 ("wht.c", "encode.c", "dl3.c", "crypto.c", "profile.c", "config.c")]
+    everything = sorted(str(p) for p in core.glob("*.c"))
+
+    # Both numbers, always. The first says how well the code the suite can actually run is
+    # tested; the second says how much of the driver that is. Printing only the first
+    # reads as 84% coverage of MView, which is not what it measures -- the files it leaves
+    # out are most of the driver and all of the parts that touch the dock.
+    print("\n=== reachable without hardware: what the suite covers ===", flush=True)
     subprocess.run(["xcrun", "llvm-cov", "report", str(library),
-                    f"-instr-profile={merged}", *sources], cwd=ROOT)
+                    f"-instr-profile={merged}", *reachable], cwd=ROOT)
+    print("\n=== every C file in the library, including the hardware paths ===", flush=True)
+    subprocess.run(["xcrun", "llvm-cov", "report", str(library),
+                    f"-instr-profile={merged}", *everything], cwd=ROOT)
+    # Four sources are tested, but not through this library. Their suites compile
+    # Tests/Support/*.c, which #includes the source directly so it can be driven with
+    # mock hardware, into a separate uninstrumented dylib. Reading their 0% here as
+    # "untested" is the opposite of the truth.
+    print("\nusb_session.c, ddc_native.c, capture_frame.c and supervisor.c read 0% above "
+          "because their tests compile them separately, through Tests/Support/*.c, rather "
+          "than through this library. What genuinely has no test is driver.c, usb_probe.c, "
+          "display.c, config.c and bench.c.", flush=True)
+
+    swift = sorted((ROOT / "Sources/MViewPlatform").glob("*.swift")) + \
+            sorted((ROOT / "Sources/MViewApp").glob("*.swift"))
+    swift_lines = sum(len(p.read_text().splitlines()) for p in swift)
+    print(f"\nSwift: {swift_lines} lines in {len(swift)} files, 0% covered. The suite drives "
+          "the library through ctypes and never enters Swift; ScreenCaptureKit, the virtual "
+          "displays and the menu-bar app are exercised only by a live run against the dock.")
+
     subprocess.run(["xcrun", "llvm-cov", "show", str(library), f"-instr-profile={merged}",
-                    "-format=html", f"-output-dir={raw / 'html'}", *sources],
+                    "-format=html", f"-output-dir={raw / 'html'}", *everything],
                    cwd=ROOT, capture_output=True)
     print(f"\nhtml report: {(raw / 'html' / 'index.html').relative_to(ROOT)}")
     return code

@@ -17,11 +17,36 @@ private final class CaptureDelegate: NSObject, SCStreamOutput, SCStreamDelegate 
               let attachments = CMSampleBufferGetSampleAttachmentsArray(sampleBuffer, createIfNecessary: false) as? [[SCStreamFrameInfo: Any]],
               let first = attachments.first, let status = first[.status] as? NSNumber else { return }
         let displayed = (first[.displayTime] as? NSNumber)?.uint64Value ?? 0
-        mview_output_enqueue(output, sampleBuffer, status.int32Value, displayed)
+        let rects = dirtyRects(first)
+        rects.withUnsafeBufferPointer {
+            mview_output_enqueue(output, sampleBuffer, status.int32Value, displayed,
+                                 $0.baseAddress, Int32($0.count))
+        }
     }
     func stream(_ stream: SCStream, didStopWithError error: Error) {
         "ScreenCaptureKit stopped: \(error.localizedDescription)".withCString { mview_output_fail(output, $0) }
     }
+}
+
+// What the compositor says moved. The stream is configured at the display's own pixel
+// size, so these are already surface pixels and need no scaling; C bounds-checks every
+// rect against the surface anyway and falls back to fingerprinting the whole frame if one
+// does not fit, which is the only thing that stays correct if that assumption ever breaks.
+// An empty list means "no rectangles reported", which is not the same as "nothing changed"
+// and is passed through as a full pass.
+private func dirtyRects(_ info: [SCStreamFrameInfo: Any]) -> [MViewDirtyRect] {
+    guard let raw = info[.dirtyRects] as? [[String: Any]], !raw.isEmpty,
+          raw.count <= Int(MVIEW_CAPTURE_MAX_RECTS) else { return [] }
+    var out: [MViewDirtyRect] = []
+    out.reserveCapacity(raw.count)
+    for entry in raw {
+        guard let rect = CGRect(dictionaryRepresentation: entry as CFDictionary) else { return [] }
+        let r = rect.integral
+        guard r.minX >= 0, r.minY >= 0, r.width > 0, r.height > 0 else { return [] }
+        out.append(MViewDirtyRect(x: UInt32(r.minX), y: UInt32(r.minY),
+                                  w: UInt32(r.width), h: UInt32(r.height)))
+    }
+    return out
 }
 
 private final class StartState {

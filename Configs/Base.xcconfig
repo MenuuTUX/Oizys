@@ -24,8 +24,10 @@ SWIFT_COMPILATION_MODE = wholemodule
 OTHER_LDFLAGS = $(inherited) -Wl,-rpath,/usr/lib/swift
 CLANG_ENABLE_MODULES = YES
 
-// The Apple-framework adapters use Objective-C++. Their message sends still require
-// the Objective-C runtime; the protocol and encoder remain C. ARC also applies to .mm.
+// No Objective-C or Objective-C++ is left in the tree: the Apple-framework adapters are
+// Swift and everything below them is C. These stay because the SDK headers the C files
+// import are still C++-aware, and a stated standard beats whichever default the toolchain
+// picks next.
 CLANG_CXX_LANGUAGE_STANDARD = c++20
 CLANG_CXX_LIBRARY = libc++
 

@@ -36,6 +36,14 @@ class Ledger:
             core.MAX_STRIPS, ctypes.byref(self.presentations))
         return count, [self.strips[i] for i in range(count)]
 
+    def plan_dirty(self, surface: bytes, rects):
+        array = (core.DirtyRect * len(rects))(*[core.DirtyRect(*r) for r in rects])
+        count = core.lib.mview_damage_plan_dirty(
+            ctypes.byref(self.map), core.as_u8(surface), STRIDE,
+            array, len(rects), self.strips, core.MAX_STRIPS,
+            ctypes.byref(self.presentations))
+        return count, [self.strips[i] for i in range(count)]
+
     def owed(self):
         count = core.lib.mview_damage_owed(ctypes.byref(self.map), self.strips, core.MAX_STRIPS)
         return count, [self.strips[i] for i in range(count)]
@@ -135,3 +143,66 @@ def test_one_pixel_charges_exactly_its_macro_tile(x, y):
     count, strips = ledger.plan(bytes(surface))
     assert count <= core.MACRO_STRIPS ** 2, f"one pixel charged {count} strips"
     assert (x // core.STRIP_W, y // core.STRIP_H) in {(s.col, s.row) for s in strips}
+
+
+# ---------------------------------------------------------------------------
+# The dirty-rectangle fast path. Fingerprinting the whole surface every frame is
+# what made this driver cost more CPU than the vendor's; these check that reading
+# less does not mean seeing less.
+# ---------------------------------------------------------------------------
+
+
+def _settled(ledger, surface):
+    """Drive the ledger past its keyframe so the fast path is actually reachable."""
+    ledger.plan(surface)
+    for _ in range(core.DAMAGE_REPEATS + 1):
+        ledger.presented()
+        ledger.plan(surface)
+    ledger.presented()
+
+
+@given(st.integers(0, WIDTH - 1), st.integers(0, HEIGHT - 1))
+@settings(max_examples=40, deadline=None)
+def test_an_honest_rect_plans_the_same_strips_as_a_full_pass(x, y):
+    """Given the rectangle that really changed, the fast path must charge exactly what
+    reading every pixel would have charged."""
+    surface = bytearray(STRIDE * HEIGHT)
+    full, fast = Ledger(), Ledger()
+    _settled(full, bytes(surface))
+    _settled(fast, bytes(surface))
+
+    surface[y * STRIDE + x * 4] ^= 0xFF
+    want, want_strips = full.plan(bytes(surface))
+    got, got_strips = fast.plan_dirty(bytes(surface), [(x, y, 1, 1)])
+    assert got == want
+    assert {(s.col, s.row) for s in got_strips} == {(s.col, s.row) for s in want_strips}
+
+
+def test_a_rect_off_the_surface_is_not_trusted():
+    """A rect the compositor reports outside the surface impeaches the whole list, and the
+    frame falls back to reading everything rather than to reading nothing."""
+    surface = bytearray(STRIDE * HEIGHT)
+    ledger = Ledger()
+    _settled(ledger, bytes(surface))
+    surface[0] ^= 0xFF
+    count, _ = ledger.plan_dirty(bytes(surface), [(WIDTH, 0, 8, 8)])
+    assert count > 0, "an out-of-range rect silently suppressed a real change"
+
+
+def test_a_missed_rect_is_repaired_by_the_verification_sweep():
+    """The compositor's rectangle list is a hint. A change it fails to report must still
+    reach the wire within MVIEW_DAMAGE_SWEEP frames, not linger forever."""
+    surface = bytearray(STRIDE * HEIGHT)
+    ledger = Ledger()
+    _settled(ledger, bytes(surface))
+
+    # Change a strip, then lie about where it happened.
+    target_row = ROWS - 1
+    surface[target_row * core.STRIP_H * STRIDE] ^= 0xFF
+    elsewhere = [(0, 0, 1, 1)]
+    for frame in range(core.DAMAGE_SWEEP):
+        count, strips = ledger.plan_dirty(bytes(surface), elsewhere)
+        if any(s.row == target_row and s.col == 0 for s in strips):
+            return
+        ledger.presented()
+    pytest.fail(f"an unreported change never reached the wire in {core.DAMAGE_SWEEP} frames")
