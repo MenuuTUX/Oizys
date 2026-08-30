@@ -37,7 +37,7 @@ jobs:
         run: |
           set -o pipefail
           python3 Tools/test.py --coverage --coverage-floor 80 | tee coverage.txt
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: coverage
