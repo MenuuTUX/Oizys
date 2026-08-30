@@ -1,0 +1,39 @@
+// Settings shared by every target and configuration.
+//
+// Build settings live in xcconfig files rather than inside the pbxproj so they are
+// reviewable in a diff and so the command-line and IDE builds cannot drift apart.
+
+PRODUCT_NAME = $(TARGET_NAME)
+MACOSX_DEPLOYMENT_TARGET = 14.0
+ARCHS = arm64
+ONLY_ACTIVE_ARCH = NO
+ALWAYS_SEARCH_USER_PATHS = NO
+
+// Build products next to the sources rather than in DerivedData. This is a command-line
+// tool whose binary gets run by hand and by the test scripts, and a path under
+// ~/Library/Developer with a hash in it is not one you can put in a README.
+SYMROOT = $(SRCROOT)/build
+OBJROOT = $(SRCROOT)/build/Intermediates
+
+GCC_C_LANGUAGE_STANDARD = c11
+CLANG_ENABLE_OBJC_ARC = YES
+CLANG_ENABLE_MODULES = YES
+
+HEADER_SEARCH_PATHS = $(SRCROOT)/Sources/MViewCore/include
+
+// Warnings the driver has actually been bitten by. Return-type is an error because a C
+// function falling off the end returns a register's leftovers, which in this codebase
+// would be a length or a status.
+GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR
+GCC_TREAT_IMPLICIT_FUNCTION_DECLARATIONS_AS_ERRORS = YES
+CLANG_WARN_STRICT_PROTOTYPES = YES
+CLANG_WARN_DOCUMENTATION_COMMENTS = YES
+CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE
+GCC_WARN_SHADOW = YES
+GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE
+GCC_WARN_64_TO_32_BIT_CONVERSION = YES
+WARNING_CFLAGS = -Wall -Wextra -Wpointer-arith -Wcast-align -Wwrite-strings -Wno-unused-parameter
+
+// -mcpu names the actual core so clang emits the full NEON set for this machine rather
+// than a portable arm64 baseline. The encoder depends on it.
+MVIEW_CPU = -mcpu=apple-m3

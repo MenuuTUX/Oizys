@@ -1,0 +1,52 @@
+# Build output
+build/
+.build/
+DerivedData/
+*.o
+*.om
+*.dSYM/
+*.profraw
+*.profdata
+coverage/
+
+# Xcode
+*.xcuserstate
+xcuserdata/
+*.xcworkspace/xcuserdata/
+
+# Run output. mview recreates logs/ on every run.
+logs/
+
+# macOS
+.DS_Store
+*.swp
+
+# ---------------------------------------------------------------------------
+# Never publish. Everything below is either someone else's copyrighted work or
+# a local research tree, and none of it belongs in an open-source driver repo.
+# ---------------------------------------------------------------------------
+
+# DisplayLink Manager: the vendor installer and everything unpacked from it.
+# The whole directory, not its subdirectories — an earlier rule listed only the
+# subdirectories and left the 13 MB .pkg tracked.
+compiled_driver/
+
+# Vino working tree and protocol probe scripts. Vino is GPL; MView is a
+# clean-room reimplementation and keeps no copy of its source.
+work/
+artifacts/
+
+# Local notes that quote or index the vendor binary, and the original task
+# brief, which is stale and cites GPL excerpts by path.
+docs/
+PROMPT.md
+
+# Knowledge-graph tooling output.
+graphify-out/
+
+# Python test environment, created by Tools/test.py
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.hypothesis/

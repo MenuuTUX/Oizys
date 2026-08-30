@@ -1,0 +1,20 @@
+#include "Base.xcconfig"
+
+GCC_OPTIMIZATION_LEVEL = 3
+GCC_PREPROCESSOR_DEFINITIONS = NDEBUG=1 _FORTIFY_SOURCE=2 $(inherited)
+DEBUG_INFORMATION_FORMAT = dwarf-with-dsym
+
+// Monolithic LTO, not thin. One link unit lets the strip encoder inline across
+// translation units, which is where its throughput comes from.
+LLVM_LTO = YES
+DEAD_CODE_STRIPPING = YES
+GCC_SYMBOLS_PRIVATE_EXTERN = YES
+
+ENABLE_HARDENED_RUNTIME = YES
+OTHER_CFLAGS = $(MVIEW_CPU) -fno-common -fstack-protector-strong
+
+// Profile-guided optimisation. Empty until Tools/pgo.py has produced a profile, at which
+// point it points at one. Measured worth on this workload is small — the hot loops are
+// branchless SIMD or branch on pixel data no profile predicts — but the plumbing is here.
+MVIEW_PGO =
+OTHER_CFLAGS = $(inherited) $(MVIEW_PGO)

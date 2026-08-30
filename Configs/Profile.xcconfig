@@ -1,0 +1,7 @@
+#include "Release.xcconfig"
+
+// A release build that keeps frame pointers, so Instruments and sample can walk the
+// stack through the encoder.
+OTHER_CFLAGS = $(inherited) -fno-omit-frame-pointer
+DEPLOYMENT_POSTPROCESSING = NO
+STRIP_INSTALLED_PRODUCT = NO

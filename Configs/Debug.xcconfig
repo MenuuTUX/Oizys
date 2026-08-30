@@ -1,0 +1,13 @@
+#include "Base.xcconfig"
+
+GCC_OPTIMIZATION_LEVEL = 0
+GCC_PREPROCESSOR_DEFINITIONS = DEBUG=1 $(inherited)
+ONLY_ACTIVE_ARCH = YES
+ENABLE_TESTABILITY = YES
+LLVM_LTO = NO
+DEBUG_INFORMATION_FORMAT = dwarf
+
+// Even a debug build keeps -mcpu. Without it the encoder falls back to a baseline NEON
+// set and runs slowly enough to change how the driver behaves against real hardware,
+// which makes debug builds useless for the thing they exist to debug.
+OTHER_CFLAGS = $(MVIEW_CPU)
