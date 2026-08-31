@@ -117,7 +117,13 @@ private final class ProductionController: NSObject, NSApplicationDelegate {
         guard eligible else { failures = 0; stopWorker(); return }
         guard CGPreflightScreenCaptureAccess() else {
             stopWorker()
-            // Recheck only while an eligible dock is connected, without prompting.
+            // Ask once, even at login. Staying quiet here means a dock that is plugged in and
+            // authenticated never lights a panel and says nothing about why: the retry below
+            // spins forever, the worker is never spawned, and `service status` reports the
+            // permission as granted because it preflights the CLI, which is a different binary
+            // with its own grant. A single prompt the first time a dock is actually present is
+            // worth more than a silent loop.
+            requestPermissionIfNeeded()
             retry = Timer.scheduledTimer(withTimeInterval: 5, repeats: false) { [weak self] _ in self?.reconcile() }
             return
         }

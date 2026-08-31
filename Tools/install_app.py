@@ -136,7 +136,12 @@ def install(bundle, applications=Path("/Applications"), login=True):
             value = {
                 "Label": LABEL,
                 # LaunchServices preserves TCC identity; -W ties the job to app lifetime.
-                "ProgramArguments": ["/usr/bin/open", "-g", "-W", "-a", str(destination), "--args", "--background"],
+                # Exec the binary rather than going through `open`. LaunchServices leaves the app
+            # without its own TCC identity that way, so the bundle's Screen Recording grant
+            # does not apply to it and the supervisor parks on a failed preflight forever,
+            # silently, while the CLI reports the permission as granted because that is a
+            # different binary. Launched directly the app is its own responsible process.
+            "ProgramArguments": [str(destination / "Contents/MacOS/Oizys"), "--background"],
                 "RunAtLoad": True, "KeepAlive": True,
                 "LimitLoadToSessionType": "Aqua", "ProcessType": "Interactive",
                 "ThrottleInterval": 10, "ExitTimeOut": 8,
