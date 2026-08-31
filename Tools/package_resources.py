@@ -6,9 +6,24 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import tempfile
 import zipfile
 
 ROOT = Path(__file__).resolve().parent.parent
+
+
+def app_icon(destination):
+    """Build the standard macOS sizes from the repository's original artwork."""
+    with tempfile.TemporaryDirectory(prefix="oizys-icon-") as temporary:
+        iconset = Path(temporary) / "Oizys.iconset"
+        iconset.mkdir()
+        for size in (16, 32, 128, 256, 512):
+            for scale in (1, 2):
+                name = f"icon_{size}x{size}{'@2x' if scale == 2 else ''}.png"
+                subprocess.run(["sips", "-z", str(size * scale), str(size * scale),
+                                str(ROOT / "Oizys.png"), "--out", str(iconset / name)],
+                               check=True, stdout=subprocess.DEVNULL)
+        subprocess.run(["iconutil", "-c", "icns", str(iconset), "-o", str(destination)], check=True)
 
 
 def package(bundle, driver, debug, identity="-", allow_debugger=False):
@@ -17,6 +32,7 @@ def package(bundle, driver, debug, identity="-", allow_debugger=False):
     resources = contents / "Resources"
     binaries.mkdir(parents=True, exist_ok=True)
     resources.mkdir(parents=True, exist_ok=True)
+    app_icon(resources / "Oizys.icns")
     shutil.copy2(driver, binaries / "OizysDriver")
     info = json.loads(subprocess.check_output([str(driver), "build-info"]))
     if info["diagnostics"] != debug:
@@ -25,7 +41,8 @@ def package(bundle, driver, debug, identity="-", allow_debugger=False):
     if debug:
         digest = hashlib.sha256()
         with zipfile.ZipFile(resources / "Developer.zip", "w", zipfile.ZIP_DEFLATED) as output:
-            paths = [ROOT / "VERSION", ROOT / "dev.sh"]
+            paths = [ROOT / name for name in ("VERSION", "dev.sh", "Oizys.png", "README.md",
+                                              "CONTRIBUTING.md", "CHANGELOG.md")]
             for directory in ("Sources", "Tools", "Tests", "Configs", "Oizys.xcodeproj"):
                 paths += sorted((ROOT / directory).rglob("*"))
             for path in paths:

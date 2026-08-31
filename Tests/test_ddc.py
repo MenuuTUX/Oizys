@@ -4,6 +4,7 @@ import pathlib
 import subprocess
 
 import pytest
+from Support.native_coverage import flags
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 
@@ -16,7 +17,7 @@ def ddc(tmp_path_factory):
         "-I", str(ROOT / "Sources/OizysCore/include"),
         str(ROOT / "Tests/Support/ddc_native_test.c"),
         "-framework", "Foundation", "-framework", "CoreGraphics", "-framework", "IOKit",
-        "-o", str(output),
+        *flags(output), "-o", str(output),
     ], check=True, capture_output=True, text=True)
     library = ctypes.CDLL(str(output))
     library.test_match.argtypes = [ctypes.c_char_p, ctypes.c_size_t,

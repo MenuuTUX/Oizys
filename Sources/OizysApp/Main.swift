@@ -107,7 +107,10 @@ final class OizysApp: NSObject, NSApplicationDelegate {
 
     private func makeMenu() {
         item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        item.button?.image = NSImage(systemSymbolName: "display.2", accessibilityDescription: "Oizys")
+        let icon = NSImage(named: NSImage.applicationIconName)?.copy() as? NSImage
+        icon?.size = NSSize(width: 18, height: 18)
+        item.button?.image = icon
+        item.button?.setAccessibilityLabel("Oizys")
         item.button?.toolTip = "Oizys — USB displays"
         let menu = NSMenu()
         statusMenu = NSMenuItem(title: "Oizys · Ready", action: nil, keyEquivalent: "")

@@ -72,7 +72,7 @@ statement of the format.
 
 ## Display
 
-`display.c` wraps `CGVirtualDisplay`, and also seats the two heads side by side above the
+`VirtualDisplay.swift` wraps `CGVirtualDisplay`. `display.c` coordinates the virtual heads, and also seats the two heads side by side above the
 main display and breaks any mirror set macOS folded them into. Both are necessary: macOS
 appends new displays to the end of one row, and with Sidecar active it mirrored a head to
 an iPad, so the dock drove the iPad's framebuffer at the iPad's aspect ratio. A pair the
@@ -157,6 +157,6 @@ time. Oizys neither disables screen locking nor prevents system sleep.
 
 The production Swift executable is named `Oizys`; the helper is `OizysDriver`. They cannot be named
 `Oizys` and `oizys`, since those collide on the usual case-insensitive macOS filesystem.
-App Stop allows the C supervisor to clean up; Quit waits for that cleanup. A bounded
-benchmark launch (`open Oizys.app --args --benchmark`) starts after permission and stops
-the driver automatically 75 seconds after it first becomes ready.
+App Stop allows the C supervisor to clean up; Quit waits for that cleanup. The debug app supports `--benchmark`, which starts after permission and stops
+the driver automatically 75 seconds after it first becomes ready. Production does not
+provide this diagnostic mode.

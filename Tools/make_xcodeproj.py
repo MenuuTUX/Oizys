@@ -82,6 +82,7 @@ def file_type(path):
         ".mm": "sourcecode.cpp.objcpp",
         ".h": "sourcecode.c.h",
         ".xcconfig": "text.xcconfig",
+        ".png": "image.png",
     }.get(path.suffix, "text")
 
 
@@ -95,7 +96,8 @@ def build():
     extras = sorted(p for directory in ("Tools", "Tests", "Documentation") for p in (ROOT / directory).rglob("*")
                     if p.is_file() and not p.is_symlink() and "__pycache__" not in p.parts
                     and p.suffix in (".py", ".swift", ".c", ".h", ".sh", ".md", ".m") and p not in xctests)
-    extras += [ROOT / "dev.sh", ROOT / "README.md", ROOT / "VERSION", ROOT / "Sources/OizysApp/Info.plist"]
+    extras += [ROOT / name for name in ("dev.sh", "README.md", "CONTRIBUTING.md", "CHANGELOG.md",
+                                        "VERSION", "Oizys.png", "Sources/OizysApp/Info.plist")]
     configs = [ROOT / path for path in XCCONFIG.values()] + [ROOT / LIBRARY_XCCONFIG]
     configs.append(ROOT / "Configs" / "Base.xcconfig")
     extras.append(ROOT / "Configs/Debug.entitlements")

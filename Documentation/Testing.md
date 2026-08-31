@@ -63,6 +63,13 @@ catches.
 | `test_protocol.py` | control framing, EDID parsing against generated malformed replies, and every frame builder checked for writing past its capacity |
 | `test_damage.py` | the ledger as a state machine: arbitrary sequences of paint, plan and present with invariants after every step |
 | `test_profiler.py` | the profiler, including concurrent recording |
+| `test_config.py` | configuration parsing, clamping, persistence, and defaults |
+| `test_capture.py`, `test_usb_frames.py`, `test_ddc.py` | bounded capture, USB frame boundaries, and DDC validation with fake devices |
+| `test_supervisor.py` | worker crash, timeout, duplicate service, and reconnect behavior |
+| `test_debug_permissions.py`, `test_diagnostic_report.py` | Swift permission policy and private report export |
+| `test_build_tools.py` | icon generation, installation rollback, build-policy rejection, and coverage validation |
+| `test_cli.py` | CLI build policy, isolated configuration, and invalid controls without hardware changes |
+| `test_fixture*.py`, `test_debug_session.py` | developer fixture and debug-session tooling |
 
 Surfaces are drawn from several styles rather than one. The codec's paths are content
 dependent: a flat tile never leaves the DC band, noise saturates the escape codes, and hard
@@ -91,29 +98,39 @@ any behavioural change makes the C disagree with the model.
 
 ## Coverage
 
-`python3 Tools/test.py --coverage` prints two numbers, because one on its own misleads in
-one direction or the other.
+`python3 Tools/test.py --coverage` builds isolated instrumented debug and production
+products, runs the suite, and writes `build/coverage/summary.json`. It measures all native
+sources under `Sources/`, the Swift/Objective-C developer executables under `Tools/`, and
+all Python tools, including modules the tests never import.
 
-| Denominator | Line coverage |
-| --- | ---: |
-| Files the suite reaches through the instrumented library | 83.71% |
-| Every C file in the library | 27.26% |
-| Swift (793 lines, 6 files) | 0% |
+The USB, DDC, capture, supervisor, permission, and diagnostic-report test adapters register
+their separately compiled binaries. Their counters now contribute to the native report.
+Production and debug use different compiled policies, so both are included. Packaging's
+`build-info` calls are discarded before testing. A failed suite returns failure before
+publishing a summary.
 
-Four sources read 0% in the second table without being untested: `usb_session.c`,
-`ddc_native.c`, `capture_frame.c` and `supervisor.c` are driven by `Tests/Support/*.c`,
-which `#include`s the source and compiles it into a separate, uninstrumented dylib so it
-can be run against mock hardware. What genuinely has no test is `driver.c`, `usb_probe.c`,
-`display.c` and `bench.c` — between them the mode-set sequence, device discovery and the
-virtual-display layout.
+LLVM can omit functions with different hashes but the same name across executables. An
+empty-profile baseline supplies the denominator for these functions in `summary.json`;
+they count as unexecuted instead of disappearing. LLVM's HTML/report output may omit those
+mismatched functions, so use the JSON summary for the complete measured denominator.
+Python line and branch counts are in `build/coverage/python.json`; native branch counts
+come from LLVM, which does not report Swift branch coverage.
 
-`--coverage-floor` fails the run when the first number falls below it; CI runs at 80. The
-floor exists because of a specific failure, not as a target to chase: a segfault inside the
-suite means the interpreter never flushes its counters, every file then reports 0.00%, and
-the run still exits through the reporting code. Read as a percentage that is a coverage
-collapse; read as a signal it is a crash, and it has to fail either way. In CI the coverage
-step also needs `set -o pipefail`, because a pipe into `tee` otherwise reports `tee`'s exit
-status and buries the whole thing under a green tick.
+- `build/coverage/html/index.html`: native execution details.
+- `build/coverage/python-html/index.html`: Python line and branch details.
+- `--coverage-floor 80`: minimum line coverage of the six core files historically measured
+  by CI. This is not whole-project coverage.
+- `--project-coverage-floor 100`: fails unless every measured native/Python line is covered
+  and no executable source remains uninstrumented. This target currently fails.
+
+The 2026-08-31 validation run passed 207 tests. It measured 83.16% line coverage in the
+six-file core subset, 17.66% across native sources, and 19.23% across measured native and
+Python lines. `DiagnosticReport.swift` reached 100% line coverage. These are snapshots,
+not promises for later changes; regenerate the reports for the current checkout.
+
+`dev.sh` is not instrumented by LLVM or coverage.py and is explicitly listed as unmeasured.
+Many production lifecycle, GUI, device discovery, authentication, and error paths remain
+unexecuted. A green core coverage check must not be presented as 100% project coverage.
 
 ### Sanitisers and the interpreter
 
@@ -126,9 +143,9 @@ undefined` tries the ctypes suite first, because it reaches every fuzzed input, 
 back to the same native runner when the load is refused, so the command means the same
 thing on a laptop as it does on CI.
 
-Swift is 0% by construction. The suite drives the library through `ctypes` and never
-enters Swift; ScreenCaptureKit, the virtual displays and the menu-bar app are exercised
-only by a live run against the dock.
+The permission policy and diagnostic export have native Swift checks. ScreenCaptureKit,
+virtual displays, and most app lifecycle/UI paths still need additional tests and live
+validation.
 
 ## Reading a run
 

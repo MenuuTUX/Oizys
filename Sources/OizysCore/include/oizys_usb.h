@@ -116,6 +116,7 @@ int oizys_start_displaylink(void);
 #endif
 
 #if !OIZYS_DIAGNOSTICS && !defined(OIZYS_LOG_IMPLEMENTATION)
-#define oizys_log(...) ((void)0)
-#define oizys_log_open(...) ((void)0)
+/* Type-check arguments without evaluating them or emitting production logging. */
+#define oizys_log(...) ((void)sizeof((oizys_log(__VA_ARGS__), 0)))
+#define oizys_log_open(...) ((void)sizeof((oizys_log_open(__VA_ARGS__), 0)))
 #endif

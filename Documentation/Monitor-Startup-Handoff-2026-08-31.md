@@ -1,6 +1,12 @@
-# Oizys monitor startup failure: handoff to Claude
+# Historical monitor startup investigation
 
-## Task and current result
+This is an incident record from before commit `6d975ad`. Its instructions and machine
+state describe that investigation, not the current setup. The subsequent head-addressing
+fixes are in [Protocol.md](Protocol.md) and [Dock-Trace.md](Dock-Trace.md). DisplayLink was
+removed again during the 2026-08-31 cleanup. Old local logs and temporary paths below
+may no longer exist.
+
+## Task and result at the time
 
 Fix Oizys so both physical Dell monitors show a live desktop without DisplayLink Manager. The user normally disconnects the dock overnight. After reconnecting this morning, both monitors stayed in standby. Restarting the Mac did not help.
 

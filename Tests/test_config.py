@@ -19,8 +19,8 @@ import pytest
 
 from Support import oizyscore as core
 
-_CONFIG_DIR = tempfile.mkdtemp(prefix="oizys-config-test-")
-os.environ["OIZYS_CONFIG_PATH"] = str(pathlib.Path(_CONFIG_DIR) / "config.json")
+_CONFIG_DIR = tempfile.TemporaryDirectory(prefix="oizys-config-test-")
+os.environ["OIZYS_CONFIG_PATH"] = str(pathlib.Path(_CONFIG_DIR.name) / "config.json")
 
 
 @pytest.fixture(autouse=True)

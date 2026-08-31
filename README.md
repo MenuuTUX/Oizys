@@ -1,5 +1,7 @@
 # Oizys
 
+<img src="Oizys.png" alt="Oizys, a face formed from white dots on black" width="192">
+
 An open userspace driver for the DisplayLink Ridge dock. It presents two 1920×1080
 displays to macOS, captures them, and encodes the result as Ridge colour strips over USB
 without loading DisplayLink Manager, vendor libraries, or firmware.
@@ -7,7 +9,12 @@ without loading DisplayLink Manager, vendor libraries, or firmware.
 The driver, encoder, transport and recovery supervisor are C. Swift is the glue and
 nothing more: it binds ScreenCaptureKit, `CGVirtualDisplay` and the menu-bar app, and hands
 every frame straight to C, which owns queueing, buffer lifetimes, pixel access, encoding
-and all scheduling decisions. No Objective-C or Objective-C++ remains in the tree.
+and all scheduling decisions. The portable debug launcher in `Tools/PortableDebug.m` uses Objective-C. The driver does not use Objective-C++.
+
+Oizys is experimental. Current source includes the two head-addressing fixes described in
+[Protocol.md](Documentation/Protocol.md). A successful build or USB acknowledgement does
+not prove physical output. Confirm both monitors after installation and after a cold
+dock reconnect.
 
 ## Overview
 
@@ -92,6 +99,10 @@ the signing requirement stable across edits.
 The developer menu includes cleaning, dependency setup, tests, coverage, three sanitizers,
 encoder and GUI profiling, static analysis, Xcode archives, status and privacy settings.
 Builds do not run tests. See [Xcode workflows](Documentation/Xcode.md) for IDE details.
+`Oizys.png` is the repository logo and the source for every app icon. Xcode packaging
+uses macOS `sips` and `iconutil` to build the required icon sizes. Replace that PNG and
+rebuild to update Finder, application dialogs, and the debug menu-bar icon.
+
 Production ZIP and PKG packaging remain available through
 `Tools/build_app.py --format both`; use `dev.sh install` to register per-user startup.
 
@@ -173,21 +184,25 @@ faithfully encoded black frame from a broken encoder, and earlier versions of th
 reported success from USB acknowledgements while one panel was black and the other showed
 no signal.
 
-Both Dells were confirmed on 2026-08-29, first on solid-colour patterns and then on the
-live desktop, with DisplayLink Manager stopped.
+Both Dells were confirmed on 2026-08-29. A later reconnect failure was recorded on
+2026-08-31, followed by head-addressing fixes. Those historical observations are not
+acceptance results for a newly built app. See the [dock trace investigation](Documentation/Dock-Trace.md).
 
 ## Testing
 
 ```bash
 python3 Tools/test.py                    # build the library, run every suite
-python3 Tools/test.py --coverage
+python3 Tools/test.py --coverage         # native and Python reports, no hardware takeover
+python3 Tools/test.py --coverage --project-coverage-floor 100  # strict target; currently fails
 python3 Tools/test.py --sanitize thread
 python3 Tools/test.py --mutate
 ```
 
 The suite is Python driving `libOizysCore.dylib` through ctypes, so it exercises the
 shipping code rather than a reimplementation of it. `Tools/test.py` creates `.venv` and
-installs pytest, hypothesis and numpy on first run.
+installs pytest, hypothesis and numpy on first run. Coverage additionally installs
+`coverage.py`. The whole project does not have 100% coverage; see the measured scopes and
+remaining gaps in [Testing.md](Documentation/Testing.md).
 
 `Tests/Support/reference.py` is a second implementation of the codec, written in numpy from
 the format rather than from the C. Any surface can be run through both, so unlike a
@@ -277,6 +292,11 @@ Sources/OizysApp/   native Swift menu-bar app
 Tests/              pytest suites and the numpy reference model
 Tools/              build, test, profile and mutation scripts
 ```
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for validation, hardware acceptance, privacy, and
+release requirements. Do not publish raw screen dumps or device-identifying logs.
 
 ## License
 

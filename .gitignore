@@ -7,6 +7,8 @@ DerivedData/
 *.dSYM/
 *.profraw
 *.profdata
+.coverage
+coverage.txt
 coverage/
 
 # Xcode

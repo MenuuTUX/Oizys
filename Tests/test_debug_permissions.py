@@ -4,6 +4,7 @@ import subprocess
 import sys
 
 import pytest
+from Support.native_coverage import flags
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -16,7 +17,8 @@ def permission_test(tmp_path_factory):
     binary = directory / "test"
     subprocess.run(["xcrun", "swiftc", "-parse-as-library", "-module-cache-path", str(directory / "modules"),
                     str(ROOT / "Sources/OizysApp/DebugPermissions.swift"),
-                    str(ROOT / "Tests/Support/debug_permissions_test.swift"), "-o", str(binary)], check=True)
+                    str(ROOT / "Tests/Support/debug_permissions_test.swift"),
+                    *flags(binary, swift=True), "-o", str(binary)], check=True)
     return binary
 
 

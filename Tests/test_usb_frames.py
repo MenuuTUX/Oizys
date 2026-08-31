@@ -4,6 +4,7 @@ import pathlib
 import subprocess
 
 from Support import oizyscore as core
+from Support.native_coverage import flags
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 
@@ -15,7 +16,7 @@ def test_whole_frames_and_short_writes(tmp_path):
         "-I", str(ROOT / "Sources/OizysCore/include"),
         str(ROOT / "Tests/Support/usb_frame_test.c"), str(core.LIBRARY_PATH),
         "-framework", "Foundation", "-framework", "IOKit", "-framework", "IOUSBHost",
-        "-o", str(output),
+        *flags(output), "-o", str(output),
     ], capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
     library = ctypes.CDLL(str(output))

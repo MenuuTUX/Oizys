@@ -50,7 +50,7 @@ def build(configuration="Release", extra_cflags="", extra_ldflags=""):
         command.append(f"OTHER_CFLAGS=$(inherited) {extra_cflags}")
         command.append(f"OTHER_LDFLAGS=$(inherited) {extra_ldflags or extra_cflags}")
     result = subprocess.run(command, capture_output=True, text=True, cwd=ROOT)
-    if "BUILD SUCCEEDED" not in result.stdout:
+    if result.returncode != 0:
         print(result.stdout[-4000:])
         sys.exit("library build failed")
     for line in result.stdout.splitlines():
@@ -64,85 +64,132 @@ def run_pytest(python, extra_args, environment=None):
     env.setdefault("PYTHONDONTWRITEBYTECODE", "1")
     if environment:
         env.update(environment)
-    return subprocess.run([str(python), "-m", "pytest", "Tests", "-q", *extra_args],
+    runner = ["-m", "pytest"]
+    if env.get("OIZYS_COVERAGE_DIR"):
+        runner = ["-m", "coverage", "run", "--branch", "--source=Tools", "-m", "pytest"]
+    return subprocess.run([str(python), *runner, "Tests", "-q", *extra_args],
                           cwd=ROOT, env=env).returncode
 
 
-def coverage(python, passthrough, floor):
-    """llvm-cov over the library while the Python suite drives it."""
-    products = build("Debug", "-fprofile-instr-generate -fcoverage-mapping")
-    raw = ROOT / "build" / "coverage"
+def coverage(python, passthrough, floor, project_floor=0):
+    """Measure native products, native test adapters, and all Python tools separately."""
+    if subprocess.run([str(python), "-c", "import coverage"], capture_output=True).returncode:
+        subprocess.run([str(python), "-m", "pip", "install", "coverage>=7,<8"], check=True)
+    raw = ROOT / "build/coverage"
     shutil.rmtree(raw, ignore_errors=True)
     raw.mkdir(parents=True)
-    code = run_pytest(python, passthrough, {
-        "LLVM_PROFILE_FILE": str(raw / "%p.profraw"),
-        # Without this the suite would load whichever library it finds first, which is
-        # usually the uninstrumented Release build, and write no profile at all.
-        "OIZYS_DYLIB": str(products / "libOizysCore.dylib"),
-    })
+    environment = dict(os.environ, LLVM_PROFILE_FILE=str(raw / "%m-%p.profraw"),
+                       OIZYS_COVERAGE_DIR=str(raw), COVERAGE_FILE=str(raw / ".coverage"))
+    flags = "-fprofile-instr-generate -fcoverage-mapping"
+    # Separate products keep instrumented builds away from installed/running apps.
+    common = ["xcodebuild", "-project", str(PROJECT), "build",
+              f"SYMROOT={raw / 'products'}", f"OBJROOT={raw / 'intermediates'}",
+              f"OTHER_CFLAGS=$(inherited) {flags}",
+              "OTHER_SWIFT_FLAGS=$(inherited) -profile-generate -profile-coverage-mapping",
+              "OTHER_LDFLAGS=$(inherited) -fprofile-instr-generate",
+              "GCC_OPTIMIZATION_LEVEL=0", "SWIFT_OPTIMIZATION_LEVEL=-Onone",
+              "LLVM_LTO=NO", "DEAD_CODE_STRIPPING=NO"]
+    objects = []
+    for configuration, target in (("Debug", "OizysCoreDylib"),
+                                  ("DebugVerbose", "OizysApp"), ("Production", "OizysApp")):
+        with (raw / f"build-{configuration}.log").open("w") as log:
+            subprocess.run([*common, "-configuration", configuration, "-target", target],
+                           cwd=ROOT, env=environment, stdout=log, stderr=subprocess.STDOUT, check=True)
+        products = raw / "products" / configuration
+        if target == "OizysCoreDylib":
+            library = products / "libOizysCore.dylib"
+            objects.append(library)
+        else:
+            name = "Oizys" if configuration == "Production" else "Oizys-debug"
+            objects += [products / "oizys", products / f"{name}.app/Contents/MacOS/{name}"]
+    # Developer executables count even when no automated test enters them.
+    for name in ("MotionBench", "FixtureBench"):
+        binary = raw / name
+        subprocess.run(["xcrun", "swiftc", "-D", "OIZYS_FIXTURE_DEBUG",
+                        "-profile-generate", "-profile-coverage-mapping",
+                        "-module-cache-path", str(ROOT / "build/ModuleCache"),
+                        str(ROOT / f"Tools/{name}.swift"), "-o", str(binary)], check=True)
+        objects.append(binary)
+    binary = raw / "PortableDebug"
+    subprocess.run(["xcrun", "clang", "-fobjc-arc", *flags.split(),
+                    "-framework", "Foundation", "-framework", "AppKit",
+                    str(ROOT / "Tools/PortableDebug.m"), "-o", str(binary)], check=True)
+    objects.append(binary)
+    # Packaging invokes build-info; those counters are not test coverage.
+    for profile in raw.glob("*.profraw"):
+        profile.unlink()
+    environment["OIZYS_DYLIB"] = str(library)
+    code = run_pytest(python, passthrough, environment)
+    if code:
+        print(f"Test suite failed ({code}); refusing to publish partial coverage as a passing run.")
+        return code
     profiles = sorted(raw.glob("*.profraw"))
     if not profiles:
-        sys.exit("no profile data was written")
+        raise RuntimeError("No native coverage profiles were written")
+    registry = raw / "objects.txt"
+    if registry.exists():
+        objects += [pathlib.Path(p) for p in registry.read_text().splitlines()]
     merged = raw / "merged.profdata"
     subprocess.run(["xcrun", "llvm-profdata", "merge", "-sparse", *map(str, profiles),
                     "-o", str(merged)], check=True)
-    library = products / "libOizysCore.dylib"
-    core = ROOT / "Sources" / "OizysCore"
-    # The files a test can reach with no dock plugged in. driver.c, usb_probe.c,
-    # usb_session.c, ddc_native.c, display.c and capture_frame.c all need real hardware or
-    # a real display server to enter.
-    reachable = [str(core / name) for name in
-                 ("wht.c", "encode.c", "dl3.c", "crypto.c", "profile.c", "config.c")]
-    everything = sorted(str(p) for p in core.glob("*.c"))
-
-    # Both numbers, always. The first says how well the code the suite can actually run is
-    # tested; the second says how much of the driver that is. Printing only the first
-    # reads as 84% coverage of Oizys, which is not what it measures -- the files it leaves
-    # out are most of the driver and all of the parts that touch the dock.
-    print("\n=== reachable without hardware: what the suite covers ===", flush=True)
-    subprocess.run(["xcrun", "llvm-cov", "report", str(library),
-                    f"-instr-profile={merged}", *reachable], cwd=ROOT)
-    print("\n=== every C file in the library, including the hardware paths ===", flush=True)
-    subprocess.run(["xcrun", "llvm-cov", "report", str(library),
-                    f"-instr-profile={merged}", *everything], cwd=ROOT)
-    # Four sources are tested, but not through this library. Their suites compile
-    # Tests/Support/*.c, which #includes the source directly so it can be driven with
-    # mock hardware, into a separate uninstrumented dylib. Reading their 0% here as
-    # "untested" is the opposite of the truth.
-    print("\nusb_session.c, ddc_native.c, capture_frame.c and supervisor.c read 0% above "
-          "because their tests compile them separately, through Tests/Support/*.c, rather "
-          "than through this library. What genuinely has no test is driver.c, usb_probe.c, "
-          "display.c and bench.c.", flush=True)
-
-    swift = sorted((ROOT / "Sources/OizysPlatform").glob("*.swift")) + \
-            sorted((ROOT / "Sources/OizysApp").glob("*.swift"))
-    swift_lines = sum(len(p.read_text().splitlines()) for p in swift)
-    print(f"\nSwift: {swift_lines} lines in {len(swift)} files, 0% covered. The suite drives "
-          "the library through ctypes and never enters Swift; ScreenCaptureKit, the virtual "
-          "displays and the menu-bar app are exercised only by a live run against the dock.")
-
-    subprocess.run(["xcrun", "llvm-cov", "show", str(library), f"-instr-profile={merged}",
-                    "-format=html", f"-output-dir={raw / 'html'}", *everything],
-                   cwd=ROOT, capture_output=True)
-    print(f"\nhtml report: {(raw / 'html' / 'index.html').relative_to(ROOT)}")
-
-    summary = json.loads(subprocess.run(
-        ["xcrun", "llvm-cov", "export", "--summary-only", str(library),
-         f"-instr-profile={merged}", *reachable],
-        cwd=ROOT, capture_output=True, text=True, check=True).stdout)
-    lines = summary["data"][0]["totals"]["lines"]
-    percent = lines["percent"]
-    (raw / "summary.json").write_text(json.dumps(summary["data"][0]["totals"], indent=2))
-    print(f"\nreachable line coverage: {percent:.2f}% "
-          f"({lines['covered']}/{lines['count']}), floor {floor:.2f}%")
-    # A crashed interpreter writes no counters at all, and every file then reports 0.00%
-    # while the run still exits through this function. That reads as "coverage collapsed"
-    # rather than "the suite died", so fail on it here instead of letting a green tick
-    # carry a report full of zeroes.
-    if percent < floor:
-        print(f"coverage {percent:.2f}% is below the {floor:.2f}% floor")
-        return code or 1
-    return code
+    sources = sorted(p for folder in (ROOT / "Sources", ROOT / "Tools") for p in folder.rglob("*")
+                     if p.suffix in (".c", ".swift", ".m"))
+    arguments = [str(objects[0]), *[f"-object={p}" for p in objects[1:]],
+                 f"-instr-profile={merged}", *map(str, sources)]
+    native = json.loads(subprocess.check_output(
+        ["xcrun", "llvm-cov", "export", "--summary-only", *arguments], text=True))["data"][0]
+    # Distinct executables can have functions called main with different hashes.
+    # llvm-cov omits mismatched records. Its empty baseline keeps those unexecuted
+    # functions in our denominator instead of silently inflating coverage.
+    baseline = json.loads(subprocess.check_output(
+        ["xcrun", "llvm-cov", "export", "--summary-only", "--empty-profile",
+         *[a for a in arguments if not a.startswith("-instr-profile=")]], text=True))["data"][0]
+    actual = {f["filename"]: f for f in native["files"]}
+    for file in baseline["files"]:
+        measured_file = actual.get(file["filename"])
+        for kind, value in file["summary"].items():
+            value["covered"] = measured_file["summary"][kind]["covered"] if measured_file else 0
+            value["percent"] = 100 * value["covered"] / value["count"] if value["count"] else 0
+    native["files"] = baseline["files"]
+    for kind, value in native["totals"].items():
+        value["count"] = baseline["totals"][kind]["count"]
+        value["percent"] = 100 * value["covered"] / value["count"] if value["count"] else 0
+    subprocess.run(["xcrun", "llvm-cov", "report", *arguments], check=True)
+    subprocess.run(["xcrun", "llvm-cov", "show", *arguments, "-format=html",
+                    f"-output-dir={raw / 'html'}"], check=True, stdout=subprocess.DEVNULL)
+    subprocess.run([str(python), "-m", "coverage", "json", "-o", str(raw / "python.json")],
+                   cwd=ROOT, env=environment, check=True)
+    subprocess.run([str(python), "-m", "coverage", "html", "-d", str(raw / "python-html")],
+                   cwd=ROOT, env=environment, check=True)
+    python_report = json.loads((raw / "python.json").read_text())
+    reached = {"wht.c", "encode.c", "dl3.c", "crypto.c", "profile.c", "config.c"}
+    reachable = [f["summary"]["lines"] for f in native["files"]
+                 if pathlib.Path(f["filename"]).name in reached]
+    covered = sum(f["covered"] for f in reachable)
+    count = sum(f["count"] for f in reachable)
+    percent = 100 * covered / count if count else 0
+    measured = {pathlib.Path(f["filename"]).resolve() for f in native["files"]}
+    unmeasured = [str(p.relative_to(ROOT)) for p in sources if p.resolve() not in measured]
+    # llvm-cov/coverage.py do not instrument the shell entry point. Never hide it.
+    unmeasured.append("dev.sh")
+    py = python_report["totals"]
+    native_lines = native["totals"]["lines"]
+    total = native_lines["count"] + py["num_statements"]
+    hit = native_lines["covered"] + py["covered_lines"]
+    combined = 100 * hit / total if total else 0
+    summary = {"native": native, "python": py, "unmeasured": unmeasured,
+               "reachable_lines": {"covered": covered, "count": count, "percent": percent},
+               "measured_lines": {"covered": hit, "count": total, "percent": combined},
+               "project_complete": False}
+    (raw / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
+    print(f"\nReachable core line coverage: {percent:.2f}% ({covered}/{count}); floor {floor:.2f}%")
+    print(f"All measured native/Python lines, including baseline-only functions: {combined:.2f}% ({hit}/{total})")
+    print("Not instrumented: " + ", ".join(unmeasured))
+    print(f"Reports: {raw / 'html/index.html'} and {raw / 'python-html/index.html'}")
+    if percent < floor or combined < project_floor or (project_floor == 100 and unmeasured):
+        print("Coverage requirement not met. Unexecuted and unmeasured code remains in the report.")
+        return 1
+    return 0
 
 
 def native_sanitizer_run(flags):
@@ -178,20 +225,24 @@ def main():
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--sanitize", choices=sorted(SANITIZERS))
     parser.add_argument("--coverage", action="store_true")
-    parser.add_argument("--coverage-floor", type=float, default=1.0,
+    parser.add_argument("--coverage-floor", type=float, default=80.0,
                         metavar="PERCENT",
                         help="fail if reachable line coverage falls below this")
+    parser.add_argument("--project-coverage-floor", type=float, default=0, metavar="PERCENT",
+                        help="minimum combined measured native/Python lines; 100 also rejects unmeasured files")
     parser.add_argument("--mutate", action="store_true")
     parser.add_argument("--configuration", default="Release")
     known, passthrough = parser.parse_known_args()
 
+    if not all(0 <= value <= 100 for value in (known.coverage_floor, known.project_coverage_floor)):
+        parser.error("coverage floors must be between 0 and 100")
     python = ensure_venv()
 
     if known.mutate:
         return subprocess.run([str(python), str(ROOT / "Tools" / "mutate.py"),
                                *passthrough], cwd=ROOT).returncode
     if known.coverage:
-        return coverage(python, passthrough, known.coverage_floor)
+        return coverage(python, passthrough, known.coverage_floor, known.project_coverage_floor)
     if known.sanitize:
         # Address sanitiser runs as a native binary, not through the Python suite. macOS
         # refuses to load a sanitizer runtime into the Apple-signed interpreter ("Sanitizer
@@ -222,8 +273,8 @@ def main():
         print(f"running the suite against a {known.sanitize}-sanitised library")
         return run_pytest(python, passthrough, {"OIZYS_DYLIB": str(library)})
 
-    build(known.configuration)
-    return run_pytest(python, passthrough)
+    products = build(known.configuration)
+    return run_pytest(python, passthrough, {"OIZYS_DYLIB": str(products / "libOizysCore.dylib")})
 
 
 if __name__ == "__main__":

@@ -8,6 +8,7 @@ import time
 from contextlib import contextmanager
 
 import pytest
+from Support.native_coverage import flags
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 
@@ -18,7 +19,7 @@ def supervisor(tmp_path_factory):
     subprocess.run([
         "xcrun", "clang", "-std=c11", "-Wall", "-Wextra", "-Werror",
         "-I", str(ROOT / "Sources/OizysCore/include"),
-        str(ROOT / "Tests/Support/supervisor_test.c"), "-o", str(output),
+        str(ROOT / "Tests/Support/supervisor_test.c"), *flags(output), "-o", str(output),
     ], check=True, capture_output=True, text=True)
     return output
 

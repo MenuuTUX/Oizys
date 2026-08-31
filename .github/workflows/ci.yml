@@ -45,6 +45,9 @@ jobs:
             coverage.txt
             build/coverage/summary.json
             build/coverage/html
+            build/coverage/python.json
+            build/coverage/python-html
+            build/coverage/build-*.log
 
   variants:
     runs-on: macos-15
