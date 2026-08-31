@@ -108,15 +108,16 @@ def test_header_layout_is_stable():
 
 
 def test_set_mode_addresses_the_head_it_was_asked_for():
-    """off23 is the one-based head. A constant there aims every set-mode at the same head and
-    leaves the other dark; off22 is not a head index at all and stays 1, the only value the
-    vendor has been seen to send, because 0 makes the dock size head 0's buffer 4/3 too large."""
+    """off22 is the zero-based head. off23 is not a head at all: it picks the line count, and
+    the dock reads 0 as 720 lines, 1 as 1440 and 2 as the 1080 this timing asks for. Reading
+    off23 as a head number sizes the buffer 2/3 or 4/3 wrong and the dock falls back with the
+    panel dark."""
     for head in (0, 1):
         mode = core.buffer(80)
         pointer = ctypes.cast(mode, ctypes.POINTER(ctypes.c_uint8))
         assert core.lib.oizys_dl3_set_mode_1080p60(pointer, 80, 0, head) == 80
-        assert bytes(mode)[22] == 1
-        assert bytes(mode)[23] == head + 1
+        assert bytes(mode)[22] == head
+        assert bytes(mode)[23] == 2
 
 
 def test_size_field_is_the_body_plus_twelve():

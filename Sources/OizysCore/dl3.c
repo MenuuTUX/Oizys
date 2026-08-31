@@ -204,17 +204,14 @@ size_t oizys_dl3_set_mode_1080p60(uint8_t *out, size_t cap, uint16_t counter, ui
     memcpy(b + 0, &id, 2);
     memcpy(b + 2, &sub, 2);
     memcpy(b + 4, &counter, 2);
-    /* off22 is not the head. off23 selects the head, and every set-mode the vendor has been
-     * observed sending carries off22=1 — its capture only ever had one monitor, on the second
-     * socket, so off22=0 has never appeared on the wire and was our inference, not a reading.
-     * Sending 0 made the dock compute head 0's geometry at 23040 against head 1's 17280, a
-     * ratio of exactly 4/3, after which it skipped the final buffer setup and fell back. Head 1
-     * has always sent 1 here and has always rendered cleanly. */
-    b[22] = 1;
-    /* off23 is the one-based head number, the same convention the per-head setup burst
-     * uses. Pinning it to 2 aimed every set-mode at the second head: head 0 was never
-     * programmed at all, and head 1 was programmed twice under two stream indices. */
-    b[23] = (uint8_t)(head + 1);
+    /* off22 is the head, zero-based. off23 is not a head at all: it selects the mode's line
+     * count, and the dock's own buffer-sizing records pin the mapping down -- off23=0 sizes
+     * for 720 lines, off23=1 for 1440, off23=2 for the 1080 this timing actually asks for.
+     * Reading it as a head number is what produced buffers 4/3 and 2/3 of the right size and
+     * sent the dock down its fallback path with the panel dark. The constant 2 was right; what
+     * was missing was the sink engage, without which no buffer was allocated at all. */
+    b[22] = head;
+    b[23] = 2;
     uint16_t hactive = 1920, hblank = 280, hfront = 88, hsync = 44;
     uint16_t vactive = 1080, vblank = 45, vfront = 4, vsync = 5;
     uint16_t flags = 0x0400;
