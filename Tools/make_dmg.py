@@ -22,7 +22,7 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-VERSION = (ROOT / "VERSION").read_text().strip()
+VERSION = (ROOT / "VERSION").read_text().strip()   # overridden by --version
 
 README = """Oizys {version}
 
@@ -59,35 +59,35 @@ Verbose diagnostics are compiled in, including the dock's own firmware trace.
 """
 
 
-def variant_payload(variant, staging):
+def variant_payload(variant, staging, version):
     """Copy what the image should contain into `staging`; return the volume name."""
     if variant == "production":
-        app = ROOT / "build" / "apps" / "production" / VERSION / "Oizys.app"
+        app = ROOT / "build" / "apps" / "production" / version / "Oizys.app"
         if not app.is_dir():
             raise SystemExit(f"Build it first: OIZYS_VARIANT=production ./dev.sh build")
         shutil.copytree(app, staging / "Oizys.app", symlinks=True)
         (staging / "Applications").symlink_to("/Applications")
-        (staging / "README.txt").write_text(README.format(version=VERSION))
-        return f"Oizys {VERSION}"
+        (staging / "README.txt").write_text(README.format(version=version))
+        return f"Oizys {version}"
 
-    binary = ROOT / "dist" / f"Oizys-debug-{VERSION}-debug-verbose"
+    binary = ROOT / "dist" / f"Oizys-debug-{version}-debug-verbose"
     if not binary.is_file():
         raise SystemExit("Build it first: OIZYS_VARIANT=debug-verbose ./dev.sh build")
     target = staging / "Oizys-debug"
     shutil.copy2(binary, target)
     target.chmod(0o755)
-    (staging / "README.txt").write_text(DEBUG_README.format(version=VERSION))
-    return f"Oizys {VERSION} debug"
+    (staging / "README.txt").write_text(DEBUG_README.format(version=version))
+    return f"Oizys {version} debug"
 
 
-def build(variant, output_dir):
+def build(variant, output_dir, version):
     suffix = "" if variant == "production" else "-debug"
-    output = output_dir / f"Oizys{suffix}-{VERSION}.dmg"
+    output = output_dir / f"Oizys{suffix}-{version}.dmg"
     output.unlink(missing_ok=True)
     with tempfile.TemporaryDirectory(prefix="oizys-dmg-") as temporary:
         staging = Path(temporary) / "payload"
         staging.mkdir()
-        volume = variant_payload(variant, staging)
+        volume = variant_payload(variant, staging, version)
         subprocess.run(
             ["hdiutil", "create", "-volname", volume, "-srcfolder", str(staging),
              "-fs", "HFS+", "-format", "UDZO", "-imagekey", "zlib-level=9",
@@ -104,6 +104,8 @@ def main():
                         help="which images to build (default: both)")
     parser.add_argument("--output", default=str(ROOT / "dist"),
                         help="directory to write the images into")
+    parser.add_argument("--version", default=VERSION,
+                        help="version to package; defaults to the VERSION file")
     arguments = parser.parse_args()
     known = ["production", "debug-verbose"]
     for variant in arguments.variants:
@@ -113,7 +115,7 @@ def main():
     output_dir.mkdir(parents=True, exist_ok=True)
 
     for variant in (arguments.variants or known):
-        image = build(variant, output_dir)
+        image = build(variant, output_dir, arguments.version)
         size = image.stat().st_size / (1024 * 1024)
         print(f"{image}  ({size:.1f} MB)")
     return 0

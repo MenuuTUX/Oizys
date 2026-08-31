@@ -38,6 +38,9 @@ jobs:
             case "$variant" in production*) format=both ;; esac
             python3 Tools/build_app.py --variant "$variant" --version "${{ steps.version.outputs.version }}" --format "$format"
           done
+          # Disk images are the drag-to-Applications route; the ZIP and PKG stay for
+          # scripted installs. make_dmg reads what build_app already produced.
+          python3 Tools/make_dmg.py --output dist
           cd dist && shasum -a 256 Oizys-* Oizys-debug-* > SHA256SUMS.txt && cat SHA256SUMS.txt
 
       - name: Publish
@@ -62,6 +65,11 @@ jobs:
           vendor-restart path is gone with them. A small event listener starts capture
           only for a connected dock in an awake login session. Take `production-fallback` on a machine that still needs
           DisplayLink Manager to come back if the driver stops.
+
+          `Oizys-<version>.dmg` is the simplest way in: open it and drag Oizys to
+          Applications. `Oizys-debug-<version>.dmg` carries the portable diagnostic
+          executable, which installs nothing and owns the dock only while it runs. The ZIP
+          and PKG of the same builds are there for scripted installs.
 
           Production is named `Oizys` and includes the shared CLI/TUI. Debug is a single
           `Oizys-debug-<version>-<variant>` executable, without an installer. It unpacks

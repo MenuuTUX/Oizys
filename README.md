@@ -11,10 +11,14 @@ nothing more: it binds ScreenCaptureKit, `CGVirtualDisplay` and the menu-bar app
 every frame straight to C, which owns queueing, buffer lifetimes, pixel access, encoding
 and all scheduling decisions. The portable debug launcher in `Tools/PortableDebug.m` uses Objective-C. The driver does not use Objective-C++.
 
-Oizys is experimental. Current source includes the two head-addressing fixes described in
-[Protocol.md](Documentation/Protocol.md). A successful build or USB acknowledgement does
-not prove physical output. Confirm both monitors after installation and after a cold
-dock reconnect.
+Both panels have been confirmed rendering a live desktop on the hardware below, and the
+login service brings them up on its own across a restart. The wire-format corrections that
+took it there are in [Protocol.md](Documentation/Protocol.md); how they were found is in
+[Dock-Trace.md](Documentation/Dock-Trace.md).
+
+Oizys is still experimental, and one habit is worth keeping: a successful build, a USB
+acknowledgement and a clean log prove nothing about the glass. Every fault found here
+passed all three. Confirm both monitors after installing and after a cold dock reconnect.
 
 ## Overview
 
@@ -34,6 +38,19 @@ a 13 ms status poll and a 3 s heartbeat, which run whether or not anything moved
 
 macOS 14 or later on Apple silicon, Xcode 16 or later, and Screen Recording permission for
 the built binary. The encoder is NEON and is compiled for the host core.
+
+## Installing a release
+
+Tagged builds are published from `.github/workflows/release.yml`. Take
+`Oizys-<version>.dmg`, open it and drag Oizys to Applications, then launch it once so macOS
+can ask for Screen Recording — the driver captures the desktop to send it over USB and
+cannot drive a panel without it. `Oizys-debug-<version>.dmg` holds the portable diagnostic
+build, which installs nothing and owns the dock only while it runs. ZIP and PKG of the same
+builds are published alongside for scripted installs, with `SHA256SUMS.txt`.
+
+Those bundles are signed ad hoc. macOS will refuse them on a machine other than the one
+that built them without an explicit Gatekeeper override, and they are not notarized, so
+treat a release as something to build from source rather than hand to someone else.
 
 ## Building and installing
 
@@ -107,6 +124,16 @@ Production ZIP and PKG packaging remain available through
 `Tools/build_app.py --format both`; use `dev.sh install` to register per-user startup.
 
 ## Terminal controls
+
+Running `oizys` with no arguments opens a full-screen terminal UI on the alternate screen,
+so it leaves the scrollback alone. The left column carries the logo, the live service state
+and every attached display; the right column is a menu over an output pane. Arrows or
+`j`/`k` move, Return runs, `PgUp`/`PgDn` scroll the output, `r` refreshes and `q` quits.
+Below 92 columns the logo column drops and the menu takes the full width. The older numbered
+menu is still there as `oizys tui --menu`.
+
+The ASCII art is generated from `Oizys.png` by `Tools/ascii_logo.py`, which writes
+`Sources/oizys/logo.h`. Point it at another image to change it.
 
 Every variant includes the same CLI. With production installed, run `oizys` or `oizys tui`.
 A portable debug executable accepts `--cli tui` or any CLI command without opening the GUI.
@@ -290,8 +317,11 @@ Sources/OizysCore/  the driver
 Sources/oizys/      command-line entry point and C supervisor
 Sources/OizysApp/   native Swift menu-bar app
 Tests/              pytest suites and the numpy reference model
-Tools/              build, test, profile and mutation scripts
+Tools/              build, test, profile, packaging and mutation scripts
 ```
+
+`Tools/make_dmg.py` builds the disk images, `Tools/ascii_logo.py` regenerates the terminal
+artwork, and `Tools/test.py` is what `./dev.sh test` runs.
 
 ## Contributing
 
