@@ -204,7 +204,13 @@ size_t oizys_dl3_set_mode_1080p60(uint8_t *out, size_t cap, uint16_t counter, ui
     memcpy(b + 0, &id, 2);
     memcpy(b + 2, &sub, 2);
     memcpy(b + 4, &counter, 2);
-    b[22] = head;
+    /* off22 is not the head. off23 selects the head, and every set-mode the vendor has been
+     * observed sending carries off22=1 — its capture only ever had one monitor, on the second
+     * socket, so off22=0 has never appeared on the wire and was our inference, not a reading.
+     * Sending 0 made the dock compute head 0's geometry at 23040 against head 1's 17280, a
+     * ratio of exactly 4/3, after which it skipped the final buffer setup and fell back. Head 1
+     * has always sent 1 here and has always rendered cleanly. */
+    b[22] = 1;
     /* off23 is the one-based head number, the same convention the per-head setup burst
      * uses. Pinning it to 2 aimed every set-mode at the second head: head 0 was never
      * programmed at all, and head 1 was programmed twice under two stream indices. */

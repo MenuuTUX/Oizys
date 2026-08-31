@@ -108,13 +108,14 @@ def test_header_layout_is_stable():
 
 
 def test_set_mode_addresses_the_head_it_was_asked_for():
-    """off22 is the zero-based head, off23 the one-based one. A constant at off23 aims every
-    set-mode at the same head, which leaves the other one dark however correct the timing is."""
+    """off23 is the one-based head. A constant there aims every set-mode at the same head and
+    leaves the other dark; off22 is not a head index at all and stays 1, the only value the
+    vendor has been seen to send, because 0 makes the dock size head 0's buffer 4/3 too large."""
     for head in (0, 1):
         mode = core.buffer(80)
         pointer = ctypes.cast(mode, ctypes.POINTER(ctypes.c_uint8))
         assert core.lib.oizys_dl3_set_mode_1080p60(pointer, 80, 0, head) == 80
-        assert bytes(mode)[22] == head
+        assert bytes(mode)[22] == 1
         assert bytes(mode)[23] == head + 1
 
 

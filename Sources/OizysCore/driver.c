@@ -197,16 +197,28 @@ static void drain_control_debug(OizysDriver *driver, int limit, double timeout) 
             oizys_log("downstream HDCP push msg=0x%02x payload=%s", plain[9], payload);
         }
         if (sub == 0x0c && plain_len > 8) {
-            char trace[256];
-            size_t n = 0;
-            for (int j = 8; j < plain_len && n + 1 < sizeof(trace); j++) {
-                if (plain[j] >= 0x20 && plain[j] < 0x7f) {
-                    trace[n++] = (char)plain[j];
+            /* The dock's own log stream. Dropping every byte under 0x20 ran its fields
+             * together and made the arguments unreadable, so separators are escaped rather
+             * than discarded and the raw payload goes out beside the text. */
+            char trace[1024], raw[1024];
+            size_t n = 0, at = 0;
+            for (int j = 8; j < plain_len; j++) {
+                if (n + 5 < sizeof(trace)) {
+                    if (plain[j] >= 0x20 && plain[j] < 0x7f) {
+                        trace[n++] = (char)plain[j];
+                    } else {
+                        n += (size_t)snprintf(trace + n, sizeof(trace) - n, "\\x%02x", plain[j]);
+                    }
+                }
+                if (at + 3 < sizeof(raw)) {
+                    at += (size_t)snprintf(raw + at, sizeof(raw) - at, "%02x", plain[j]);
                 }
             }
             trace[n] = 0;
+            raw[at] = 0;
             if (n >= 4) {
                 oizys_log("dock trace: %s", trace);
+                oizys_log("dock trace raw: %s", raw);
             }
         }
     }

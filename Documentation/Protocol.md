@@ -45,6 +45,37 @@ An EDID reply is `0x0114/0x0021` with the 128-byte blocks starting at offset 22.
 of the first block is the extension count and drives the copy length, so it is validated
 against the payload before anything is read. Every block's checksum must sum to zero.
 
+## Mode set
+
+`0x48/0x22` carries the timing. Offsets are into the decrypted inner plaintext, and the
+field positions are corroborated twice over: `off26` reads 1920 and `off70` reads 14850 in
+units of 10 kHz, which is the 148.5 MHz pixel clock for 1080p60.
+
+| off | 22 | 23 | 26 | 28 | 30 | 32 | 34 | 36 | 42 | 44 | 46 | 48 | 66 | 68 | 70 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| | 1 | head+1 | 1920 | 280 | 88 | 44 | 1080 | 45 | `0x0400` | 60 | `0x4000` | `0x6000` | `0x2810` | `0x0200` | 14850 |
+
+The two head bytes are the part worth stating plainly, because both were wrong here and
+each one cost a working panel.
+
+`off23` is the **one-based head number**, 1 and 2. It is the head selector. The per-head
+setup burst in `configure_one_head` already used this convention; the mode builder pinned it
+to a constant 2, so every set-mode addressed head 1. Head 0 was never programmed at all and
+stayed dark, while head 1 was programmed twice under two stream indices and its downstream
+link retried on a five-second cycle without ever settling.
+
+`off22` is **not** a head index, despite reading like one. It is 1 for both heads. The only
+vendor capture available shows `off22=1`, but that capture had a single monitor on the second
+socket, so `off22=0` has never been observed on the wire and treating it as a zero-based head
+was an inference rather than a reading. Sending 0 made the dock size head 0's buffer at 23040
+against head 1's 17280 — a ratio of exactly 4/3, the 32-bit to 24-bit pixel ratio — after
+which it skipped its final buffer registration and took a fallback path. The panel lit, held
+the correct timing, and rendered a barred, banded image. With `off22=1` both heads compute
+17280 and run an identical path through the dock's firmware.
+
+Neither fault produced a failed write, a rejected frame, or an error reply. Both were visible
+only in the dock's own trace and on the glass.
+
 ## Video
 
 A 1920×1080 head is 2040 strips of 64×16. Each strip is sixteen 8×8 blocks across three
