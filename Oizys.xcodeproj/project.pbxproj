@@ -40,6 +40,7 @@
 		1A75FC126DB72404470A8F45 /* main.c in oizys */ = {isa = PBXBuildFile; fileRef = C593A3109A47D53AB431DAFD /* main.c */; };
 		4141A9AEF5CF36EF8653716C /* supervisor.c in oizys */ = {isa = PBXBuildFile; fileRef = B360A9AEDDC0C8C5BDF0CEB2 /* supervisor.c */; };
 		1FFD9DC8765DC53D9A47DC11 /* terminal.c in oizys */ = {isa = PBXBuildFile; fileRef = B410E56E518D7B8C0F6E7312 /* terminal.c */; };
+		5EAB7C7200A4A36E79F0BD4B /* tui.c in oizys */ = {isa = PBXBuildFile; fileRef = DBCCD12D988454B33AC263B1 /* tui.c */; };
 		D5A83486A57253F7F74C7383 /* Capture.swift in oizys */ = {isa = PBXBuildFile; fileRef = 0EEB566E0BCDC6A7067DF4BD /* Capture.swift */; };
 		39BF92B23AA03B51EB79FB7B /* ConfigStore.swift in oizys */ = {isa = PBXBuildFile; fileRef = DE1672BC58629EB9C49013C0 /* ConfigStore.swift */; };
 		D7003A3070DFFAB95CE14744 /* OizysLifecycle.swift in oizys */ = {isa = PBXBuildFile; fileRef = 2D523F3D48DA3B99FC5AE500 /* OizysLifecycle.swift */; };
@@ -129,6 +130,8 @@
 		C593A3109A47D53AB431DAFD /* main.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = main.c; path = Sources/oizys/main.c; sourceTree = SOURCE_ROOT; };
 		B360A9AEDDC0C8C5BDF0CEB2 /* supervisor.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = supervisor.c; path = Sources/oizys/supervisor.c; sourceTree = SOURCE_ROOT; };
 		B410E56E518D7B8C0F6E7312 /* terminal.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = terminal.c; path = Sources/oizys/terminal.c; sourceTree = SOURCE_ROOT; };
+		DBCCD12D988454B33AC263B1 /* tui.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = tui.c; path = Sources/oizys/tui.c; sourceTree = SOURCE_ROOT; };
+		7DA8B3994C1E29ADBCDEED29 /* logo.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = logo.h; path = Sources/oizys/logo.h; sourceTree = SOURCE_ROOT; };
 		4EABC461870478C12B55B408 /* oizys.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = oizys.h; path = Sources/OizysCore/include/oizys.h; sourceTree = SOURCE_ROOT; };
 		8342AA8919989AC72F94AF85 /* oizys_build.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = oizys_build.h; path = Sources/OizysCore/include/oizys_build.h; sourceTree = SOURCE_ROOT; };
 		A7462DBC420BD9989E18DBBE /* oizys_capture.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = oizys_capture.h; path = Sources/OizysCore/include/oizys_capture.h; sourceTree = SOURCE_ROOT; };
@@ -150,6 +153,7 @@
 		3F745877C8CFAB87E33E20F1 /* Production.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Production.swift; path = Sources/OizysApp/Production.swift; sourceTree = SOURCE_ROOT; };
 		A9B7EB1B7BE89C6D48072F43 /* SuiteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SuiteTests.swift; path = Tests/Xcode/SuiteTests.swift; sourceTree = SOURCE_ROOT; };
 		B5DDBF3F89114336EC0E08B7 = {isa = PBXFileReference; lastKnownFileType = text; name = "Architecture.md"; path = "Documentation/Architecture.md"; sourceTree = SOURCE_ROOT; };
+		5E663D17CC9BCFB31C121022 = {isa = PBXFileReference; lastKnownFileType = text; name = "Dock-Trace.md"; path = "Documentation/Dock-Trace.md"; sourceTree = SOURCE_ROOT; };
 		BE64DCC9992D21937DD471DF = {isa = PBXFileReference; lastKnownFileType = text; name = "Monitor-Startup-Handoff-2026-08-31.md"; path = "Documentation/Monitor-Startup-Handoff-2026-08-31.md"; sourceTree = SOURCE_ROOT; };
 		8CDA9285FD41E3077587483A = {isa = PBXFileReference; lastKnownFileType = text; name = "OriginalBrief.md"; path = "Documentation/OriginalBrief.md"; sourceTree = SOURCE_ROOT; };
 		CF05053E159299B83ACD7B00 = {isa = PBXFileReference; lastKnownFileType = text; name = "Performance-2026-08-30.md"; path = "Documentation/Performance-2026-08-30.md"; sourceTree = SOURCE_ROOT; };
@@ -161,12 +165,16 @@
 		26AE79822092186F35ABFC2F = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = "capture_test.c"; path = "Tests/Support/capture_test.c"; sourceTree = SOURCE_ROOT; };
 		AB3E4A7CE5B83C3DEDDC341E = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = "ddc_native_test.c"; path = "Tests/Support/ddc_native_test.c"; sourceTree = SOURCE_ROOT; };
 		8E8B6084D129FE3519110A7C = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "debug_permissions_test.swift"; path = "Tests/Support/debug_permissions_test.swift"; sourceTree = SOURCE_ROOT; };
+		CE41F210AE5F724F4205BB75 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "diagnostic_report_test.swift"; path = "Tests/Support/diagnostic_report_test.swift"; sourceTree = SOURCE_ROOT; };
+		44685A03681CFA13FC03BD72 = {isa = PBXFileReference; lastKnownFileType = text; name = "native_coverage.py"; path = "Tests/Support/native_coverage.py"; sourceTree = SOURCE_ROOT; };
 		023EA7B4A03F34571AA15F61 = {isa = PBXFileReference; lastKnownFileType = text; name = "oizyscore.py"; path = "Tests/Support/oizyscore.py"; sourceTree = SOURCE_ROOT; };
 		320EC1CA2CCE79B2D6C43B54 = {isa = PBXFileReference; lastKnownFileType = text; name = "reference.py"; path = "Tests/Support/reference.py"; sourceTree = SOURCE_ROOT; };
 		C7948E4A3AC7F3005DFFE893 = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = "supervisor_test.c"; path = "Tests/Support/supervisor_test.c"; sourceTree = SOURCE_ROOT; };
 		6673C227F9C7BB35A6ABD767 = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = "usb_frame_test.c"; path = "Tests/Support/usb_frame_test.c"; sourceTree = SOURCE_ROOT; };
 		BEE555D432F9BAFE40F1BED0 = {isa = PBXFileReference; lastKnownFileType = text; name = "conftest.py"; path = "Tests/conftest.py"; sourceTree = SOURCE_ROOT; };
+		1FD45C9E303FB101D3EBD6A6 = {isa = PBXFileReference; lastKnownFileType = text; name = "test_build_tools.py"; path = "Tests/test_build_tools.py"; sourceTree = SOURCE_ROOT; };
 		4F4DF7FDB482C869604CC941 = {isa = PBXFileReference; lastKnownFileType = text; name = "test_capture.py"; path = "Tests/test_capture.py"; sourceTree = SOURCE_ROOT; };
+		BC7A479B3BD93F710D425C06 = {isa = PBXFileReference; lastKnownFileType = text; name = "test_cli.py"; path = "Tests/test_cli.py"; sourceTree = SOURCE_ROOT; };
 		58EB06910DCF5ABE446E9851 = {isa = PBXFileReference; lastKnownFileType = text; name = "test_codec.py"; path = "Tests/test_codec.py"; sourceTree = SOURCE_ROOT; };
 		FB672CB9A4C7E21C05254C87 = {isa = PBXFileReference; lastKnownFileType = text; name = "test_config.py"; path = "Tests/test_config.py"; sourceTree = SOURCE_ROOT; };
 		B3AD56AE2BC0333262B7D308 = {isa = PBXFileReference; lastKnownFileType = text; name = "test_crypto.py"; path = "Tests/test_crypto.py"; sourceTree = SOURCE_ROOT; };
@@ -174,6 +182,7 @@
 		F929532D04321AA564ACA42D = {isa = PBXFileReference; lastKnownFileType = text; name = "test_ddc.py"; path = "Tests/test_ddc.py"; sourceTree = SOURCE_ROOT; };
 		4921F74DE582B01B712B5121 = {isa = PBXFileReference; lastKnownFileType = text; name = "test_debug_permissions.py"; path = "Tests/test_debug_permissions.py"; sourceTree = SOURCE_ROOT; };
 		1946E91367E67FD756B332BA = {isa = PBXFileReference; lastKnownFileType = text; name = "test_debug_session.py"; path = "Tests/test_debug_session.py"; sourceTree = SOURCE_ROOT; };
+		8E18B1FC222940D8CD949F98 = {isa = PBXFileReference; lastKnownFileType = text; name = "test_diagnostic_report.py"; path = "Tests/test_diagnostic_report.py"; sourceTree = SOURCE_ROOT; };
 		6162FAEDF49874AFB8D1709C = {isa = PBXFileReference; lastKnownFileType = text; name = "test_fixture.py"; path = "Tests/test_fixture.py"; sourceTree = SOURCE_ROOT; };
 		ECA0DC486912A78EDFB710A3 = {isa = PBXFileReference; lastKnownFileType = text; name = "test_fixture_runtime.py"; path = "Tests/test_fixture_runtime.py"; sourceTree = SOURCE_ROOT; };
 		76914F8BD3D0C35EBCDCD136 = {isa = PBXFileReference; lastKnownFileType = text; name = "test_profiler.py"; path = "Tests/test_profiler.py"; sourceTree = SOURCE_ROOT; };
@@ -184,6 +193,7 @@
 		FDB68CB8660E88A7BF2B1BED = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "FixtureBench.swift"; path = "Tools/FixtureBench.swift"; sourceTree = SOURCE_ROOT; };
 		B435DDA2CA384C83F6AE6CFC = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "MotionBench.swift"; path = "Tools/MotionBench.swift"; sourceTree = SOURCE_ROOT; };
 		E37252CA0186E55BF1ECCE02 = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = "PortableDebug.m"; path = "Tools/PortableDebug.m"; sourceTree = SOURCE_ROOT; };
+		8E72D95D073D7A8A2AA2DAE7 = {isa = PBXFileReference; lastKnownFileType = text; name = "ascii_logo.py"; path = "Tools/ascii_logo.py"; sourceTree = SOURCE_ROOT; };
 		7F8330C7A8D9ECFB63DF215B = {isa = PBXFileReference; lastKnownFileType = text; name = "build_app.py"; path = "Tools/build_app.py"; sourceTree = SOURCE_ROOT; };
 		A104FD1EB10AB41318C9BA4D = {isa = PBXFileReference; lastKnownFileType = text; name = "debug_session.py"; path = "Tools/debug_session.py"; sourceTree = SOURCE_ROOT; };
 		F95F0604183B1CEFD4ECBC64 = {isa = PBXFileReference; lastKnownFileType = text; name = "dev_runner.py"; path = "Tools/dev_runner.py"; sourceTree = SOURCE_ROOT; };
@@ -191,6 +201,7 @@
 		EAA4E0C658C19CC6326E57A4 = {isa = PBXFileReference; lastKnownFileType = text; name = "fixture_browser.py"; path = "Tools/fixture_browser.py"; sourceTree = SOURCE_ROOT; };
 		699E20D3B627876512B48885 = {isa = PBXFileReference; lastKnownFileType = text; name = "fixture_runtime.py"; path = "Tools/fixture_runtime.py"; sourceTree = SOURCE_ROOT; };
 		5D93F226019C404676645007 = {isa = PBXFileReference; lastKnownFileType = text; name = "install_app.py"; path = "Tools/install_app.py"; sourceTree = SOURCE_ROOT; };
+		BF18B858D9284BC35A3C955A = {isa = PBXFileReference; lastKnownFileType = text; name = "make_dmg.py"; path = "Tools/make_dmg.py"; sourceTree = SOURCE_ROOT; };
 		A84EBF5462C6F2508751D12C = {isa = PBXFileReference; lastKnownFileType = text; name = "make_xcodeproj.py"; path = "Tools/make_xcodeproj.py"; sourceTree = SOURCE_ROOT; };
 		4CCBF8D93ECE1B037B73DAF5 = {isa = PBXFileReference; lastKnownFileType = text; name = "measure_processes.py"; path = "Tools/measure_processes.py"; sourceTree = SOURCE_ROOT; };
 		6C75A42862F4CC73D7D0FB88 = {isa = PBXFileReference; lastKnownFileType = text; name = "mutate.py"; path = "Tools/mutate.py"; sourceTree = SOURCE_ROOT; };
@@ -201,7 +212,10 @@
 		BC7120CA10A1BDE777791428 = {isa = PBXFileReference; lastKnownFileType = text; name = "test.py"; path = "Tools/test.py"; sourceTree = SOURCE_ROOT; };
 		BBC30E87AFE96CF51FBB0E23 = {isa = PBXFileReference; lastKnownFileType = text; name = "dev.sh"; path = "dev.sh"; sourceTree = SOURCE_ROOT; };
 		8DB8F481D5E69BA66D9161D7 = {isa = PBXFileReference; lastKnownFileType = text; name = "README.md"; path = "README.md"; sourceTree = SOURCE_ROOT; };
+		FD7C19202B203B5206C2A807 = {isa = PBXFileReference; lastKnownFileType = text; name = "CONTRIBUTING.md"; path = "CONTRIBUTING.md"; sourceTree = SOURCE_ROOT; };
+		FCB09B967218B2B57D628943 = {isa = PBXFileReference; lastKnownFileType = text; name = "CHANGELOG.md"; path = "CHANGELOG.md"; sourceTree = SOURCE_ROOT; };
 		8A6B08D2E621841BD6E5AB06 = {isa = PBXFileReference; lastKnownFileType = text; name = "VERSION"; path = "VERSION"; sourceTree = SOURCE_ROOT; };
+		A33F85C5F7DA87D45034B127 = {isa = PBXFileReference; lastKnownFileType = image.png; name = "Oizys.png"; path = "Oizys.png"; sourceTree = SOURCE_ROOT; };
 		3C33486C2F209E6AF59FECFB = {isa = PBXFileReference; lastKnownFileType = text; name = "Info.plist"; path = "Sources/OizysApp/Info.plist"; sourceTree = SOURCE_ROOT; };
 		AE50061E3AD89B2597210370 = {isa = PBXFileReference; lastKnownFileType = text; name = "Debug.entitlements"; path = "Configs/Debug.entitlements"; sourceTree = SOURCE_ROOT; };
 		D8BF94C905C13E87D9C1CC29 /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Debug.xcconfig; path = Configs/Debug.xcconfig; sourceTree = SOURCE_ROOT; };
@@ -362,6 +376,7 @@
 		E7F946B3826CDD418864299C /* include */ = {
 			isa = PBXGroup;
 			children = (
+				7DA8B3994C1E29ADBCDEED29 /* logo.h */,
 				4EABC461870478C12B55B408 /* oizys.h */,
 				8342AA8919989AC72F94AF85 /* oizys_build.h */,
 				A7462DBC420BD9989E18DBBE /* oizys_capture.h */,
@@ -386,6 +401,7 @@
 				C593A3109A47D53AB431DAFD /* main.c */,
 				B360A9AEDDC0C8C5BDF0CEB2 /* supervisor.c */,
 				B410E56E518D7B8C0F6E7312 /* terminal.c */,
+				DBCCD12D988454B33AC263B1 /* tui.c */,
 			);
 			name = oizys;
 			sourceTree = "<group>";
@@ -414,6 +430,7 @@
 			isa = PBXGroup;
 			children = (
 				B5DDBF3F89114336EC0E08B7 /* Architecture.md */,
+				5E663D17CC9BCFB31C121022 /* Dock-Trace.md */,
 				BE64DCC9992D21937DD471DF /* Monitor-Startup-Handoff-2026-08-31.md */,
 				8CDA9285FD41E3077587483A /* OriginalBrief.md */,
 				CF05053E159299B83ACD7B00 /* Performance-2026-08-30.md */,
@@ -425,12 +442,16 @@
 				26AE79822092186F35ABFC2F /* capture_test.c */,
 				AB3E4A7CE5B83C3DEDDC341E /* ddc_native_test.c */,
 				8E8B6084D129FE3519110A7C /* debug_permissions_test.swift */,
+				CE41F210AE5F724F4205BB75 /* diagnostic_report_test.swift */,
+				44685A03681CFA13FC03BD72 /* native_coverage.py */,
 				023EA7B4A03F34571AA15F61 /* oizyscore.py */,
 				320EC1CA2CCE79B2D6C43B54 /* reference.py */,
 				C7948E4A3AC7F3005DFFE893 /* supervisor_test.c */,
 				6673C227F9C7BB35A6ABD767 /* usb_frame_test.c */,
 				BEE555D432F9BAFE40F1BED0 /* conftest.py */,
+				1FD45C9E303FB101D3EBD6A6 /* test_build_tools.py */,
 				4F4DF7FDB482C869604CC941 /* test_capture.py */,
+				BC7A479B3BD93F710D425C06 /* test_cli.py */,
 				58EB06910DCF5ABE446E9851 /* test_codec.py */,
 				FB672CB9A4C7E21C05254C87 /* test_config.py */,
 				B3AD56AE2BC0333262B7D308 /* test_crypto.py */,
@@ -438,6 +459,7 @@
 				F929532D04321AA564ACA42D /* test_ddc.py */,
 				4921F74DE582B01B712B5121 /* test_debug_permissions.py */,
 				1946E91367E67FD756B332BA /* test_debug_session.py */,
+				8E18B1FC222940D8CD949F98 /* test_diagnostic_report.py */,
 				6162FAEDF49874AFB8D1709C /* test_fixture.py */,
 				ECA0DC486912A78EDFB710A3 /* test_fixture_runtime.py */,
 				76914F8BD3D0C35EBCDCD136 /* test_profiler.py */,
@@ -448,6 +470,7 @@
 				FDB68CB8660E88A7BF2B1BED /* FixtureBench.swift */,
 				B435DDA2CA384C83F6AE6CFC /* MotionBench.swift */,
 				E37252CA0186E55BF1ECCE02 /* PortableDebug.m */,
+				8E72D95D073D7A8A2AA2DAE7 /* ascii_logo.py */,
 				7F8330C7A8D9ECFB63DF215B /* build_app.py */,
 				A104FD1EB10AB41318C9BA4D /* debug_session.py */,
 				F95F0604183B1CEFD4ECBC64 /* dev_runner.py */,
@@ -455,6 +478,7 @@
 				EAA4E0C658C19CC6326E57A4 /* fixture_browser.py */,
 				699E20D3B627876512B48885 /* fixture_runtime.py */,
 				5D93F226019C404676645007 /* install_app.py */,
+				BF18B858D9284BC35A3C955A /* make_dmg.py */,
 				A84EBF5462C6F2508751D12C /* make_xcodeproj.py */,
 				4CCBF8D93ECE1B037B73DAF5 /* measure_processes.py */,
 				6C75A42862F4CC73D7D0FB88 /* mutate.py */,
@@ -465,7 +489,10 @@
 				BC7120CA10A1BDE777791428 /* test.py */,
 				BBC30E87AFE96CF51FBB0E23 /* dev.sh */,
 				8DB8F481D5E69BA66D9161D7 /* README.md */,
+				FD7C19202B203B5206C2A807 /* CONTRIBUTING.md */,
+				FCB09B967218B2B57D628943 /* CHANGELOG.md */,
 				8A6B08D2E621841BD6E5AB06 /* VERSION */,
+				A33F85C5F7DA87D45034B127 /* Oizys.png */,
 				3C33486C2F209E6AF59FECFB /* Info.plist */,
 				AE50061E3AD89B2597210370 /* Debug.entitlements */,
 			);
@@ -657,6 +684,7 @@
 				1A75FC126DB72404470A8F45 /* main.c */,
 				4141A9AEF5CF36EF8653716C /* supervisor.c */,
 				1FFD9DC8765DC53D9A47DC11 /* terminal.c */,
+				5EAB7C7200A4A36E79F0BD4B /* tui.c */,
 				D5A83486A57253F7F74C7383 /* Capture.swift */,
 				39BF92B23AA03B51EB79FB7B /* ConfigStore.swift */,
 				D7003A3070DFFAB95CE14744 /* OizysLifecycle.swift */,

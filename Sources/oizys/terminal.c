@@ -165,7 +165,7 @@ static void monitor_menu(void) {
     }
 }
 
-static int tui(void) {
+static int legacy_menu(void) {
     if (!isatty(STDIN_FILENO) || !isatty(STDOUT_FILENO)) {
         fputs("The TUI needs an interactive terminal. Use `oizys help` for scriptable commands.\n", stderr); return 2;
     }
@@ -202,7 +202,10 @@ static int tui(void) {
 }
 
 int oizys_terminal_command(int argc, char **argv) {
-    if ((argc == 1 && isatty(STDIN_FILENO)) || (argc > 1 && !strcmp(argv[1], "tui"))) return tui();
+    if ((argc == 1 && isatty(STDIN_FILENO)) || (argc > 1 && !strcmp(argv[1], "tui"))) {
+        if (argc > 2 && !strcmp(argv[2], "--menu")) return legacy_menu();
+        return oizys_tui();
+    }
     if (argc < 2) return -1;
     if (!strcmp(argv[1], "monitors")) return monitors();
     if (!strcmp(argv[1], "monitor")) return monitor(argc - 2, argv + 2);

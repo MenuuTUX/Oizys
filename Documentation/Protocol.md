@@ -76,6 +76,19 @@ the correct timing, and rendered a barred, banded image. With `off22=1` both hea
 Neither fault produced a failed write, a rejected frame, or an error reply. Both were visible
 only in the dock's own trace and on the glass.
 
+## Sink engage
+
+`0x16/0x23` takes the DDC selector at `off22` and the **head** at `off23`. Passing the selector
+twice looks harmless and is not: the dock dispatches the command either way, and then does
+nothing with it. Its trace shows the vendor handing it `(1, 0)` and `(3, 1)` and running a
+three-call per-head setup immediately afterwards, which is what makes the dock size and
+register a buffer for the mode that follows. Without it the set-mode is accepted, the timing is
+programmed, the output flag is set, and no buffer is ever allocated, so the panel stays dark
+with no error anywhere in the session.
+
+This is the same mistake as the mode set's `off23`: a field that holds the head number, filled
+in with a selector because both are small integers that happen to agree for one head.
+
 ## Video
 
 A 1920×1080 head is 2040 strips of 64×16. Each strip is sixteen 8×8 blocks across three
@@ -92,8 +105,15 @@ prefix carries no terminating zero, so a luma coefficient coded with chroma's ce
 a bit the dock reads as an offset and everything after it in the half-strip decodes off by
 one. The symptom is a picture that is almost right.
 
-The dock rotates its backing store over 4×4-strip macro tiles across three buffers, so a
-changed strip drags its macro tile with it and each must be presented on three consecutive
-frames.
+The dock rotates its backing store over 4×4-strip macro tiles, so a changed strip drags its
+macro tile with it and each must be presented on three consecutive frames.
+
+How many buffers it rotates over is a separate number, and on this dock it is two. The frame
+trailer's phase is how the dock is told to step to the next one, and it has to wrap on the
+real count: `dock.buffers` had been declared with a default of 2 and never read while the
+trailer wrapped on a hardcoded 3, which advanced the phase past the last real buffer. The dock
+then stopped flipping and held the armed frame on the glass, accepting and discarding every
+frame after it. The symptom is a lit panel showing a still image, which looks nothing like a
+protocol fault: every write succeeds and the dock reports no error.
 
 `Tests/Support/reference.py` is an executable statement of all of the above.

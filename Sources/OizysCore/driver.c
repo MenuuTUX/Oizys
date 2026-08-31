@@ -710,7 +710,12 @@ static int fetch_one_edid(OizysDriver *driver, OizysHeadStatus *head) {
         usleep(10000);
     }
     for (int i = 0; i < 2; i++) {
-        if (send_edid_message(driver, 0x16, 0x23, head->ddc_selector, head->ddc_selector,
+        /* off23 on the engage is the head, not a second copy of the selector. The dock's own
+         * trace shows the vendor handing it (selector, head) -- (1, 0) and (3, 1) -- and
+         * running a three-call setup per head straight afterwards. Passing the selector twice
+         * left that setup unrun for both heads: the command is accepted and dispatched, and
+         * the dock then does nothing with it, so no buffer is ever allocated for the mode. */
+        if (send_edid_message(driver, 0x16, 0x23, head->ddc_selector, head->logical_head,
                               "EDID sink engage") < 0) {
             return -1;
         }
@@ -1002,8 +1007,15 @@ static uint16_t video_stream(uint8_t head) {
 
 static void make_frame_trailer(uint8_t out[96], uint8_t head, uint32_t sequence) {
     memset(out, 0, 96);
-    uint8_t phase = (uint8_t)((sequence % 3) * 2);
-    uint8_t next = (uint8_t)((phase + 2) % 6);
+    /* The phase is how the dock steps to its next buffer, so it has to wrap on the number of
+     * buffers the dock actually has. `dock.buffers` was declared with a default of 2 and never
+     * read, while this wrapped on a hardcoded 3: the phase then advanced past the last real
+     * buffer and the dock stopped flipping, holding the armed frame on the glass while every
+     * later frame was accepted and discarded. */
+    unsigned buffers = (unsigned)oizys_config()->dock_buffers;
+    if (buffers < 2 || buffers > 3) buffers = 2;
+    uint8_t phase = (uint8_t)((sequence % buffers) * 2);
+    uint8_t next = (uint8_t)((phase + 2) % (buffers * 2));
     for (int record = 0; record < 3; record++) {
         size_t offset = (size_t)record * 32;
         oizys_dl3_header(out + offset, 4,
