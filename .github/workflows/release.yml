@@ -26,6 +26,7 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
       # A release that ships an untested build is worse than no release.
+      - run: python3 Tools/make_xcodeproj.py
       - run: python3 Tools/test.py
 
       - name: Build and package every variant
@@ -33,18 +34,18 @@ jobs:
           set -euo pipefail
           mkdir -p dist
           for variant in production production-fallback debug-verbose debug-fallback debug-minimal; do
-            python3 Tools/build_app.py --variant "$variant" --version "${{ steps.version.outputs.version }}"
-            ditto -c -k --keepParent "build/apps/$variant/Mview.app" \
-              "dist/Mview-${{ steps.version.outputs.version }}-$variant.zip"
+            format=portable
+            case "$variant" in production*) format=both ;; esac
+            python3 Tools/build_app.py --variant "$variant" --version "${{ steps.version.outputs.version }}" --format "$format"
           done
-          cd dist && shasum -a 256 *.zip > SHA256SUMS.txt && cat SHA256SUMS.txt
+          cd dist && shasum -a 256 Oizys-* Oizys-debug-* > SHA256SUMS.txt && cat SHA256SUMS.txt
 
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "v${{ steps.version.outputs.version }}" dist/* \
-            --title "Mview ${{ steps.version.outputs.version }}" \
+            --title "Oizys ${{ steps.version.outputs.version }}" \
             --notes-file - <<'NOTES'
           ## Which build to take
 
@@ -58,9 +59,16 @@ jobs:
 
           `production` is the hardened build: profiling zones, frame dumps, the log stream
           and the diagnostics window are compiled out, not merely switched off, and the
-          vendor-restart path is gone with them. It quits its own UI process once the
-          driver is running. Take `production-fallback` on a machine that still needs
+          vendor-restart path is gone with them. A small event listener starts capture
+          only for a connected dock in an awake login session. Take `production-fallback` on a machine that still needs
           DisplayLink Manager to come back if the driver stops.
+
+          Production is named `Oizys` and includes the shared CLI/TUI. Debug is a single
+          `Oizys-debug-<version>-<variant>` executable, without an installer. It unpacks
+          a signed runtime bundle in the user cache, pauses production for the developer
+          session and restores it on exit. Python dependencies are prepared on demand.
+          Xcode tools are required to compile repository tests. Production ZIP/PKG bundles
+          can be registered for login startup with `./dev.sh install`.
 
           ## Signing
 
@@ -71,7 +79,7 @@ jobs:
 
           ## What the tests here do and do not cover
 
-          CI runs the full suite against `libMViewCore.dylib`. No GitHub runner has a
+          CI runs the full suite against `libOizysCore.dylib`. No GitHub runner has a
           DL-6950 dock attached, so nothing in this release has been exercised against real
           USB, real HDMI or real panels by this workflow. Hardware validation is manual and
           recorded in `Documentation/`.

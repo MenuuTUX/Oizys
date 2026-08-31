@@ -2,7 +2,7 @@
 
 What is written down here was established from live I/O against the dock on this machine,
 the public Vino project's documentation, and the HDCP 2.2 specification. No part of it came
-from disassembling DisplayLink Manager or its libraries, and MView keeps no copy of anyone
+from disassembling DisplayLink Manager or its libraries, and Oizys keeps no copy of anyone
 else's source.
 
 ## Device

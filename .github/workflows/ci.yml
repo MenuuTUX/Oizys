@@ -18,7 +18,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - run: xcodebuild -version && swift --version
-      # Drives libMViewCore.dylib through ctypes. Nothing here needs a dock, a display or
+      # Drives libOizysCore.dylib through ctypes. Nothing here needs a dock, a display or
       # Screen Recording permission; the hardware paths are covered by mock device
       # discovery and real subprocesses. See Documentation/Testing.md for what that
       # leaves untested.
@@ -54,7 +54,7 @@ jobs:
         variant: [debug-minimal, debug-verbose, debug-fallback, production, production-fallback]
     steps:
       - uses: actions/checkout@v5
-      # build_app.py re-reads `mview build-info` out of the binary it just built and
+      # build_app.py re-reads `oizys build-info` out of the binary it just built and
       # refuses to package a bundle whose compiled-in policy disagrees with the variant
       # name. A production build that still had diagnostics in it fails here, not on a
       # trader's machine.

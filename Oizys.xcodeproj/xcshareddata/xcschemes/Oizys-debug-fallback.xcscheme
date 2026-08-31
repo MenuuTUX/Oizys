@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Scheme LastUpgradeVersion = "2600" version = "1.7">
+   <BuildAction parallelizeBuildables = "YES" buildImplicitDependencies = "YES">
+      <BuildActionEntries>
+         <BuildActionEntry buildForTesting = "YES" buildForRunning = "YES"
+                           buildForProfiling = "YES" buildForArchiving = "YES"
+                           buildForAnalyzing = "YES">
+            <BuildableReference BuildableIdentifier = "primary"
+               BlueprintIdentifier = "73138023C98EA8B11A6FB4E5" BuildableName = "Oizys-debug.app"
+               BlueprintName = "OizysApp" ReferencedContainer = "container:Oizys.xcodeproj" />
+         </BuildActionEntry>
+         <BuildActionEntry buildForTesting="YES" buildForRunning="NO" buildForProfiling="NO"
+                           buildForArchiving="NO" buildForAnalyzing="YES">
+            <BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="DE2F51C13C61E4893A8B4134"
+              BuildableName="OizysTests.xctest" BlueprintName="OizysTests" ReferencedContainer="container:Oizys.xcodeproj" />
+         </BuildActionEntry>
+      </BuildActionEntries>
+   </BuildAction>
+   <TestAction buildConfiguration = "Debug" selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
+               selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
+               shouldUseLaunchSchemeArgsEnv = "YES">
+      <MacroExpansion>
+         <BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="73138023C98EA8B11A6FB4E5"
+           BuildableName="Oizys-debug.app" BlueprintName="OizysApp" ReferencedContainer="container:Oizys.xcodeproj" />
+      </MacroExpansion>
+      <Testables>
+         <TestableReference skipped="NO">
+            <BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="DE2F51C13C61E4893A8B4134"
+              BuildableName="OizysTests.xctest" BlueprintName="OizysTests" ReferencedContainer="container:Oizys.xcodeproj" />
+         </TestableReference>
+      </Testables>
+      <EnvironmentVariables>
+         <EnvironmentVariable key="OIZYS_DYLIB" value="$(BUILT_PRODUCTS_DIR)/libOizysCore.dylib" isEnabled="YES" />
+      </EnvironmentVariables>
+   </TestAction>
+   <LaunchAction buildConfiguration = "DebugFallback"
+                 selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
+                 selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
+                 launchStyle = "0" useCustomWorkingDirectory = "YES"
+                 customWorkingDirectory = "$(SRCROOT)"
+                 debugDocumentVersioning = "YES" debugServiceExtension = "internal"
+                 allowLocationSimulation = "YES">
+      <BuildableProductRunnable runnableDebuggingMode = "0">
+         <BuildableReference BuildableIdentifier = "primary"
+            BlueprintIdentifier = "73138023C98EA8B11A6FB4E5" BuildableName = "Oizys-debug.app"
+            BlueprintName = "OizysApp" ReferencedContainer = "container:Oizys.xcodeproj" />
+      </BuildableProductRunnable>
+      <CommandLineArguments>
+
+      </CommandLineArguments>
+   </LaunchAction>
+   <ProfileAction buildConfiguration = "DebugFallback" shouldUseLaunchSchemeArgsEnv = "YES"
+                  savedToolIdentifier = "" useCustomWorkingDirectory = "YES"
+                  customWorkingDirectory = "$(SRCROOT)" debugDocumentVersioning = "YES">
+      <BuildableProductRunnable runnableDebuggingMode = "0">
+         <BuildableReference BuildableIdentifier = "primary"
+            BlueprintIdentifier = "73138023C98EA8B11A6FB4E5" BuildableName = "Oizys-debug.app"
+            BlueprintName = "OizysApp" ReferencedContainer = "container:Oizys.xcodeproj" />
+      </BuildableProductRunnable>
+   </ProfileAction>
+   <AnalyzeAction buildConfiguration = "Debug" />
+   <ArchiveAction buildConfiguration = "DebugFallback" revealArchiveInOrganizer = "YES" />
+</Scheme>

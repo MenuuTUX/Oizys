@@ -14,10 +14,10 @@
  * the strip encoder -- including the dirty-rectangle fast path, whose bounds arithmetic is
  * exactly what a sanitizer is here to check.
  */
-#include "mview_config.h"
-#include "mview_dl3.h"
-#include "mview_encode.h"
-#include "mview_platform.h"
+#include "oizys_config.h"
+#include "oizys_dl3.h"
+#include "oizys_encode.h"
+#include "oizys_platform.h"
 
 #include <stdint.h>
 #include <stdio.h>
@@ -45,14 +45,14 @@ static int32_t coeff_gen(void *context, unsigned index) {
    runner has no Swift, so it stands in with a no-op store: config_selftest exercises the
    parsing and validation in config.c, which is the C worth sanitising, and never depends
    on anything actually persisting. */
-void mview_settings_read(const char *path, void *context,
+void oizys_settings_read(const char *path, void *context,
                          void (*value)(void *, const char *, const char *)) {
     (void)path; (void)context; (void)value;
 }
-int mview_settings_write(const char *path, const char *key, const char *value, int type) {
+int oizys_settings_write(const char *path, const char *key, const char *value, int type) {
     (void)path; (void)key; (void)value; (void)type; return 0;
 }
-int mview_settings_reset(const char *path) { (void)path; return 0; }
+int oizys_settings_reset(const char *path) { (void)path; return 0; }
 
 #define W 1920u
 #define H 1080u
@@ -61,12 +61,12 @@ int mview_settings_reset(const char *path) { (void)path; return 0; }
 int main(void) {
     printf("asan runner seed 0x%llx\n", (unsigned long long)rng_state);
 
-    if (mview_config_selftest() != 0) {
+    if (oizys_config_selftest() != 0) {
         fprintf(stderr, "config selftest failed\n");
         return 1;
     }
     /* The vector quantiser against the scalar one, many rounds of generated coefficients. */
-    if (mview_encode_selftest(coeff_gen, NULL, 20000) != 0) {
+    if (oizys_encode_selftest(coeff_gen, NULL, 20000) != 0) {
         fprintf(stderr, "encode selftest disagreed with the reference\n");
         return 1;
     }
@@ -75,11 +75,11 @@ int main(void) {
     if (!surface) return 2;
     for (size_t i = 0; i < STRIDE * (size_t)H; i++) surface[i] = (uint8_t)rng();
 
-    MViewDamageMap *map = calloc(1, sizeof(*map));
+    OizysDamageMap *map = calloc(1, sizeof(*map));
     if (!map) return 2;
-    mview_damage_init(map, W, H);
+    oizys_damage_init(map, W, H);
 
-    MViewStrip owed[MVIEW_MAX_STRIPS];
+    OizysStrip owed[OIZYS_MAX_STRIPS];
     /* One frame's worth of output for the encoder, sized as the driver sizes it. */
     uint8_t *out = malloc(1u << 20);
     if (!out) return 2;
@@ -99,19 +99,19 @@ int main(void) {
         int presentations = 1;
         int count;
         if (frame & 1) {
-            MViewDirtyRect rects[8];
+            OizysDirtyRect rects[8];
             int n = 0;
-            rects[n++] = (MViewDirtyRect){0, y0, W, bh};
-            rects[n++] = (MViewDirtyRect){rng() % W, rng() % H, 0, 0};
-            rects[n++] = (MViewDirtyRect){W - 1, H - 1, 1, 1};
-            if (frame % 7 == 0) rects[n++] = (MViewDirtyRect){W, 0, 4, 4}; /* off-surface */
-            count = mview_damage_plan_dirty(map, surface, STRIDE, rects, n, owed,
-                                            MVIEW_MAX_STRIPS, &presentations);
+            rects[n++] = (OizysDirtyRect){0, y0, W, bh};
+            rects[n++] = (OizysDirtyRect){rng() % W, rng() % H, 0, 0};
+            rects[n++] = (OizysDirtyRect){W - 1, H - 1, 1, 1};
+            if (frame % 7 == 0) rects[n++] = (OizysDirtyRect){W, 0, 4, 4}; /* off-surface */
+            count = oizys_damage_plan_dirty(map, surface, STRIDE, rects, n, owed,
+                                            OIZYS_MAX_STRIPS, &presentations);
         } else {
-            count = mview_damage_plan(map, surface, STRIDE, owed, MVIEW_MAX_STRIPS,
+            count = oizys_damage_plan(map, surface, STRIDE, owed, OIZYS_MAX_STRIPS,
                                       &presentations);
         }
-        if (count < 0 || count > MVIEW_MAX_STRIPS) {
+        if (count < 0 || count > OIZYS_MAX_STRIPS) {
             fprintf(stderr, "damage plan returned %d on frame %d\n", count, frame);
             return 1;
         }
@@ -119,11 +119,11 @@ int main(void) {
            write into fixed buffers. */
         int encode = count < 64 ? count : 64;
         for (int i = 0; i < encode; i++) {
-            MViewStrip s = owed[i];
-            mview_video_colour_strip_bgra(out, 1u << 20, (uint16_t)s.x, (uint16_t)s.y,
+            OizysStrip s = owed[i];
+            oizys_video_colour_strip_bgra(out, 1u << 20, (uint16_t)s.x, (uint16_t)s.y,
                                           surface, STRIDE, W, H);
         }
-        mview_damage_presented(map);
+        oizys_damage_presented(map);
     }
 
     free(out);

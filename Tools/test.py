@@ -7,7 +7,7 @@
     python3 Tools/test.py --coverage [--coverage-floor 80]
     python3 Tools/test.py --mutate
 
-The tests drive libMViewCore.dylib through ctypes, so a sanitiser run means building the
+The tests drive libOizysCore.dylib through ctypes, so a sanitiser run means building the
 library with the sanitiser and letting the same Python suite drive it. Nothing about the
 tests changes.
 """
@@ -24,7 +24,7 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 VENV = ROOT / ".venv"
 PYTHON = VENV / "bin" / "python"
-PROJECT = ROOT / "MView.xcodeproj"
+PROJECT = ROOT / "Oizys.xcodeproj"
 
 SANITIZERS = {
     "address": "-fsanitize=address,undefined -fno-omit-frame-pointer",
@@ -44,7 +44,7 @@ def ensure_venv() -> pathlib.Path:
 
 
 def build(configuration="Release", extra_cflags="", extra_ldflags=""):
-    command = ["xcodebuild", "-project", str(PROJECT), "-target", "MViewCoreDylib",
+    command = ["xcodebuild", "-project", str(PROJECT), "-target", "OizysCoreDylib",
                "-configuration", configuration, "build"]
     if extra_cflags:
         command.append(f"OTHER_CFLAGS=$(inherited) {extra_cflags}")
@@ -78,7 +78,7 @@ def coverage(python, passthrough, floor):
         "LLVM_PROFILE_FILE": str(raw / "%p.profraw"),
         # Without this the suite would load whichever library it finds first, which is
         # usually the uninstrumented Release build, and write no profile at all.
-        "MVIEW_DYLIB": str(products / "libMViewCore.dylib"),
+        "OIZYS_DYLIB": str(products / "libOizysCore.dylib"),
     })
     profiles = sorted(raw.glob("*.profraw"))
     if not profiles:
@@ -86,8 +86,8 @@ def coverage(python, passthrough, floor):
     merged = raw / "merged.profdata"
     subprocess.run(["xcrun", "llvm-profdata", "merge", "-sparse", *map(str, profiles),
                     "-o", str(merged)], check=True)
-    library = products / "libMViewCore.dylib"
-    core = ROOT / "Sources" / "MViewCore"
+    library = products / "libOizysCore.dylib"
+    core = ROOT / "Sources" / "OizysCore"
     # The files a test can reach with no dock plugged in. driver.c, usb_probe.c,
     # usb_session.c, ddc_native.c, display.c and capture_frame.c all need real hardware or
     # a real display server to enter.
@@ -97,7 +97,7 @@ def coverage(python, passthrough, floor):
 
     # Both numbers, always. The first says how well the code the suite can actually run is
     # tested; the second says how much of the driver that is. Printing only the first
-    # reads as 84% coverage of MView, which is not what it measures -- the files it leaves
+    # reads as 84% coverage of Oizys, which is not what it measures -- the files it leaves
     # out are most of the driver and all of the parts that touch the dock.
     print("\n=== reachable without hardware: what the suite covers ===", flush=True)
     subprocess.run(["xcrun", "llvm-cov", "report", str(library),
@@ -114,8 +114,8 @@ def coverage(python, passthrough, floor):
           "than through this library. What genuinely has no test is driver.c, usb_probe.c, "
           "display.c and bench.c.", flush=True)
 
-    swift = sorted((ROOT / "Sources/MViewPlatform").glob("*.swift")) + \
-            sorted((ROOT / "Sources/MViewApp").glob("*.swift"))
+    swift = sorted((ROOT / "Sources/OizysPlatform").glob("*.swift")) + \
+            sorted((ROOT / "Sources/OizysApp").glob("*.swift"))
     swift_lines = sum(len(p.read_text().splitlines()) for p in swift)
     print(f"\nSwift: {swift_lines} lines in {len(swift)} files, 0% covered. The suite drives "
           "the library through ctypes and never enters Swift; ScreenCaptureKit, the virtual "
@@ -150,12 +150,12 @@ def native_sanitizer_run(flags):
     and run it directly. Our own binary, so the sanitizer loads with no platform policy in
     the way -- unlike injecting it into the Apple-signed Python host."""
     pure = ["config.c", "encode.c", "wht.c", "crypto.c", "dl3.c", "profile.c", "log.c"]
-    sources = [str(ROOT / "Sources/MViewCore" / name) for name in pure]
+    sources = [str(ROOT / "Sources/OizysCore" / name) for name in pure]
     binary = ROOT / "build" / "asan_runner"
     binary.parent.mkdir(parents=True, exist_ok=True)
     command = ["xcrun", "clang", "-std=c11", "-fblocks", "-g", "-O1",
-               "-mcpu=apple-m1", "-DMVIEW_LOG_IMPLEMENTATION",
-               "-I", str(ROOT / "Sources/MViewCore/include"),
+               "-mcpu=apple-m1", "-DOIZYS_LOG_IMPLEMENTATION",
+               "-I", str(ROOT / "Sources/OizysCore/include"),
                *flags.split(), str(ROOT / "Tests/Support/asan_runner.c"), *sources,
                # crypto.c calls SecKey for RSA-OAEP; dl3/log touch CoreFoundation.
                "-framework", "Security", "-framework", "CoreFoundation",
@@ -171,6 +171,9 @@ def native_sanitizer_run(flags):
 
 
 def main():
+    if sys.argv[1:2] == ["--fixture"]:
+        from fixture import main as fixture_main
+        return fixture_main(sys.argv[2:])
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--sanitize", choices=sorted(SANITIZERS))
@@ -206,7 +209,7 @@ def main():
         # thing on a laptop and on CI, instead of being red on one and green on the other.
         flags = SANITIZERS[known.sanitize]
         products = build("Debug", flags)
-        library = products / "libMViewCore.dylib"
+        library = products / "libOizysCore.dylib"
         probe = subprocess.run([str(python), "-c", f"import ctypes; ctypes.CDLL({str(library)!r})"],
                                capture_output=True, text=True)
         if probe.returncode != 0:
@@ -217,7 +220,7 @@ def main():
             print("falling back to the native runner, which covers the pure-logic sources only")
             return native_sanitizer_run(flags)
         print(f"running the suite against a {known.sanitize}-sanitised library")
-        return run_pytest(python, passthrough, {"MVIEW_DYLIB": str(library)})
+        return run_pytest(python, passthrough, {"OIZYS_DYLIB": str(library)})
 
     build(known.configuration)
     return run_pytest(python, passthrough)

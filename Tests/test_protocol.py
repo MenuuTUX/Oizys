@@ -11,7 +11,7 @@ import pytest
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
-from Support import mviewcore as core
+from Support import oizyscore as core
 
 EDID_OFFSET = 22
 MAGIC = bytes([0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00])
@@ -35,7 +35,7 @@ def build_reply(extension_blocks: int = 0) -> bytes:
 def parse(reply: bytes, capacity: int = 512):
     out = core.buffer(capacity)
     length = ctypes.c_size_t(0)
-    status = core.lib.mview_dl3_parse_ridge_edid(
+    status = core.lib.oizys_dl3_parse_ridge_edid(
         core.as_u8(reply), len(reply),
         ctypes.cast(out, ctypes.POINTER(ctypes.c_uint8)), capacity, ctypes.byref(length))
     return status, length.value, bytes(out[:length.value])
@@ -102,34 +102,45 @@ def test_no_mutation_makes_the_parser_lie(mutations):
 
 def test_header_layout_is_stable():
     header = core.buffer(16)
-    core.lib.mview_dl3_header(ctypes.cast(header, ctypes.POINTER(ctypes.c_uint8)),
+    core.lib.oizys_dl3_header(ctypes.cast(header, ctypes.POINTER(ctypes.c_uint8)),
                               0x11223344, 0x5566, 0x7788, 0x99AABBCC, 32)
     assert bytes(header).hex() == "00002c00443322116655887 7ccbbaa99".replace(" ", "")
+
+
+def test_set_mode_addresses_the_head_it_was_asked_for():
+    """off22 is the zero-based head, off23 the one-based one. A constant at off23 aims every
+    set-mode at the same head, which leaves the other one dark however correct the timing is."""
+    for head in (0, 1):
+        mode = core.buffer(80)
+        pointer = ctypes.cast(mode, ctypes.POINTER(ctypes.c_uint8))
+        assert core.lib.oizys_dl3_set_mode_1080p60(pointer, 80, 0, head) == 80
+        assert bytes(mode)[22] == head
+        assert bytes(mode)[23] == head + 1
 
 
 def test_size_field_is_the_body_plus_twelve():
     header = core.buffer(16)
     for body in (0, 1, 64, 1024):
-        core.lib.mview_dl3_header(ctypes.cast(header, ctypes.POINTER(ctypes.c_uint8)),
+        core.lib.oizys_dl3_header(ctypes.cast(header, ctypes.POINTER(ctypes.c_uint8)),
                                   0, 0, 0, 0, body)
         assert int.from_bytes(bytes(header)[2:4], "little") == body + 12
 
 
 BUILDERS = {
-    "init_0": lambda out, cap: core.lib.mview_dl3_init_0(out, cap),
-    "init_25": lambda out, cap: core.lib.mview_dl3_init_25(out, cap),
-    "init_4_probe": lambda out, cap: core.lib.mview_dl3_init_4_probe(out, cap),
-    "session_ack": lambda out, cap: core.lib.mview_hdcp_session_ack(out, cap, 1, 2),
-    "ake_init": lambda out, cap: core.lib.mview_hdcp_ake_init(out, cap, 1, 2,
+    "init_0": lambda out, cap: core.lib.oizys_dl3_init_0(out, cap),
+    "init_25": lambda out, cap: core.lib.oizys_dl3_init_25(out, cap),
+    "init_4_probe": lambda out, cap: core.lib.oizys_dl3_init_4_probe(out, cap),
+    "session_ack": lambda out, cap: core.lib.oizys_hdcp_session_ack(out, cap, 1, 2),
+    "ake_init": lambda out, cap: core.lib.oizys_hdcp_ake_init(out, cap, 1, 2,
                                                               core.as_u8(bytes(8))),
-    "ake_txinfo": lambda out, cap: core.lib.mview_hdcp_ake_txinfo(out, cap, 1, 2),
-    "ake_no_stored_km": lambda out, cap: core.lib.mview_hdcp_ake_no_stored_km(
+    "ake_txinfo": lambda out, cap: core.lib.oizys_hdcp_ake_txinfo(out, cap, 1, 2),
+    "ake_no_stored_km": lambda out, cap: core.lib.oizys_hdcp_ake_no_stored_km(
         out, cap, 1, 2, core.as_u8(bytes(128))),
-    "lc_init": lambda out, cap: core.lib.mview_hdcp_lc_init(out, cap, 1, 2, core.as_u8(bytes(8))),
-    "ske_send_eks": lambda out, cap: core.lib.mview_hdcp_ske_send_eks(
+    "lc_init": lambda out, cap: core.lib.oizys_hdcp_lc_init(out, cap, 1, 2, core.as_u8(bytes(8))),
+    "ske_send_eks": lambda out, cap: core.lib.oizys_hdcp_ske_send_eks(
         out, cap, 1, 2, core.as_u8(bytes(16)), core.as_u8(bytes(8))),
-    "stream_manage": lambda out, cap: core.lib.mview_hdcp_stream_manage(out, cap, 1, 2),
-    "set_mode_1080p60": lambda out, cap: core.lib.mview_dl3_set_mode_1080p60(out, cap, 0, 0),
+    "stream_manage": lambda out, cap: core.lib.oizys_hdcp_stream_manage(out, cap, 1, 2),
+    "set_mode_1080p60": lambda out, cap: core.lib.oizys_dl3_set_mode_1080p60(out, cap, 0, 0),
 }
 
 
@@ -156,18 +167,18 @@ def test_frame_builders_never_write_past_their_capacity(name):
 def test_cp_session_key_whitening_is_reversible(raw):
     live, back = core.buffer(16), core.buffer(16)
     p = ctypes.POINTER(ctypes.c_uint8)
-    core.lib.mview_cp_session_key(core.as_u8(raw), ctypes.cast(live, p))
-    core.lib.mview_cp_session_key(core.as_u8(bytes(live)), ctypes.cast(back, p))
+    core.lib.oizys_cp_session_key(core.as_u8(raw), ctypes.cast(live, p))
+    core.lib.oizys_cp_session_key(core.as_u8(bytes(live)), ctypes.cast(back, p))
     assert bytes(back) == raw
     assert bytes(live) != raw, "whitening was a no-op"
 
 
 def test_only_ridge_has_a_profile():
-    profile = core.lib.mview_dl3_profile(0x6000)
+    profile = core.lib.oizys_dl3_profile(0x6000)
     assert profile, "the Ridge profile is missing"
     assert profile.contents.head_count == 2
     assert profile.contents.video_endpoint[0] == 0x08
     assert profile.contents.video_endpoint[1] == 0x0B
     assert profile.contents.ddc_selector[0] != profile.contents.ddc_selector[1]
     for unknown in (0x0000, 0xFFFF, 0x6001):
-        assert not core.lib.mview_dl3_profile(unknown), f"{unknown:#06x} returned a profile"
+        assert not core.lib.oizys_dl3_profile(unknown), f"{unknown:#06x} returned a profile"

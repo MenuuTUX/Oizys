@@ -2,7 +2,7 @@
 
 ## Overview
 
-MView has three layers. The transport claims the USB interface and carries sealed frames.
+Oizys has three layers. The transport claims the USB interface and carries sealed frames.
 The protocol layer authenticates the dock and sets modes. The scanout layer turns a
 captured desktop into colour strips and decides which of them reach the wire.
 
@@ -92,8 +92,8 @@ debt only after two capture periods without a fresh presentation.
 ### Dirty rectangles
 
 Each sample buffer carries `SCStreamFrameInfo.dirtyRects`, the compositor's own account of
-what moved. Swift copies it into `MViewDirtyRect` values and hands it to C with the frame;
-`mview_damage_plan_dirty` then fingerprints only the strips those rectangles cover and
+what moved. Swift copies it into `OizysDirtyRect` values and hands it to C with the frame;
+`oizys_damage_plan_dirty` then fingerprints only the strips those rectangles cover and
 carries every other strip's previous fingerprint forward unchanged.
 
 Before this, every frame re-read all 8 MB of the surface to find out which 64×16 strips had
@@ -109,7 +109,7 @@ Three things keep this from trading correctness for the saving:
 - A replaced frame's rectangles are unioned into the frame that replaces it. The dropped
   frame's pixels were never fingerprinted, so forgetting where they changed would strand
   those strips. If the union no longer fits, the frame falls back to a full pass.
-- One strip row in `MVIEW_DAMAGE_SWEEP` is re-fingerprinted unconditionally every frame, on
+- One strip row in `OIZYS_DAMAGE_SWEEP` is re-fingerprinted unconditionally every frame, on
   a rotating phase. The rectangle list is a hint from the compositor, not a contract; a
   rectangle it omits costs at most eight frames of staleness rather than a tile nothing
   ever repairs. The sweep is an eighth of the old cost, and it is the reason the fast path
@@ -117,11 +117,11 @@ Three things keep this from trading correctness for the saving:
 
 ## Recovery
 
-`mview serve --takeover` keeps a small C supervisor separate from the capture/USB worker.
-It restarts MView after worker failures, waits while the dock is absent or ambiguous, and
+`oizys serve --takeover` keeps a small C supervisor separate from the capture/USB worker.
+It restarts Oizys after worker failures, waits while the dock is absent or ambiguous, and
 uses a 1–8 second retry backoff. A worker must start within 45 seconds and then report its
 health every second; 15 seconds without a report triggers shutdown. Shutdown gets 10
-seconds before the supervisor terminates an unresponsive worker. No encoding runs in the
+seconds in diagnostic builds and three seconds in production before terminating an unresponsive worker. No encoding runs in the
 supervisor, and no vendor binary is used for recovery.
 
 A per-user file lock prevents duplicate services. Screen Recording permission and head
@@ -141,13 +141,22 @@ and NEON intrinsics where measured.
 
 ## App and privacy identity
 
-`Sources/MViewApp/Main.swift` owns the menu-bar controls and starts the bundled
-`MViewDriver` supervisor with `Process`. It receives text status, not pixels. The capture
-path stays in the C worker. `Tools/build_app.py` creates `MView.app`, which
-must be launched through LaunchServices or Finder to establish its own app identity.
+The debug app's `Sources/OizysApp/Main.swift` owns menu-bar controls and starts the bundled
+`OizysDriver` supervisor with `Process`. It receives text status, not pixels. Production's
+`Production.swift` has no diagnostic UI. It listens for USB attachment/removal and macOS
+session/sleep/wake events. Without one supported dock and an awake console session, no
+capture or USB worker runs. The event listener remains dormant so reconnects need no launch.
 
-The Swift executable is named `MView`; the helper is `MViewDriver`. They cannot be named
-`MView` and `mview`, since those collide on the usual case-insensitive macOS filesystem.
+Production is `Oizys.app`; debug is `Oizys-debug <version>.app`. `Tools/install_app.py`
+installs production into Applications and registers a per-user Aqua-session LaunchAgent.
+The login path never presents a permission dialog. Initial Screen Recording permission is
+granted through macOS by opening the app manually; it cannot be granted by the installer.
+Worker teardown is asynchronous and bounded to three seconds in production. Wake starts a
+fresh session after the old worker exits; USB authentication and display setup still take
+time. Oizys neither disables screen locking nor prevents system sleep.
+
+The production Swift executable is named `Oizys`; the helper is `OizysDriver`. They cannot be named
+`Oizys` and `oizys`, since those collide on the usual case-insensitive macOS filesystem.
 App Stop allows the C supervisor to clean up; Quit waits for that cleanup. A bounded
-benchmark launch (`open MView.app --args --benchmark`) starts after permission and stops
+benchmark launch (`open Oizys.app --args --benchmark`) starts after permission and stops
 the driver automatically 75 seconds after it first becomes ready.

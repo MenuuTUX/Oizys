@@ -15,7 +15,7 @@ import pytest
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
-from Support import mviewcore as core
+from Support import oizyscore as core
 from Support import reference as ref
 from conftest import bgra_surface
 
@@ -65,11 +65,11 @@ def test_scan_tables_agree_with_the_library():
     saying which table is wrong."""
     for row in range(8):
         for column in range(8):
-            assert core.lib.mview_scan_index(row, column) == int(ref.SCAN_INDEX[row][column]), \
+            assert core.lib.oizys_scan_index(row, column) == int(ref.SCAN_INDEX[row][column]), \
                 f"scan index disagrees at {row},{column}"
     for scan in range(64):
         expected = int(ref.SCAN_INDEX.flatten().tolist().index(scan))
-        assert core.lib.mview_inverse_scan(scan) == expected, f"inverse scan wrong at {scan}"
+        assert core.lib.oizys_inverse_scan(scan) == expected, f"inverse scan wrong at {scan}"
 
 
 @given(st.integers(0, 2), st.integers(0, 63), st.integers(-(1 << 24), 1 << 24))
@@ -77,7 +77,7 @@ def test_scan_tables_agree_with_the_library():
 def test_quantiser_matches_the_model(plane, scan, value):
     """Covers the rounding rule and the luma mixed-band truncation, which differ only in
     sign and band and are easy to get subtly wrong."""
-    assert core.lib.mview_quantize_reference(plane, scan, value) == ref.quantize(plane, scan, value)
+    assert core.lib.oizys_quantize_reference(plane, scan, value) == ref.quantize(plane, scan, value)
 
 
 @given(st.lists(st.integers(-(1 << 20), 1 << 20), min_size=64, max_size=64))
@@ -93,6 +93,6 @@ def test_haar_is_reversible_in_the_model(values):
 
 def test_vector_quantiser_agrees_with_the_scalar_one():
     """The NEON quantiser replaced a scalar function that stays in the tree as the
-    definition. mview_encode_selftest runs both over generated coefficients inside the
+    definition. oizys_encode_selftest runs both over generated coefficients inside the
     library, where the static vector path is reachable."""
-    assert core.lib.mview_encode_selftest(None, None, 1) == 0
+    assert core.lib.oizys_encode_selftest(None, None, 1) == 0

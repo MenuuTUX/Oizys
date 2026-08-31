@@ -13,7 +13,7 @@ from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 from hypothesis.stateful import RuleBasedStateMachine, invariant, precondition, rule
 
-from Support import mviewcore as core
+from Support import oizyscore as core
 
 WIDTH, HEIGHT = 640, 256
 STRIDE = WIDTH * 4
@@ -26,30 +26,30 @@ class Ledger:
 
     def __init__(self, width=WIDTH, height=HEIGHT):
         self.map = core.DamageMap()
-        core.lib.mview_damage_init(ctypes.byref(self.map), width, height)
+        core.lib.oizys_damage_init(ctypes.byref(self.map), width, height)
         self.strips = (core.Strip * core.MAX_STRIPS)()
         self.presentations = ctypes.c_int(0)
 
     def plan(self, surface: bytes):
-        count = core.lib.mview_damage_plan(
+        count = core.lib.oizys_damage_plan(
             ctypes.byref(self.map), core.as_u8(surface), STRIDE, self.strips,
             core.MAX_STRIPS, ctypes.byref(self.presentations))
         return count, [self.strips[i] for i in range(count)]
 
     def plan_dirty(self, surface: bytes, rects):
         array = (core.DirtyRect * len(rects))(*[core.DirtyRect(*r) for r in rects])
-        count = core.lib.mview_damage_plan_dirty(
+        count = core.lib.oizys_damage_plan_dirty(
             ctypes.byref(self.map), core.as_u8(surface), STRIDE,
             array, len(rects), self.strips, core.MAX_STRIPS,
             ctypes.byref(self.presentations))
         return count, [self.strips[i] for i in range(count)]
 
     def owed(self):
-        count = core.lib.mview_damage_owed(ctypes.byref(self.map), self.strips, core.MAX_STRIPS)
+        count = core.lib.oizys_damage_owed(ctypes.byref(self.map), self.strips, core.MAX_STRIPS)
         return count, [self.strips[i] for i in range(count)]
 
     def presented(self):
-        core.lib.mview_damage_presented(ctypes.byref(self.map))
+        core.lib.oizys_damage_presented(ctypes.byref(self.map))
 
 
 class DamageLedgerMachine(RuleBasedStateMachine):
@@ -191,7 +191,7 @@ def test_a_rect_off_the_surface_is_not_trusted():
 
 def test_a_missed_rect_is_repaired_by_the_verification_sweep():
     """The compositor's rectangle list is a hint. A change it fails to report must still
-    reach the wire within MVIEW_DAMAGE_SWEEP frames, not linger forever."""
+    reach the wire within OIZYS_DAMAGE_SWEEP frames, not linger forever."""
     surface = bytearray(STRIDE * HEIGHT)
     ledger = Ledger()
     _settled(ledger, bytes(surface))

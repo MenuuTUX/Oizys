@@ -24,7 +24,11 @@ import time
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "Tests"))
 
-from Support import mviewcore as core  # noqa: E402
+if __name__ == "__main__" and sys.argv[1:2] == ["--fixture"]:
+    from fixture import main as fixture_main
+    sys.exit(fixture_main(sys.argv[2:]))
+
+from Support import oizyscore as core  # noqa: E402
 
 WIDTH, HEIGHT = 1920, 1080
 STRIDE = WIDTH * 4
@@ -39,24 +43,24 @@ ZONES = [
 
 def zone_stats():
     """(name, calls, total_ms, self_ms, depth) for every zone that ran."""
-    core.lib.mview_profile_zone_stats.restype = None
-    core.lib.mview_profile_zone_stats.argtypes = [
+    core.lib.oizys_profile_zone_stats.restype = None
+    core.lib.oizys_profile_zone_stats.argtypes = [
         ctypes.c_int, ctypes.POINTER(ctypes.c_uint64),
         ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double)]
-    core.lib.mview_profile_zone_name.restype = ctypes.c_char_p
-    core.lib.mview_profile_zone_name.argtypes = [ctypes.c_int]
-    core.lib.mview_profile_zone_count.restype = ctypes.c_int
+    core.lib.oizys_profile_zone_name.restype = ctypes.c_char_p
+    core.lib.oizys_profile_zone_name.argtypes = [ctypes.c_int]
+    core.lib.oizys_profile_zone_count.restype = ctypes.c_int
 
     rows = []
-    for index in range(core.lib.mview_profile_zone_count()):
+    for index in range(core.lib.oizys_profile_zone_count()):
         calls = ctypes.c_uint64(0)
         total = ctypes.c_double(0)
         own = ctypes.c_double(0)
-        core.lib.mview_profile_zone_stats(index, ctypes.byref(calls), ctypes.byref(total),
+        core.lib.oizys_profile_zone_stats(index, ctypes.byref(calls), ctypes.byref(total),
                                           ctypes.byref(own))
         if calls.value == 0:
             continue
-        label = core.lib.mview_profile_zone_name(index).decode()
+        label = core.lib.oizys_profile_zone_name(index).decode()
         depth = (len(label) - len(label.lstrip())) // 2
         rows.append({"zone": label.strip(), "depth": depth, "calls": calls.value,
                      "total_ms": total.value, "self_ms": own.value})
@@ -100,20 +104,20 @@ class Workload:
         self.surface = paint_desktop()
         self.pointer = ctypes.cast(self.surface, ctypes.POINTER(ctypes.c_uint8))
         self.map = core.DamageMap()
-        core.lib.mview_damage_init(ctypes.byref(self.map), WIDTH, HEIGHT)
+        core.lib.oizys_damage_init(ctypes.byref(self.map), WIDTH, HEIGHT)
         self.strips = (core.Strip * core.MAX_STRIPS)()
         self.presentations = ctypes.c_int(0)
         self.body = core.buffer(4096)
         self.planned = []
 
     def _plan(self):
-        return core.lib.mview_damage_plan(
+        return core.lib.oizys_damage_plan(
             ctypes.byref(self.map), self.pointer, STRIDE, self.strips,
             core.MAX_STRIPS, ctypes.byref(self.presentations))
 
     def _encode(self, count):
         body = ctypes.cast(self.body, ctypes.POINTER(ctypes.c_uint8))
-        encode = core.lib.mview_video_colour_strip_bgra
+        encode = core.lib.oizys_video_colour_strip_bgra
         for i in range(count):
             encode(body, 4096, self.strips[i].x, self.strips[i].y, self.pointer, STRIDE,
                    WIDTH, HEIGHT)
@@ -134,7 +138,7 @@ class Workload:
             started = time.perf_counter()
             count = self._plan()
             self._encode(count)
-            core.lib.mview_damage_presented(ctypes.byref(self.map))
+            core.lib.oizys_damage_presented(ctypes.byref(self.map))
             wall.append((time.perf_counter() - started) * 1000)
         return wall
 
@@ -200,10 +204,10 @@ def main():
     args = parser.parse_args()
 
     workload = Workload(args.frames)
-    core.lib.mview_profile_reset()
-    core.lib.mview_profile_enable(1)
+    core.lib.oizys_profile_reset()
+    core.lib.oizys_profile_enable(1)
     wall = workload.run(args.workload)
-    core.lib.mview_profile_enable(0)
+    core.lib.oizys_profile_enable(0)
 
     rows = zone_stats()
     report(rows, wall, f"scanout profile: {args.workload}, {WIDTH}x{HEIGHT}")

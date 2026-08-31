@@ -1,6 +1,6 @@
-# MView — finish the open DisplayLink driver on this Mac
+# Oizys — finish the open DisplayLink driver on this Mac
 
-You are a coding agent with a shell on **this** Mac. The DisplayLink USB dock is plugged in. Two Dell monitors are attached to it. Your job is to make **both physical Dells show a real macOS desktop** using the open-source tree in `/Users/shib/Developer/MView`, then **prove** it from measurements — not from log lines that say “bring-up finished”.
+You are a coding agent with a shell on **this** Mac. The DisplayLink USB dock is plugged in. Two Dell monitors are attached to it. Your job is to make **both physical Dells show a real macOS desktop** using the open-source tree in `/Users/shib/Developer/Oizys`, then **prove** it from measurements — not from log lines that say “bring-up finished”.
 
 Previous agents claimed success after USB ACKs. The user then looked at the panels: **right Dell solid black, left Dell “No HDMI”**. USB ACK ≠ picture. Do not repeat that.
 
@@ -64,7 +64,7 @@ Ignore their “AKE not yet” tables. Live `logs/run.log` already shows:
 
 Also already true:
 
-- `swift run mview probe` / `displays` / `run --takeover`
+- `swift run oizys probe` / `displays` / `run --takeover`
 - Logs **must** stay under `logs/` (never `/tmp`)
 - `--takeover` restores DLM on Ctrl-C — keep that
 - Tests: `swift test` (identity, init_0, AES-CMAC NIST empty, damage map). Add tests when you add codec/CP math.
@@ -72,13 +72,13 @@ Also already true:
 **Real bugs / gaps (start here, do not rewrite the tree):**
 
 1. **Decoder ARM never sent.** Vino cold pipe-arm is **1104 bytes** (mode header + 5 CODE_TABLES + QUANT_TABLE). Ridge layout word **`0x4000`**. See `artifacts/vino-video-arm.rs.txt`. Current `video.c` sends a 32-byte stub then simplified `last=0` black strips. Dock cannot decode that as a desktop.
-2. **Per-head video keys missing.** Vino `configure_head` is a **9-step CP loop** with its own km/rtx/rn and a **24-byte video key** (whitened ks + per-head nonce). `mview_video_refresh` then pumps head 1 with `ks=NULL`.
+2. **Per-head video keys missing.** Vino `configure_head` is a **9-step CP loop** with its own km/rtx/rn and a **24-byte video key** (whitened ks + per-head nonce). `oizys_video_refresh` then pumps head 1 with `ks=NULL`.
 3. **Encoder is a stub.** Need 64×16 integer Y/Cb/Cr, Haar/WHT, VLC, max 4096-byte records. `encode.c` is damage+YCC only. Uncompressed 1080p60×2 ≈ 750 MB/s; SuperSpeed cannot carry it — encoder is mandatory.
 4. **No ScreenCaptureKit** on the two `CGVirtualDisplay` heads. Do **not** start capture until a **static unique pattern** is proven on the *physical* panels.
 5. Empty-head video **resets the dock**. Never scan out a head with no EDID / not present.
 6. HDCP wire **seq is always 0** on this path (Chimera). Parse IN HDCP at **body[9]** as msg_id. Persistent EP84 IN ring or you drop the 522B cert.
-7. Leftover `mview` may still hold the hub (`logs/mview.pid`). Kill it before a run. Restore DLM if you brick the session:
-   `swift run mview start-dlm`
+7. Leftover `oizys` may still hold the hub (`logs/oizys.pid`). Kill it before a run. Restore DLM if you brick the session:
+   `swift run oizys start-dlm`
 
 ---
 
@@ -89,19 +89,19 @@ You have no guaranteed camera. **Do not use Mac virtual-display screenshots as p
 ### A. Gold capture (DLM running, both panels known-good)
 
 ```bash
-cd /Users/shib/Developer/MView
-swift run mview start-dlm
+cd /Users/shib/Developer/Oizys
+swift run oizys start-dlm
 sleep 3
 system_profiler SPDisplaysDataType > logs/gold-displays.txt
 ioreg -lw0 | grep -E 'DisplayLink|RidgeDoc|P2219|IOUSBHost' > logs/gold-ioreg.txt
-swift run mview probe | tee logs/gold-probe.txt
+swift run oizys probe | tee logs/gold-probe.txt
 ```
 
-### B. After every `mview run --takeover`, write `logs/verify.json` with ALL of:
+### B. After every `oizys run --takeover`, write `logs/verify.json` with ALL of:
 
 | Check | PASS |
 |---|---|
-| USB owner | `mview` (or this process), **not** `DisplayLinkUserAgent` |
+| USB owner | `oizys` (or this process), **not** `DisplayLinkUserAgent` |
 | Identity | still `RidgeDoc` |
 | AKE | log contains `H' verified`, `L' verified`, `V' verified` |
 | CP | at least one EP84 frame type-4 **sub 0x45** |
@@ -110,7 +110,7 @@ swift run mview probe | tee logs/gold-probe.txt
 | Video EPs | bulk writes to **0x08 and 0x0b** succeed; dock did **not** reset (identity still readable) |
 | Pattern | you are sending a **unique** pattern, not silent black: **head0 solid red**, **head1 solid green**, invert every 1s so a human/camera can tell “our pixels” from “TMDS black” |
 
-Implement `swift run mview verify` (or a C helper called from `run`) that prints PASS/FAIL per row and exits non-zero unless heads+EDID+CP ACK+video EP all pass.
+Implement `swift run oizys verify` (or a C helper called from `run`) that prints PASS/FAIL per row and exits non-zero unless heads+EDID+CP ACK+video EP all pass.
 
 ### C. Fault tree (OSD → cause)
 
@@ -126,7 +126,7 @@ If you have a webcam / Continuity Camera, photograph the two panels and OCR “N
 
 ### D. Compare to DLM, don’t cargo-cult it
 
-Diff `logs/gold-displays.txt` vs mview. Matching extra `CGDirectDisplayID`s is **necessary and not sufficient**. Matching **dock EDID/HPD** is the hardware signal DLM has and you currently do not.
+Diff `logs/gold-displays.txt` vs oizys. Matching extra `CGDirectDisplayID`s is **necessary and not sufficient**. Matching **dock EDID/HPD** is the hardware signal DLM has and you currently do not.
 
 ---
 
@@ -134,7 +134,7 @@ Diff `logs/gold-displays.txt` vs mview. Matching extra `CGDirectDisplayID`s is *
 
 Do not rewrite the CLI. Do not add Rust. Do not build a capture pipeline first.
 
-1. Kill stale mview, restore a clean USB claim.
+1. Kill stale oizys, restore a clean USB claim.
 2. Port **decoder ARM 1104B** (Ridge `0x4000`) onto both video EPs **before** strips.
 3. Port **`configure_head` 9-step** + per-head 24-byte video keys from `artifacts/vino-session.rs.txt` + Vino hdcp/control docs. Wait for 0x45 ACKs.
 4. `probe_head_present` + `fetch_edid` both heads. Gate scanout on presence.
@@ -146,7 +146,7 @@ Do not rewrite the CLI. Do not add Rust. Do not build a capture pipeline first.
 Loop:
 
 ```text
-change one thing → swift test → kill old mview → swift run mview run --takeover
+change one thing → swift test → kill old oizys → swift run oizys run --takeover
 → verify.json → if dock reset: start-dlm, stop guessing
 → next smallest fix
 ```
@@ -158,14 +158,14 @@ Timeouts: first `DeviceCapture` open often fails once; retry. SET_INTERFACE ifac
 ## Commands
 
 ```bash
-cd /Users/shib/Developer/MView
+cd /Users/shib/Developer/Oizys
 swift test
-swift run mview probe
-swift run mview run --takeover    # Ctrl-C restores DLM
-swift run mview start-dlm
+swift run oizys probe
+swift run oizys run --takeover    # Ctrl-C restores DLM
+swift run oizys start-dlm
 ```
 
-If USB is stuck: `kill $(cat logs/mview.pid)` then `swift run mview start-dlm`.
+If USB is stuck: `kill $(cat logs/oizys.pid)` then `swift run oizys start-dlm`.
 
 ---
 

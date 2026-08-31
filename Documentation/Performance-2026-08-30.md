@@ -40,7 +40,7 @@ not extend that bracket or retry failed USB writes in place.
 
 ## Capture cadence
 
-The one-minute unprofiled cadence run (`mview-cadence-motion.log`) delivered roughly
+The one-minute unprofiled cadence run (`oizys-cadence-motion.log`) delivered roughly
 57–58 complete captures per second per head. In the steady five-second windows, processing
 averaged about 3–4 ms per capture. One pending frame per head was replaced over the minute.
 These counts include captures with no changed encoded strips; they are not a measurement
@@ -60,21 +60,21 @@ comparisons below do not enable it.
 | Process group | CPU median (range), % of one core | Peak RSS median | WindowServer CPU median | WindowServer peak RSS median |
 | --- | ---: | ---: | ---: | ---: |
 | DisplayLink agent + XPC service | 54.0% (50.6–56.9) | 196.0 MiB | 41.2% | 297.7 MiB |
-| MView worker + C supervisor | 92.7% (88.9–100.1) | 75.1 MiB | 41.9% | 319.5 MiB |
+| Oizys worker + C supervisor | 92.7% (88.9–100.1) | 75.1 MiB | 41.9% | 319.5 MiB |
 
-All six final trials completed without a reset or worker restart. MView uses roughly
+All six final trials completed without a reset or worker restart. Oizys uses roughly
 1.72× the driver-process CPU of DisplayLink in this workload. Its driver-process RSS is
 lower, while WindowServer RSS is higher. Shared pages and caching mean these RSS sums
-are not a measurement of total system memory saved. MView is not yet ahead on CPU, and
+are not a measurement of total system memory saved. Oizys is not yet ahead on CPU, and
 no end-to-end latency advantage has been established.
 
 `Tools/MotionBench.swift` puts the same 960×540 scrolling colored-row window on every
 screen, including the built-in reference. That is what it did when these numbers were
 taken. It has since changed defaults to a full-screen always-on-top surface and gained
 other patterns, so reproducing this table needs `--windowed --pattern scroll`; the numbers
-below are not comparable with a run of the current default. Trials alternate DisplayLink and MView, with
+below are not comparable with a run of the current default. Trials alternate DisplayLink and Oizys, with
 three seconds of motion warmup followed by at least twenty seconds of sampling. The final
-MView trials use `serve --takeover --stats`, including its supervisor process. Each trial
+Oizys trials use `serve --takeover --stats`, including its supervisor process. Each trial
 must finish without a worker restart to qualify.
 
 `Tools/measure_processes.py` samples cumulative CPU time and RSS once a second. CPU is the
@@ -94,12 +94,12 @@ The CLI tests were launched by the Codex helper inside `/Applications/ChatGPT.ap
 The user noticed macOS naming ChatGPT as the screen-sharing app. Apple's
 [explanation of process responsibility](https://developer.apple.com/forums/thread/125438)
 describes how privacy attribution can follow the user-facing app responsible for a helper.
-That attribution does not add ChatGPT to MView's pixel path: the source calls
+That attribution does not add ChatGPT to Oizys's pixel path: the source calls
 ScreenCaptureKit, the C encoder and IOUSBHost directly.
 
-To test the launch context, a Swift `MView.app` was built and launched through LaunchServices.
+To test the launch context, a Swift `Oizys.app` was built and launched through LaunchServices.
 The user granted its own Screen Recording permission. Its parent PID was 1, and TCC logged
-`org.mview.MView` as the responsible app for the C helper. The embedded helper was verified
+`org.oizys.Oizys` as the responsible app for the C helper. The embedded helper was verified
 byte-for-byte identical to the CLI binary used in the repeated comparisons.
 
 One identical 20-second motion sample measured **100.4% of one core** in the standalone C
@@ -116,22 +116,22 @@ arrows, consistent with separate carousel entries. A blank thumbnail alone does 
 that a display or physical video stream is absent.
 
 The native Swift window was visually checked after launch. Raw evidence:
-`standalone-motion.json`, `standalone-app-session.log`, `mview-app-ui.png` and
-`mview-tcc-attribution.log` in the same local evidence directory. The app is signed ad hoc
+`standalone-motion.json`, `standalone-app-session.log`, `oizys-app-ui.png` and
+`oizys-tcc-attribution.log` in the same local evidence directory. The app is signed ad hoc
 for development, since this machine has no usable development signing identity. Stable
 signing and distribution packaging remain production work.
 
 ## Independent recovery
 
-`mview serve --takeover` runs a separate C supervisor. It checks for a supported dock,
-starts a fresh worker, and restarts MView after failures without launching DisplayLink.
+`oizys serve --takeover` runs a separate C supervisor. It checks for a supported dock,
+starts a fresh worker, and restarts Oizys after failures without launching DisplayLink.
 Missing or ambiguous device sets cause a wait, rather than repeated seizures. Retry delay
 backs off from one to eight seconds. Worker startup and heartbeat deadlines prevent a
 hung framework call from blocking Stop indefinitely.
 
-In the real-dock test, the active MView worker was deliberately killed. The supervisor
+In the real-dock test, the active Oizys worker was deliberately killed. The supervisor
 reopened the dock and reached healthy capture again in **7.66 seconds**. The subsequent
-USB probe identified the new MView worker as the owner; no DisplayLink process appeared
+USB probe identified the new Oizys worker as the owner; no DisplayLink process appeared
 in the thirty-second recovered-session sample. Both virtual heads resumed capture.
 This tests a real worker crash; unplug/replug and an unresponsive worker were tested with
 mock device discovery and real subprocesses, not by physically removing a cable.
@@ -142,7 +142,7 @@ lock/unlock, permissions changing during a session, and long unattended use need
 validation. The software has not yet met the user's reliability target.
 
 Stop restores DisplayLink only when it was running before service takeover. A machine
-using MView alone does not need DisplayLink installed for service operation or recovery.
+using Oizys alone does not need DisplayLink installed for service operation or recovery.
 The single-session `run` command retains its diagnostic restore behavior.
 
 ## Validation and artifacts
@@ -155,14 +155,14 @@ termination. Physical test wrappers restore DisplayLink after each bounded test.
 Raw local evidence is in `logs/latency-20260830/` (gitignored):
 
 - `comparison-final.json`, `*-final-*.json`, `*-final-*.log`: repeated samples and cadence.
-- `mview-no-zlp-motion.log`, `mview-fixed-motion.log`: sustained motion and idle runs.
-- `mview-cadence-motion.log`: one-minute capture cadence.
-- `recovery.json`, `mview-recovery.log`, `recovered-probe.txt`: real worker-crash recovery.
+- `oizys-no-zlp-motion.log`, `oizys-fixed-motion.log`: sustained motion and idle runs.
+- `oizys-cadence-motion.log`: one-minute capture cadence.
+- `recovery.json`, `oizys-recovery.log`, `recovered-probe.txt`: real worker-crash recovery.
 - `tests-final.log`, `build-final.log`: suite and build results.
 
 Rebuild the workload with `xcrun swiftc -O -module-cache-path build/ModuleCache
 Tools/MotionBench.swift -o build/MotionBench`. Start either driver, run `build/MotionBench
 27 --windowed --pattern scroll`, wait three seconds, then run `python3 Tools/measure_processes.py output.json --seconds
 20`. Repeat under the same display layout. Do not run builds or test suites during CPU
-sampling. Confirm the actual panels independently; do not use `mview confirm` solely
+sampling. Confirm the actual panels independently; do not use `oizys confirm` solely
 because USB and capture checks pass.

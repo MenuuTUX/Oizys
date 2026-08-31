@@ -17,7 +17,7 @@ def supervisor(tmp_path_factory):
     output = tmp_path_factory.mktemp("supervisor") / "supervisor-test"
     subprocess.run([
         "xcrun", "clang", "-std=c11", "-Wall", "-Wextra", "-Werror",
-        "-I", str(ROOT / "Sources/MViewCore/include"),
+        "-I", str(ROOT / "Sources/OizysCore/include"),
         str(ROOT / "Tests/Support/supervisor_test.c"), "-o", str(output),
     ], check=True, capture_output=True, text=True)
     return output
@@ -37,10 +37,10 @@ def service(supervisor, directory, vendor=False, topology=1, stubborn=False):
     worker = directory / "worker"
     worker.write_text(f"#!{sys.executable}\n" + '''
 import os, pathlib, signal, time
-pidfile = pathlib.Path(os.environ["MVIEW_TEST_PIDS"])
+pidfile = pathlib.Path(os.environ["OIZYS_TEST_PIDS"])
 with pidfile.open("a") as out:
     out.write(str(os.getpid()) + "\\n")
-if os.environ.get("MVIEW_TEST_STUBBORN") and len(pidfile.read_text().splitlines()) == 1:
+if os.environ.get("OIZYS_TEST_STUBBORN") and len(pidfile.read_text().splitlines()) == 1:
     signal.signal(signal.SIGTERM, signal.SIG_IGN)
 fd = int(next(arg.split("=", 1)[1] for arg in __import__("sys").argv if arg.startswith("--worker-fd=")))
 while True:
@@ -52,12 +52,12 @@ while True:
     topology_file.write_text(str(topology))
     pids = directory / "pids"
     pids.write_text("")
-    env = dict(os.environ, MVIEW_TEST_DIR=str(directory) + "/",
-               MVIEW_TEST_TOPOLOGY=str(topology_file), MVIEW_TEST_PIDS=str(pids))
+    env = dict(os.environ, OIZYS_TEST_DIR=str(directory) + "/",
+               OIZYS_TEST_TOPOLOGY=str(topology_file), OIZYS_TEST_PIDS=str(pids))
     if stubborn:
-        env["MVIEW_TEST_STUBBORN"] = "1"
+        env["OIZYS_TEST_STUBBORN"] = "1"
     if vendor:
-        env["MVIEW_TEST_VENDOR"] = "1"
+        env["OIZYS_TEST_VENDOR"] = "1"
     logfile = directory / "service.log"
     with logfile.open("w") as log:
         process = subprocess.Popen([str(supervisor), str(worker)], env=env, stdout=log,
@@ -73,7 +73,7 @@ while True:
             os.kill(int(pid), 0)
 
 
-def test_crash_restarts_mview_and_restores_vendor_only_on_stop(supervisor, tmp_path):
+def test_crash_restarts_oizys_and_restores_vendor_only_on_stop(supervisor, tmp_path):
     with service(supervisor, tmp_path, vendor=True) as (process, log, pids, _, _, _):
         eventually(lambda: "worker ready" in log.read_text())
         os.kill(int(pids.read_text().splitlines()[-1]), signal.SIGKILL)
@@ -108,7 +108,7 @@ def test_duplicate_service_does_not_touch_vendor_or_worker(supervisor, tmp_path)
         duplicate = subprocess.run([str(supervisor), str(worker)], env=env,
                                    capture_output=True, text=True, timeout=3)
         assert duplicate.returncode == 1
-        assert "another MView service" in duplicate.stderr
+        assert "another Oizys service" in duplicate.stderr
         assert "TEST vendor" not in duplicate.stdout
         assert len(pids.read_text().splitlines()) == 1
 

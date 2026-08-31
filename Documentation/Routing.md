@@ -1,7 +1,7 @@
 # Routing investigation, 2026-08-30
 
 The earlier native/USB split investigation is closed for the current setup. Both Dell
-HDMI cables stay on the ACASIS adapter, and MView is intended to drive both outputs itself.
+HDMI cables stay on the ACASIS adapter, and Oizys is intended to drive both outputs itself.
 The user accepts that software cannot create a native GPU route through a USB-only path.
 
 ## Measured topology
@@ -23,7 +23,7 @@ inside the sandbox is not evidence that a monitor is disconnected.
 Reproduce without stopping DisplayLink Manager:
 
 ```sh
-build/Release/mview routes
+build/Release/oizys routes
 system_profiler SPDisplaysDataType SPThunderboltDataType
 ioreg -r -c DCPAVServiceProxy -w0 -l
 ```
@@ -66,11 +66,11 @@ missing private API support can also prevent verification.
 
 ## Current work
 
-MView drives both outputs using its own protocol and encoder. The motion/reset fixes and
+Oizys drives both outputs using its own protocol and encoder. The motion/reset fixes and
 independent session recovery are recorded in [the performance report](Performance-2026-08-30.md).
 The Ridge DDC/CI tunnel and native monitor readback testing remain unfinished. A Swift
 menu-bar app now provides connection controls, recovery status and permission guidance. The protocol currently sets 1080p60 for the local Dell panels; the adapter's
-advertised 4K60 support is not a claim that MView implements that mode yet.
+advertised 4K60 support is not a claim that Oizys implements that mode yet.
 
 The earlier native-DDC tests covered synthetic EDID matching and malformed replies. They
 do not prove native DDC on a physical monitor: this setup exposes no native external I2C

@@ -1,4 +1,4 @@
-# MView
+# Oizys
 
 An open userspace driver for the DisplayLink Ridge dock. It presents two 1920×1080
 displays to macOS, captures them, and encodes the result as Ridge colour strips over USB
@@ -28,46 +28,115 @@ a 13 ms status poll and a 3 s heartbeat, which run whether or not anything moved
 macOS 14 or later on Apple silicon, Xcode 16 or later, and Screen Recording permission for
 the built binary. The encoder is NEON and is compiled for the host core.
 
-## Building
+## Building and installing
+
+Run `./dev.sh` for the interactive developer menu, or use its scriptable commands:
 
 ```bash
-xcodebuild -project MView.xcodeproj -scheme mview -configuration Release build
+./dev.sh install production           # optimized app, CLI and login startup
+./dev.sh build production-fallback    # optional vendor fallback; not installed
+./dev.sh build debug-minimal          # single portable developer executable
+./dev.sh debug                        # build and open debug beside production
+./dev.sh build-debug-all              # build all three portable debug variants
+./dev.sh xcode                        # regenerate and open the native Xcode project
 ```
 
-For the standalone Swift menu-bar app:
+Installation replaces other Oizys apps in `/Applications` and `~/Applications` with
+`/Applications/Oizys.app`, preserves settings, and installs `oizys` in a writable command
+directory on PATH when available. Debug is never installed. Its executable is
+`dist/Oizys-debug-<version>-<variant>`; the version comes from `VERSION`.
+
+A debug executable carries its signed runtime bundle and extracts it into
+`~/Library/Caches/Oizys/Portable/`. Opening the GUI leaves production running.
+**Start debug driver** pauses production and takes the dock; **Stop debug and restore
+production** returns it. Hardware diagnostics use the same handoff. Only one debug
+session can own the dock, but idle developer windows and software tests can coexist.
+It does not install a login item. A crashed portable GUI is recovered by its launcher;
+a direct Xcode debug session that crashes can be recovered with `oizys service recover-debug`.
+Debug settings, logs and embedded tools stay under
+`~/Library/Application Support/Oizys/Debug/<variant>/`. They do not change production
+settings. `./dev.sh debug` uses the current checkout and its shared `.venv`; portable
+executables launched separately use embedded source tools unless you choose a checkout.
+**Prepare tools** installs their isolated Python dependencies. Launching the GUI does
+not start tests or video playback.
+Repeat `./dev.sh debug debug-verbose` after edits to close the previous verbose debug
+session, rebuild, and run the new version. Active tests in that session stop first;
+production resumes if debug had taken the dock. Nothing is installed, and the command
+does not reset permissions.
+
+Grant **Oizys** Screen Recording access if macOS asks. Login startup never waits for
+permission dialogs. A small event listener remains resident without USB polling while
+the dock is absent; capture, encoding, virtual displays and USB workers are stopped.
+Capture starts only for one supported dock in an awake, logged-in console session and
+stops on unplug, sleep or session deactivation. Reconnection still requires hardware
+initialization. No application can guarantee zero RAM use or eliminate macOS login delays.
+
+Production uses C `-O3`, Swift `-O`, link-time optimization, dead stripping and hardened
+runtime. It excludes the developer GUI and diagnostic commands. `production-fallback`
+adds vendor recovery and replaces the same production app if installed. Both use the
+same bundle identifier for privacy identity. Local builds are signed ad hoc; a changed
+signature may require macOS permission again. Developer ID signing and notarization are
+still required for frictionless distribution to other Macs. `OIZYS_SIGN_IDENTITY` selects
+a signing identity for `dev.sh`; no script grants privacy permissions or disables Gatekeeper.
+
+When a debug app lacks Screen Recording access, it clears registered debug Screen
+Recording permissions before requesting its own approval. Production and other apps
+are never reset. A valid debug approval is kept; repeated clicks do not reset it again
+within the same process. The app's Quit command restores production and removes its
+own debug permission entry, so a later session may need approval again. Use the system
+Quit & Reopen button during permission setup to preserve that pending grant. Another
+running copy of the same debug variant keeps its shared permission until it quits.
+Ad-hoc rebuilds can also require approval; an Apple Development signing identity keeps
+the signing requirement stable across edits.
+
+The developer menu includes cleaning, dependency setup, tests, coverage, three sanitizers,
+encoder and GUI profiling, static analysis, Xcode archives, status and privacy settings.
+Builds do not run tests. See [Xcode workflows](Documentation/Xcode.md) for IDE details.
+Production ZIP and PKG packaging remain available through
+`Tools/build_app.py --format both`; use `dev.sh install` to register per-user startup.
+
+## Terminal controls
+
+Every variant includes the same CLI. With production installed, run `oizys` or `oizys tui`.
+A portable debug executable accepts `--cli tui` or any CLI command without opening the GUI.
+The production app executable also accepts `--cli`.
 
 ```bash
-python3 Tools/build_app.py
-open build/Release/MView.app
+oizys monitors                         # current monitors, pixels, desktop size and mode Hz
+oizys monitor 1 modes                  # replace 1 with an ID from monitors
+oizys monitor 1 mode 3                  # select a listed mode index
+oizys monitor 1 position 1920 0         # session arrangement, in desktop points
+oizys monitor 1 mirror off
+oizys ddc get 0x10 --display 1          # brightness on a supported native DDC connection
+oizys config list
+oizys config set capture.fps 60
+oizys service restart                  # apply changed driver settings
+oizys service stop                     # stop until resumed or the next login
+oizys service login-disable            # stop and disable automatic startup
+oizys service login-enable
 ```
 
-Grant **MView** Screen Recording access, then use its Start/Stop button. Launch the bundle
-with `open` or Finder so macOS attributes capture to MView, rather than a terminal or the
-app that launched a bare executable. The bundle contains a Swift `MView` executable and a
-separate C `MViewDriver` helper. Diagnostics are in
-`~/Library/Application Support/MView/logs/`. This is an ad-hoc development build; a new
-build can require permission again. Distribution signing and notarization are not set up.
-
-Or open `MView.xcodeproj`. Two targets: `mview` is the command-line tool and
-`MViewCoreDylib` builds the core sources as a dylib for the test suite to drive.
-Build settings live in `Configs/*.xcconfig` rather than inside the project file, so
-a setting is reviewable in a diff and the IDE and command line cannot drift apart.
+The TUI exposes these controls, all driver configuration keys, brightness, contrast,
+volume, input selection and power through DDC. DDC is unavailable on connections that do
+not expose a supported native I2C path, including Oizys's virtual dock heads. Display mode
+Hz is not a measurement of physical panel output or capture FPS. Unsupported changes
+report errors rather than silently pretending to succeed.
 
 ## Running
 
 ```bash
-build/Release/mview probe                      # identify the hub, read-only
-build/Release/mview routes                     # configured routes and native I2C matches, read-only
-build/Release/mview diagnose --takeover        # authenticate both heads, read EDIDs
-build/Release/mview verify --takeover          # measured pattern proof
-build/Release/mview run --takeover --stats     # one diagnostic session with capture metrics
-build/Release/mview serve --takeover --stats   # recover MView sessions after failures
-build/Release/mview confirm                    # record that you saw both panels
+build/Release/oizys probe                      # identify the hub, read-only
+build/Release/oizys routes                     # configured routes and native I2C matches, read-only
+build/Release/oizys diagnose --takeover        # authenticate both heads, read EDIDs
+build/Release/oizys verify --takeover          # measured pattern proof
+build/Release/oizys run --takeover --stats     # one diagnostic session with capture metrics
+build/Release/oizys serve --takeover --stats   # recover Oizys sessions after failures
+build/Release/oizys confirm                    # record that you saw both panels
 ```
 
 `--takeover` stops DisplayLink Manager before claiming the USB interfaces; bounded commands
 restore it when they finish and `run` restores it on Ctrl-C. `serve` owns a separate C
-worker, restarts MView after faults, and waits for a disconnected dock to return. It does
+worker, restarts Oizys after faults, and waits for a disconnected dock to return. It does
 not launch DisplayLink for recovery. On Stop it restores DisplayLink only if it was running
 before takeover. Virtual displays are recreated during recovery, so applications may move
 windows during that gap.
@@ -75,7 +144,7 @@ windows during that gap.
 ## Dock and native routing
 
 Both Dell HDMI connections currently use the Ridge USB graphics path. Disabling one with
-`heads.active` stops MView driving that output. It does not connect it to the Mac's GPU.
+`heads.active` stops Oizys driving that output. It does not connect it to the Mac's GPU.
 `heads.native` describes an intended native connection and cannot switch the dock's wiring.
 An explicit native configuration is checked before `run`, `patterns`, or `verify` stops
 DisplayLink Manager. Overlapping dock/native selections and unverified native connections
@@ -86,7 +155,7 @@ Thunderbolt. A dock can provide that alongside DisplayLink only if it has the ad
 hardware. The identified ACASIS adapter advertises both HDMI outputs through DisplayLink,
 with no separate native output. See [the routing investigation](Documentation/Routing.md).
 
-`mview ddc list` reports native I2C services matched to a unique online monitor EDID.
+`oizys ddc list` reports native I2C services matched to a unique online monitor EDID.
 DDC reads and writes over this backend still need validation on a natively connected
 monitor. Ridge USB DDC tunnelling is not implemented. The Swift app currently provides connection,
 recovery status, permission guidance and diagnostics; it does not yet expose monitor settings.
@@ -98,7 +167,7 @@ firmware, H-prime/L-prime/V-prime results, sealed control replies, both presence
 EDIDs, and video writes on both endpoints.
 
 `machine_pass` covers what the process can observe. `overall_pass` additionally requires a
-person and is set only by `mview confirm`, which refuses a run whose `machine_pass` is
+person and is set only by `oizys confirm`, which refuses a run whose `machine_pass` is
 already false. The separation is deliberate: nothing measurable here distinguishes a
 faithfully encoded black frame from a broken encoder, and earlier versions of this driver
 reported success from USB acknowledgements while one panel was black and the other showed
@@ -116,7 +185,7 @@ python3 Tools/test.py --sanitize thread
 python3 Tools/test.py --mutate
 ```
 
-The suite is Python driving `libMViewCore.dylib` through ctypes, so it exercises the
+The suite is Python driving `libOizysCore.dylib` through ctypes, so it exercises the
 shipping code rather than a reimplementation of it. `Tools/test.py` creates `.venv` and
 installs pytest, hypothesis and numpy on first run.
 
@@ -202,9 +271,9 @@ straight back.
 ```text
 Configs/            xcconfig build settings
 Documentation/      architecture, protocol and testing notes
-Sources/MViewCore/  the driver
-Sources/mview/      command-line entry point and C supervisor
-Sources/MViewApp/   native Swift menu-bar app
+Sources/OizysCore/  the driver
+Sources/oizys/      command-line entry point and C supervisor
+Sources/OizysApp/   native Swift menu-bar app
 Tests/              pytest suites and the numpy reference model
 Tools/              build, test, profile and mutation scripts
 ```

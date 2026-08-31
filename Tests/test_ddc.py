@@ -13,7 +13,7 @@ def ddc(tmp_path_factory):
     output = tmp_path_factory.mktemp("ddc") / "ddc-tests.dylib"
     subprocess.run([
         "xcrun", "clang", "-std=c11", "-dynamiclib",
-        "-I", str(ROOT / "Sources/MViewCore/include"),
+        "-I", str(ROOT / "Sources/OizysCore/include"),
         str(ROOT / "Tests/Support/ddc_native_test.c"),
         "-framework", "Foundation", "-framework", "CoreGraphics", "-framework", "IOKit",
         "-o", str(output),

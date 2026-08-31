@@ -26,10 +26,10 @@ def snapshot():
             continue
         pid, cpu, rss, name = fields
         # Case-insensitive on the driver's own name. The app bundle ships its binaries as
-        # Mview/MviewDriver and the CLI is mview; a case-sensitive match silently dropped
+        # Oizys/OizysDriver and the CLI is oizys; a case-sensitive match silently dropped
         # the bundled worker from the sample and reported a comparison with no driver in it.
         lowered = name.lower()
-        if "mview" in lowered or any(part in name for part in
+        if "oizys" in lowered or any(part in name for part in
                                      ("DisplayLink", "WindowServer", "MotionBench")):
             processes[pid] = {"name": name, "cpu_seconds": cpu_seconds(cpu), "rss_kib": int(rss)}
     return processes

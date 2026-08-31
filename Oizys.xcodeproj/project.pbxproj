@@ -1,0 +1,1427 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		0D9C3939943FB277F3DBF00D /* Capture.swift in OizysCoreDylib */ = {isa = PBXBuildFile; fileRef = 0EEB566E0BCDC6A7067DF4BD /* Capture.swift */; };
+		58C4C896F87DA4741763AC5A /* ConfigStore.swift in OizysCoreDylib */ = {isa = PBXBuildFile; fileRef = DE1672BC58629EB9C49013C0 /* ConfigStore.swift */; };
+		326FE7DE0BCBCED53738EE4F /* OizysLifecycle.swift in OizysCoreDylib */ = {isa = PBXBuildFile; fileRef = 2D523F3D48DA3B99FC5AE500 /* OizysLifecycle.swift */; };
+		012A7339043C5873D643D87D /* VirtualDisplay.swift in OizysCoreDylib */ = {isa = PBXBuildFile; fileRef = 28A8EB7B7AA353DF636743BA /* VirtualDisplay.swift */; };
+		E499DB1DF7B0EFF40D266039 /* bench.c in OizysCoreDylib */ = {isa = PBXBuildFile; fileRef = 458C2E28700DA1184E0BDAC2 /* bench.c */; };
+		133F099A39DAFA610B7D4403 /* capture_frame.c in OizysCoreDylib */ = {isa = PBXBuildFile; fileRef = ED0EEB4EBCACE0D053E738AD /* capture_frame.c */; };
+		87F457E443E6B0CC4850CC10 /* config.c in OizysCoreDylib */ = {isa = PBXBuildFile; fileRef = D84D26C78DEF97C8F1123C16 /* config.c */; };
+		51F6F4A75C46BB6CA18E3C27 /* crypto.c in OizysCoreDylib */ = {isa = PBXBuildFile; fileRef = 3B32423357F906EBA67305CD /* crypto.c */; };
+		E70341836FB6BDD07A77D8D5 /* ddc_native.c in OizysCoreDylib */ = {isa = PBXBuildFile; fileRef = 6E923A000FA6991C4973A5DF /* ddc_native.c */; };
+		D76C083E4C265B0B756BCCE2 /* display.c in OizysCoreDylib */ = {isa = PBXBuildFile; fileRef = BBCD0F1FE7BBD144E1376A42 /* display.c */; };
+		CDD70DA9F1CC36F32D8B59A6 /* dl3.c in OizysCoreDylib */ = {isa = PBXBuildFile; fileRef = A0E0F016740BCCB3D349E1E8 /* dl3.c */; };
+		FBA84444E83625C62A7A9E1C /* driver.c in OizysCoreDylib */ = {isa = PBXBuildFile; fileRef = F57E32910C395FEEBF5C17D9 /* driver.c */; };
+		BD741D2A8F4FB0C4060E3FA4 /* encode.c in OizysCoreDylib */ = {isa = PBXBuildFile; fileRef = DE4B0A2652A590797A2DA7F8 /* encode.c */; };
+		E79E12B677A2AA80159EFFE7 /* log.c in OizysCoreDylib */ = {isa = PBXBuildFile; fileRef = 96E4E0F8AC502FFB55F7CEAD /* log.c */; };
+		38748F5A0662F66BA5D87D1F /* profile.c in OizysCoreDylib */ = {isa = PBXBuildFile; fileRef = 029C381021032EA9E5AD0D79 /* profile.c */; };
+		1F3756ED92FBD5F06A9CBBBB /* usb_probe.c in OizysCoreDylib */ = {isa = PBXBuildFile; fileRef = 3B6B6273958EF4109954EB42 /* usb_probe.c */; };
+		EE87A051CC694B8DA023194D /* usb_session.c in OizysCoreDylib */ = {isa = PBXBuildFile; fileRef = 9C753C6EA135B5B29A5D07CA /* usb_session.c */; };
+		ED379B2D5F07C2EE264B2415 /* wht.c in OizysCoreDylib */ = {isa = PBXBuildFile; fileRef = 2E77A962705E2AD2553840D9 /* wht.c */; };
+		C66B5BA8C637816919834095 /* AppKit in OizysCoreDylib */ = {isa = PBXBuildFile; fileRef = 6960390CFB747E68ECAA34F4 /* AppKit.framework */; };
+		B2DF04824D7574E2279559AA /* Foundation in OizysCoreDylib */ = {isa = PBXBuildFile; fileRef = D6B62CF1F3C9BD64275EFF04 /* Foundation.framework */; };
+		367C4FDBA870A6939A4DB55E /* CoreFoundation in OizysCoreDylib */ = {isa = PBXBuildFile; fileRef = 6B3DDE583D98730BFF9EDE70 /* CoreFoundation.framework */; };
+		530B1F90C04397A1135B43AD /* CoreGraphics in OizysCoreDylib */ = {isa = PBXBuildFile; fileRef = 7DD7D61E1F7D6083A93B2601 /* CoreGraphics.framework */; };
+		230C072BC6588EDEAA187CF3 /* CoreMedia in OizysCoreDylib */ = {isa = PBXBuildFile; fileRef = 6A1053725482E6333E9867BF /* CoreMedia.framework */; };
+		CD4EC709DB5686D7AA3442AD /* CoreVideo in OizysCoreDylib */ = {isa = PBXBuildFile; fileRef = A3F3E1021F96963433BFA361 /* CoreVideo.framework */; };
+		03155F9FEDE50209E6063BCA /* IOKit in OizysCoreDylib */ = {isa = PBXBuildFile; fileRef = 68DCEA15427C44547CD3DD3F /* IOKit.framework */; };
+		674F6CD69A8BE31E14F19C99 /* IOUSBHost in OizysCoreDylib */ = {isa = PBXBuildFile; fileRef = 133E45B6B4E8778A6A1357F7 /* IOUSBHost.framework */; };
+		059233F9738D70C186BC0FD0 /* Security in OizysCoreDylib */ = {isa = PBXBuildFile; fileRef = 1611D29C69F038A379A6256B /* Security.framework */; };
+		A9154007EEA9095298E078A8 /* ScreenCaptureKit in OizysCoreDylib */ = {isa = PBXBuildFile; fileRef = 508FCEC1FFB54BE8DE65E6C0 /* ScreenCaptureKit.framework */; };
+		3665E4520DE4A926D94D6F93 /* ImageIO in OizysCoreDylib */ = {isa = PBXBuildFile; fileRef = A97F0B1BA1D23D3882C9D6D0 /* ImageIO.framework */; };
+		2A50A8FD773CDF2EFABC3505 /* UniformTypeIdentifiers in OizysCoreDylib */ = {isa = PBXBuildFile; fileRef = C0CDFB53944F250CE0F1A8F2 /* UniformTypeIdentifiers.framework */; };
+		1A75FC126DB72404470A8F45 /* main.c in oizys */ = {isa = PBXBuildFile; fileRef = C593A3109A47D53AB431DAFD /* main.c */; };
+		4141A9AEF5CF36EF8653716C /* supervisor.c in oizys */ = {isa = PBXBuildFile; fileRef = B360A9AEDDC0C8C5BDF0CEB2 /* supervisor.c */; };
+		1FFD9DC8765DC53D9A47DC11 /* terminal.c in oizys */ = {isa = PBXBuildFile; fileRef = B410E56E518D7B8C0F6E7312 /* terminal.c */; };
+		D5A83486A57253F7F74C7383 /* Capture.swift in oizys */ = {isa = PBXBuildFile; fileRef = 0EEB566E0BCDC6A7067DF4BD /* Capture.swift */; };
+		39BF92B23AA03B51EB79FB7B /* ConfigStore.swift in oizys */ = {isa = PBXBuildFile; fileRef = DE1672BC58629EB9C49013C0 /* ConfigStore.swift */; };
+		D7003A3070DFFAB95CE14744 /* OizysLifecycle.swift in oizys */ = {isa = PBXBuildFile; fileRef = 2D523F3D48DA3B99FC5AE500 /* OizysLifecycle.swift */; };
+		100A6C539A6B479B793574F4 /* VirtualDisplay.swift in oizys */ = {isa = PBXBuildFile; fileRef = 28A8EB7B7AA353DF636743BA /* VirtualDisplay.swift */; };
+		9AABA441294486640DED0716 /* bench.c in oizys */ = {isa = PBXBuildFile; fileRef = 458C2E28700DA1184E0BDAC2 /* bench.c */; };
+		107F347DC796AECDF0882681 /* capture_frame.c in oizys */ = {isa = PBXBuildFile; fileRef = ED0EEB4EBCACE0D053E738AD /* capture_frame.c */; };
+		AEA1EEAB76E0A3AEE0C45A56 /* config.c in oizys */ = {isa = PBXBuildFile; fileRef = D84D26C78DEF97C8F1123C16 /* config.c */; };
+		2752BDB59A24B1E5867C9B4D /* crypto.c in oizys */ = {isa = PBXBuildFile; fileRef = 3B32423357F906EBA67305CD /* crypto.c */; };
+		1C431784C109DC7578247593 /* ddc_native.c in oizys */ = {isa = PBXBuildFile; fileRef = 6E923A000FA6991C4973A5DF /* ddc_native.c */; };
+		F23DDB6DC87994557EBD37FA /* display.c in oizys */ = {isa = PBXBuildFile; fileRef = BBCD0F1FE7BBD144E1376A42 /* display.c */; };
+		F680AD6EFD17ADB3CB9A4E34 /* dl3.c in oizys */ = {isa = PBXBuildFile; fileRef = A0E0F016740BCCB3D349E1E8 /* dl3.c */; };
+		91A29460027136E1EC1BD620 /* driver.c in oizys */ = {isa = PBXBuildFile; fileRef = F57E32910C395FEEBF5C17D9 /* driver.c */; };
+		363DB6102698D157C8ABBEC2 /* encode.c in oizys */ = {isa = PBXBuildFile; fileRef = DE4B0A2652A590797A2DA7F8 /* encode.c */; };
+		6F4FE6D5F17E142F3F954560 /* log.c in oizys */ = {isa = PBXBuildFile; fileRef = 96E4E0F8AC502FFB55F7CEAD /* log.c */; };
+		675EDAE83ED651614FB35789 /* profile.c in oizys */ = {isa = PBXBuildFile; fileRef = 029C381021032EA9E5AD0D79 /* profile.c */; };
+		36A8DC267A822883AD29B707 /* usb_probe.c in oizys */ = {isa = PBXBuildFile; fileRef = 3B6B6273958EF4109954EB42 /* usb_probe.c */; };
+		4900BA53993B89BF9C33B617 /* usb_session.c in oizys */ = {isa = PBXBuildFile; fileRef = 9C753C6EA135B5B29A5D07CA /* usb_session.c */; };
+		040CB5F9CEB5666B7AB39AF4 /* wht.c in oizys */ = {isa = PBXBuildFile; fileRef = 2E77A962705E2AD2553840D9 /* wht.c */; };
+		44E6B4BCFC8820A0BC8AF1DF /* AppKit in oizys */ = {isa = PBXBuildFile; fileRef = 6960390CFB747E68ECAA34F4 /* AppKit.framework */; };
+		FDF573656ED94E6EFA4105A3 /* Foundation in oizys */ = {isa = PBXBuildFile; fileRef = D6B62CF1F3C9BD64275EFF04 /* Foundation.framework */; };
+		B8283442F71316C103BBBA9D /* CoreFoundation in oizys */ = {isa = PBXBuildFile; fileRef = 6B3DDE583D98730BFF9EDE70 /* CoreFoundation.framework */; };
+		FECDE74E4AE4C3B91A924DD0 /* CoreGraphics in oizys */ = {isa = PBXBuildFile; fileRef = 7DD7D61E1F7D6083A93B2601 /* CoreGraphics.framework */; };
+		D98927BE459FA146BA8E630E /* CoreMedia in oizys */ = {isa = PBXBuildFile; fileRef = 6A1053725482E6333E9867BF /* CoreMedia.framework */; };
+		E2CFBD53D06CB0AF9F8C68F0 /* CoreVideo in oizys */ = {isa = PBXBuildFile; fileRef = A3F3E1021F96963433BFA361 /* CoreVideo.framework */; };
+		A9EFB3805F6EEA56B4DAF016 /* IOKit in oizys */ = {isa = PBXBuildFile; fileRef = 68DCEA15427C44547CD3DD3F /* IOKit.framework */; };
+		919AE2A95B0C5D644C0B0A4C /* IOUSBHost in oizys */ = {isa = PBXBuildFile; fileRef = 133E45B6B4E8778A6A1357F7 /* IOUSBHost.framework */; };
+		8C44EB2C7E51A858EA28C08E /* Security in oizys */ = {isa = PBXBuildFile; fileRef = 1611D29C69F038A379A6256B /* Security.framework */; };
+		5FF9241A4929305E790423D6 /* ScreenCaptureKit in oizys */ = {isa = PBXBuildFile; fileRef = 508FCEC1FFB54BE8DE65E6C0 /* ScreenCaptureKit.framework */; };
+		64E196210333828D5E4066B1 /* ImageIO in oizys */ = {isa = PBXBuildFile; fileRef = A97F0B1BA1D23D3882C9D6D0 /* ImageIO.framework */; };
+		B1E39D8FCD1ADE7689753739 /* UniformTypeIdentifiers in oizys */ = {isa = PBXBuildFile; fileRef = C0CDFB53944F250CE0F1A8F2 /* UniformTypeIdentifiers.framework */; };
+		B7560249CA6BB9A813AA7CE5 /* DebugPermissions.swift in OizysApp */ = {isa = PBXBuildFile; fileRef = 3DEE5D5E5D207CD24CEA8780 /* DebugPermissions.swift */; };
+		A34FC258810ACE6E9F7D99D6 /* DevDiagnostics.swift in OizysApp */ = {isa = PBXBuildFile; fileRef = FEA78EF48E937C1FA9802574 /* DevDiagnostics.swift */; };
+		F3E6D66195D05E2FB51CCEFE /* DiagnosticReport.swift in OizysApp */ = {isa = PBXBuildFile; fileRef = 128BD5F987CB6D3B259C5A90 /* DiagnosticReport.swift */; };
+		2953351EF9776F1F663E868B /* Main.swift in OizysApp */ = {isa = PBXBuildFile; fileRef = 945D4B4A37A269A4CE6589DF /* Main.swift */; };
+		B70C2A170864AE54B691923A /* Production.swift in OizysApp */ = {isa = PBXBuildFile; fileRef = 3F745877C8CFAB87E33E20F1 /* Production.swift */; };
+		EC708FDCCDBE549E12B05B04 /* OizysLifecycle.swift in OizysApp */ = {isa = PBXBuildFile; fileRef = 2D523F3D48DA3B99FC5AE500 /* OizysLifecycle.swift */; };
+		F8B2A95CA051A849364B80C3 /* AppKit in OizysApp */ = {isa = PBXBuildFile; fileRef = 6960390CFB747E68ECAA34F4 /* AppKit.framework */; };
+		96F0F846479C78013B259767 /* Foundation in OizysApp */ = {isa = PBXBuildFile; fileRef = D6B62CF1F3C9BD64275EFF04 /* Foundation.framework */; };
+		5BA015528FD72E348ED8A1CF /* CoreFoundation in OizysApp */ = {isa = PBXBuildFile; fileRef = 6B3DDE583D98730BFF9EDE70 /* CoreFoundation.framework */; };
+		849329AD24B6ADBFD48EC025 /* CoreGraphics in OizysApp */ = {isa = PBXBuildFile; fileRef = 7DD7D61E1F7D6083A93B2601 /* CoreGraphics.framework */; };
+		12542D4B22B9F60555560E2A /* CoreMedia in OizysApp */ = {isa = PBXBuildFile; fileRef = 6A1053725482E6333E9867BF /* CoreMedia.framework */; };
+		597E7A89B68EA17A3430D708 /* CoreVideo in OizysApp */ = {isa = PBXBuildFile; fileRef = A3F3E1021F96963433BFA361 /* CoreVideo.framework */; };
+		6F88414CF130858C59AA217D /* IOKit in OizysApp */ = {isa = PBXBuildFile; fileRef = 68DCEA15427C44547CD3DD3F /* IOKit.framework */; };
+		54411BBD899E95D21527F1E4 /* IOUSBHost in OizysApp */ = {isa = PBXBuildFile; fileRef = 133E45B6B4E8778A6A1357F7 /* IOUSBHost.framework */; };
+		0C25C2CF02C6CA02EDB3102D /* Security in OizysApp */ = {isa = PBXBuildFile; fileRef = 1611D29C69F038A379A6256B /* Security.framework */; };
+		56BC197363A3A409EF57A8DC /* ScreenCaptureKit in OizysApp */ = {isa = PBXBuildFile; fileRef = 508FCEC1FFB54BE8DE65E6C0 /* ScreenCaptureKit.framework */; };
+		03E516F4261AD33BFB2D4940 /* ImageIO in OizysApp */ = {isa = PBXBuildFile; fileRef = A97F0B1BA1D23D3882C9D6D0 /* ImageIO.framework */; };
+		859A97A4FD8EA45B24A7ED4C /* UniformTypeIdentifiers in OizysApp */ = {isa = PBXBuildFile; fileRef = C0CDFB53944F250CE0F1A8F2 /* UniformTypeIdentifiers.framework */; };
+		E7D7FCB74B49573B749E170D /* SuiteTests.swift in OizysTests */ = {isa = PBXBuildFile; fileRef = A9B7EB1B7BE89C6D48072F43 /* SuiteTests.swift */; };
+		4AEA78AE5F875D725B5ADE25 /* AppKit in OizysTests */ = {isa = PBXBuildFile; fileRef = 6960390CFB747E68ECAA34F4 /* AppKit.framework */; };
+		2C11A7D7683FBA3325001B34 /* Foundation in OizysTests */ = {isa = PBXBuildFile; fileRef = D6B62CF1F3C9BD64275EFF04 /* Foundation.framework */; };
+		47BD4DD12199609F1736FF84 /* CoreFoundation in OizysTests */ = {isa = PBXBuildFile; fileRef = 6B3DDE583D98730BFF9EDE70 /* CoreFoundation.framework */; };
+		7CFBE5971497916F7748E991 /* CoreGraphics in OizysTests */ = {isa = PBXBuildFile; fileRef = 7DD7D61E1F7D6083A93B2601 /* CoreGraphics.framework */; };
+		6D526DA7CA74D2A6D7B11B13 /* CoreMedia in OizysTests */ = {isa = PBXBuildFile; fileRef = 6A1053725482E6333E9867BF /* CoreMedia.framework */; };
+		28C30B170DC24869DCDB9751 /* CoreVideo in OizysTests */ = {isa = PBXBuildFile; fileRef = A3F3E1021F96963433BFA361 /* CoreVideo.framework */; };
+		FAD65D7B705FAF8F1FF08123 /* IOKit in OizysTests */ = {isa = PBXBuildFile; fileRef = 68DCEA15427C44547CD3DD3F /* IOKit.framework */; };
+		83269B47315DC0575272A7DA /* IOUSBHost in OizysTests */ = {isa = PBXBuildFile; fileRef = 133E45B6B4E8778A6A1357F7 /* IOUSBHost.framework */; };
+		C28D789674D27139E6508E00 /* Security in OizysTests */ = {isa = PBXBuildFile; fileRef = 1611D29C69F038A379A6256B /* Security.framework */; };
+		5AEC08A05F7B01E7BFFCD959 /* ScreenCaptureKit in OizysTests */ = {isa = PBXBuildFile; fileRef = 508FCEC1FFB54BE8DE65E6C0 /* ScreenCaptureKit.framework */; };
+		FD5B9E39F967CF8FB2E2A6E1 /* ImageIO in OizysTests */ = {isa = PBXBuildFile; fileRef = A97F0B1BA1D23D3882C9D6D0 /* ImageIO.framework */; };
+		D91543A62B1A53823CCE4E85 /* UniformTypeIdentifiers in OizysTests */ = {isa = PBXBuildFile; fileRef = C0CDFB53944F250CE0F1A8F2 /* UniformTypeIdentifiers.framework */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		57FBC0BE93DE512BAE2A0045 /* libOizysCore.dylib */ = {isa = PBXFileReference; explicitFileType = compiled.mach-o.dylib; includeInIndex = 0; path = libOizysCore.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
+		3E3A71E6953A012528C0927C /* oizys */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = oizys; sourceTree = BUILT_PRODUCTS_DIR; };
+		F6C868DA022C925587A8358C /* Oizys.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Oizys.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		2827362FAFFED6902E5BBA81 /* OizysTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OizysTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		0EEB566E0BCDC6A7067DF4BD /* Capture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Capture.swift; path = Sources/OizysPlatform/Capture.swift; sourceTree = SOURCE_ROOT; };
+		DE1672BC58629EB9C49013C0 /* ConfigStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ConfigStore.swift; path = Sources/OizysPlatform/ConfigStore.swift; sourceTree = SOURCE_ROOT; };
+		2D523F3D48DA3B99FC5AE500 /* OizysLifecycle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OizysLifecycle.swift; path = Sources/Support/OizysLifecycle.swift; sourceTree = SOURCE_ROOT; };
+		28A8EB7B7AA353DF636743BA /* VirtualDisplay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = VirtualDisplay.swift; path = Sources/OizysPlatform/VirtualDisplay.swift; sourceTree = SOURCE_ROOT; };
+		458C2E28700DA1184E0BDAC2 /* bench.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = bench.c; path = Sources/OizysCore/bench.c; sourceTree = SOURCE_ROOT; };
+		ED0EEB4EBCACE0D053E738AD /* capture_frame.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = capture_frame.c; path = Sources/OizysCore/capture_frame.c; sourceTree = SOURCE_ROOT; };
+		D84D26C78DEF97C8F1123C16 /* config.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = config.c; path = Sources/OizysCore/config.c; sourceTree = SOURCE_ROOT; };
+		3B32423357F906EBA67305CD /* crypto.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = crypto.c; path = Sources/OizysCore/crypto.c; sourceTree = SOURCE_ROOT; };
+		6E923A000FA6991C4973A5DF /* ddc_native.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = ddc_native.c; path = Sources/OizysCore/ddc_native.c; sourceTree = SOURCE_ROOT; };
+		BBCD0F1FE7BBD144E1376A42 /* display.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = display.c; path = Sources/OizysCore/display.c; sourceTree = SOURCE_ROOT; };
+		A0E0F016740BCCB3D349E1E8 /* dl3.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = dl3.c; path = Sources/OizysCore/dl3.c; sourceTree = SOURCE_ROOT; };
+		F57E32910C395FEEBF5C17D9 /* driver.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = driver.c; path = Sources/OizysCore/driver.c; sourceTree = SOURCE_ROOT; };
+		DE4B0A2652A590797A2DA7F8 /* encode.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = encode.c; path = Sources/OizysCore/encode.c; sourceTree = SOURCE_ROOT; };
+		96E4E0F8AC502FFB55F7CEAD /* log.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = log.c; path = Sources/OizysCore/log.c; sourceTree = SOURCE_ROOT; };
+		029C381021032EA9E5AD0D79 /* profile.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = profile.c; path = Sources/OizysCore/profile.c; sourceTree = SOURCE_ROOT; };
+		3B6B6273958EF4109954EB42 /* usb_probe.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = usb_probe.c; path = Sources/OizysCore/usb_probe.c; sourceTree = SOURCE_ROOT; };
+		9C753C6EA135B5B29A5D07CA /* usb_session.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = usb_session.c; path = Sources/OizysCore/usb_session.c; sourceTree = SOURCE_ROOT; };
+		2E77A962705E2AD2553840D9 /* wht.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = wht.c; path = Sources/OizysCore/wht.c; sourceTree = SOURCE_ROOT; };
+		C593A3109A47D53AB431DAFD /* main.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = main.c; path = Sources/oizys/main.c; sourceTree = SOURCE_ROOT; };
+		B360A9AEDDC0C8C5BDF0CEB2 /* supervisor.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = supervisor.c; path = Sources/oizys/supervisor.c; sourceTree = SOURCE_ROOT; };
+		B410E56E518D7B8C0F6E7312 /* terminal.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = terminal.c; path = Sources/oizys/terminal.c; sourceTree = SOURCE_ROOT; };
+		4EABC461870478C12B55B408 /* oizys.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = oizys.h; path = Sources/OizysCore/include/oizys.h; sourceTree = SOURCE_ROOT; };
+		8342AA8919989AC72F94AF85 /* oizys_build.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = oizys_build.h; path = Sources/OizysCore/include/oizys_build.h; sourceTree = SOURCE_ROOT; };
+		A7462DBC420BD9989E18DBBE /* oizys_capture.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = oizys_capture.h; path = Sources/OizysCore/include/oizys_capture.h; sourceTree = SOURCE_ROOT; };
+		A9493B2960D156BFEF2A6130 /* oizys_capture_frame.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = oizys_capture_frame.h; path = Sources/OizysCore/include/oizys_capture_frame.h; sourceTree = SOURCE_ROOT; };
+		BAB11EB198EF479E9D90FDED /* oizys_config.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = oizys_config.h; path = Sources/OizysCore/include/oizys_config.h; sourceTree = SOURCE_ROOT; };
+		2FD582AA360BA119CF9FD877 /* oizys_ddc.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = oizys_ddc.h; path = Sources/OizysCore/include/oizys_ddc.h; sourceTree = SOURCE_ROOT; };
+		A2D30429742EC733B060EF94 /* oizys_display.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = oizys_display.h; path = Sources/OizysCore/include/oizys_display.h; sourceTree = SOURCE_ROOT; };
+		A5CF28589715AB82973C2DE8 /* oizys_dl3.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = oizys_dl3.h; path = Sources/OizysCore/include/oizys_dl3.h; sourceTree = SOURCE_ROOT; };
+		BDB6258FC55086FD38077AF6 /* oizys_encode.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = oizys_encode.h; path = Sources/OizysCore/include/oizys_encode.h; sourceTree = SOURCE_ROOT; };
+		874F70ACEEE81C7D3FED7E5A /* oizys_platform.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = oizys_platform.h; path = Sources/OizysCore/include/oizys_platform.h; sourceTree = SOURCE_ROOT; };
+		468FB9C93F3C92781367C06B /* oizys_profile.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = oizys_profile.h; path = Sources/OizysCore/include/oizys_profile.h; sourceTree = SOURCE_ROOT; };
+		5E15EE1D433B9BC1117187B5 /* oizys_usb.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = oizys_usb.h; path = Sources/OizysCore/include/oizys_usb.h; sourceTree = SOURCE_ROOT; };
+		2B86D95D18914F714F25C86A /* supervisor.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = supervisor.h; path = Sources/oizys/supervisor.h; sourceTree = SOURCE_ROOT; };
+		2B535736F94B18EFDBD64C46 /* terminal.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = terminal.h; path = Sources/oizys/terminal.h; sourceTree = SOURCE_ROOT; };
+		3DEE5D5E5D207CD24CEA8780 /* DebugPermissions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DebugPermissions.swift; path = Sources/OizysApp/DebugPermissions.swift; sourceTree = SOURCE_ROOT; };
+		FEA78EF48E937C1FA9802574 /* DevDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DevDiagnostics.swift; path = Sources/OizysApp/DevDiagnostics.swift; sourceTree = SOURCE_ROOT; };
+		128BD5F987CB6D3B259C5A90 /* DiagnosticReport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DiagnosticReport.swift; path = Sources/OizysApp/DiagnosticReport.swift; sourceTree = SOURCE_ROOT; };
+		945D4B4A37A269A4CE6589DF /* Main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Main.swift; path = Sources/OizysApp/Main.swift; sourceTree = SOURCE_ROOT; };
+		3F745877C8CFAB87E33E20F1 /* Production.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Production.swift; path = Sources/OizysApp/Production.swift; sourceTree = SOURCE_ROOT; };
+		A9B7EB1B7BE89C6D48072F43 /* SuiteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SuiteTests.swift; path = Tests/Xcode/SuiteTests.swift; sourceTree = SOURCE_ROOT; };
+		B5DDBF3F89114336EC0E08B7 = {isa = PBXFileReference; lastKnownFileType = text; name = "Architecture.md"; path = "Documentation/Architecture.md"; sourceTree = SOURCE_ROOT; };
+		BE64DCC9992D21937DD471DF = {isa = PBXFileReference; lastKnownFileType = text; name = "Monitor-Startup-Handoff-2026-08-31.md"; path = "Documentation/Monitor-Startup-Handoff-2026-08-31.md"; sourceTree = SOURCE_ROOT; };
+		8CDA9285FD41E3077587483A = {isa = PBXFileReference; lastKnownFileType = text; name = "OriginalBrief.md"; path = "Documentation/OriginalBrief.md"; sourceTree = SOURCE_ROOT; };
+		CF05053E159299B83ACD7B00 = {isa = PBXFileReference; lastKnownFileType = text; name = "Performance-2026-08-30.md"; path = "Documentation/Performance-2026-08-30.md"; sourceTree = SOURCE_ROOT; };
+		B348D2F3794A333F06CCCDA3 = {isa = PBXFileReference; lastKnownFileType = text; name = "Protocol.md"; path = "Documentation/Protocol.md"; sourceTree = SOURCE_ROOT; };
+		EA87C733CE8C41B98948CC91 = {isa = PBXFileReference; lastKnownFileType = text; name = "Routing.md"; path = "Documentation/Routing.md"; sourceTree = SOURCE_ROOT; };
+		F276D2CABF3D0FCCCC182759 = {isa = PBXFileReference; lastKnownFileType = text; name = "Testing.md"; path = "Documentation/Testing.md"; sourceTree = SOURCE_ROOT; };
+		225DB77BA9C39FB96D5E66FD = {isa = PBXFileReference; lastKnownFileType = text; name = "Xcode.md"; path = "Documentation/Xcode.md"; sourceTree = SOURCE_ROOT; };
+		95F400267BCE4521576DA2CB = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = "asan_runner.c"; path = "Tests/Support/asan_runner.c"; sourceTree = SOURCE_ROOT; };
+		26AE79822092186F35ABFC2F = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = "capture_test.c"; path = "Tests/Support/capture_test.c"; sourceTree = SOURCE_ROOT; };
+		AB3E4A7CE5B83C3DEDDC341E = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = "ddc_native_test.c"; path = "Tests/Support/ddc_native_test.c"; sourceTree = SOURCE_ROOT; };
+		8E8B6084D129FE3519110A7C = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "debug_permissions_test.swift"; path = "Tests/Support/debug_permissions_test.swift"; sourceTree = SOURCE_ROOT; };
+		023EA7B4A03F34571AA15F61 = {isa = PBXFileReference; lastKnownFileType = text; name = "oizyscore.py"; path = "Tests/Support/oizyscore.py"; sourceTree = SOURCE_ROOT; };
+		320EC1CA2CCE79B2D6C43B54 = {isa = PBXFileReference; lastKnownFileType = text; name = "reference.py"; path = "Tests/Support/reference.py"; sourceTree = SOURCE_ROOT; };
+		C7948E4A3AC7F3005DFFE893 = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = "supervisor_test.c"; path = "Tests/Support/supervisor_test.c"; sourceTree = SOURCE_ROOT; };
+		6673C227F9C7BB35A6ABD767 = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = "usb_frame_test.c"; path = "Tests/Support/usb_frame_test.c"; sourceTree = SOURCE_ROOT; };
+		BEE555D432F9BAFE40F1BED0 = {isa = PBXFileReference; lastKnownFileType = text; name = "conftest.py"; path = "Tests/conftest.py"; sourceTree = SOURCE_ROOT; };
+		4F4DF7FDB482C869604CC941 = {isa = PBXFileReference; lastKnownFileType = text; name = "test_capture.py"; path = "Tests/test_capture.py"; sourceTree = SOURCE_ROOT; };
+		58EB06910DCF5ABE446E9851 = {isa = PBXFileReference; lastKnownFileType = text; name = "test_codec.py"; path = "Tests/test_codec.py"; sourceTree = SOURCE_ROOT; };
+		FB672CB9A4C7E21C05254C87 = {isa = PBXFileReference; lastKnownFileType = text; name = "test_config.py"; path = "Tests/test_config.py"; sourceTree = SOURCE_ROOT; };
+		B3AD56AE2BC0333262B7D308 = {isa = PBXFileReference; lastKnownFileType = text; name = "test_crypto.py"; path = "Tests/test_crypto.py"; sourceTree = SOURCE_ROOT; };
+		2888A24A61E19ADAC3D463A7 = {isa = PBXFileReference; lastKnownFileType = text; name = "test_damage.py"; path = "Tests/test_damage.py"; sourceTree = SOURCE_ROOT; };
+		F929532D04321AA564ACA42D = {isa = PBXFileReference; lastKnownFileType = text; name = "test_ddc.py"; path = "Tests/test_ddc.py"; sourceTree = SOURCE_ROOT; };
+		4921F74DE582B01B712B5121 = {isa = PBXFileReference; lastKnownFileType = text; name = "test_debug_permissions.py"; path = "Tests/test_debug_permissions.py"; sourceTree = SOURCE_ROOT; };
+		1946E91367E67FD756B332BA = {isa = PBXFileReference; lastKnownFileType = text; name = "test_debug_session.py"; path = "Tests/test_debug_session.py"; sourceTree = SOURCE_ROOT; };
+		6162FAEDF49874AFB8D1709C = {isa = PBXFileReference; lastKnownFileType = text; name = "test_fixture.py"; path = "Tests/test_fixture.py"; sourceTree = SOURCE_ROOT; };
+		ECA0DC486912A78EDFB710A3 = {isa = PBXFileReference; lastKnownFileType = text; name = "test_fixture_runtime.py"; path = "Tests/test_fixture_runtime.py"; sourceTree = SOURCE_ROOT; };
+		76914F8BD3D0C35EBCDCD136 = {isa = PBXFileReference; lastKnownFileType = text; name = "test_profiler.py"; path = "Tests/test_profiler.py"; sourceTree = SOURCE_ROOT; };
+		0C38FDBD5F5D4D68A1ECE7AD = {isa = PBXFileReference; lastKnownFileType = text; name = "test_protocol.py"; path = "Tests/test_protocol.py"; sourceTree = SOURCE_ROOT; };
+		26E17847289BED0F04C5A525 = {isa = PBXFileReference; lastKnownFileType = text; name = "test_supervisor.py"; path = "Tests/test_supervisor.py"; sourceTree = SOURCE_ROOT; };
+		8214AA2F1D3B061D056911E8 = {isa = PBXFileReference; lastKnownFileType = text; name = "test_usb_frames.py"; path = "Tests/test_usb_frames.py"; sourceTree = SOURCE_ROOT; };
+		B3F21D01661BE53C03DE0FE6 = {isa = PBXFileReference; lastKnownFileType = text; name = "test_wire.py"; path = "Tests/test_wire.py"; sourceTree = SOURCE_ROOT; };
+		FDB68CB8660E88A7BF2B1BED = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "FixtureBench.swift"; path = "Tools/FixtureBench.swift"; sourceTree = SOURCE_ROOT; };
+		B435DDA2CA384C83F6AE6CFC = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "MotionBench.swift"; path = "Tools/MotionBench.swift"; sourceTree = SOURCE_ROOT; };
+		E37252CA0186E55BF1ECCE02 = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = "PortableDebug.m"; path = "Tools/PortableDebug.m"; sourceTree = SOURCE_ROOT; };
+		7F8330C7A8D9ECFB63DF215B = {isa = PBXFileReference; lastKnownFileType = text; name = "build_app.py"; path = "Tools/build_app.py"; sourceTree = SOURCE_ROOT; };
+		A104FD1EB10AB41318C9BA4D = {isa = PBXFileReference; lastKnownFileType = text; name = "debug_session.py"; path = "Tools/debug_session.py"; sourceTree = SOURCE_ROOT; };
+		F95F0604183B1CEFD4ECBC64 = {isa = PBXFileReference; lastKnownFileType = text; name = "dev_runner.py"; path = "Tools/dev_runner.py"; sourceTree = SOURCE_ROOT; };
+		8DBE07C50FDD24734CD54D12 = {isa = PBXFileReference; lastKnownFileType = text; name = "fixture.py"; path = "Tools/fixture.py"; sourceTree = SOURCE_ROOT; };
+		EAA4E0C658C19CC6326E57A4 = {isa = PBXFileReference; lastKnownFileType = text; name = "fixture_browser.py"; path = "Tools/fixture_browser.py"; sourceTree = SOURCE_ROOT; };
+		699E20D3B627876512B48885 = {isa = PBXFileReference; lastKnownFileType = text; name = "fixture_runtime.py"; path = "Tools/fixture_runtime.py"; sourceTree = SOURCE_ROOT; };
+		5D93F226019C404676645007 = {isa = PBXFileReference; lastKnownFileType = text; name = "install_app.py"; path = "Tools/install_app.py"; sourceTree = SOURCE_ROOT; };
+		A84EBF5462C6F2508751D12C = {isa = PBXFileReference; lastKnownFileType = text; name = "make_xcodeproj.py"; path = "Tools/make_xcodeproj.py"; sourceTree = SOURCE_ROOT; };
+		4CCBF8D93ECE1B037B73DAF5 = {isa = PBXFileReference; lastKnownFileType = text; name = "measure_processes.py"; path = "Tools/measure_processes.py"; sourceTree = SOURCE_ROOT; };
+		6C75A42862F4CC73D7D0FB88 = {isa = PBXFileReference; lastKnownFileType = text; name = "mutate.py"; path = "Tools/mutate.py"; sourceTree = SOURCE_ROOT; };
+		A03C030E26E308B104040A94 = {isa = PBXFileReference; lastKnownFileType = text; name = "package_resources.py"; path = "Tools/package_resources.py"; sourceTree = SOURCE_ROOT; };
+		3E955C9A53EEE6EB1D64F82E = {isa = PBXFileReference; lastKnownFileType = text; name = "profile.py"; path = "Tools/profile.py"; sourceTree = SOURCE_ROOT; };
+		F032671C5658B4B70F60B44E = {isa = PBXFileReference; lastKnownFileType = text; name = "report.py"; path = "Tools/report.py"; sourceTree = SOURCE_ROOT; };
+		1064A5399B4A5D6422558D7E = {isa = PBXFileReference; lastKnownFileType = text; name = "setup_debug.py"; path = "Tools/setup_debug.py"; sourceTree = SOURCE_ROOT; };
+		BC7120CA10A1BDE777791428 = {isa = PBXFileReference; lastKnownFileType = text; name = "test.py"; path = "Tools/test.py"; sourceTree = SOURCE_ROOT; };
+		BBC30E87AFE96CF51FBB0E23 = {isa = PBXFileReference; lastKnownFileType = text; name = "dev.sh"; path = "dev.sh"; sourceTree = SOURCE_ROOT; };
+		8DB8F481D5E69BA66D9161D7 = {isa = PBXFileReference; lastKnownFileType = text; name = "README.md"; path = "README.md"; sourceTree = SOURCE_ROOT; };
+		8A6B08D2E621841BD6E5AB06 = {isa = PBXFileReference; lastKnownFileType = text; name = "VERSION"; path = "VERSION"; sourceTree = SOURCE_ROOT; };
+		3C33486C2F209E6AF59FECFB = {isa = PBXFileReference; lastKnownFileType = text; name = "Info.plist"; path = "Sources/OizysApp/Info.plist"; sourceTree = SOURCE_ROOT; };
+		AE50061E3AD89B2597210370 = {isa = PBXFileReference; lastKnownFileType = text; name = "Debug.entitlements"; path = "Configs/Debug.entitlements"; sourceTree = SOURCE_ROOT; };
+		D8BF94C905C13E87D9C1CC29 /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Debug.xcconfig; path = Configs/Debug.xcconfig; sourceTree = SOURCE_ROOT; };
+		10ED73FF5BEFD6D01C934A9E /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Release.xcconfig; path = Configs/Release.xcconfig; sourceTree = SOURCE_ROOT; };
+		F46E2F9BE32669DA3B2CEE2A /* Profile.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Profile.xcconfig; path = Configs/Profile.xcconfig; sourceTree = SOURCE_ROOT; };
+		DA000A0C9D3A5C047E7B9680 /* DebugMinimal.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = DebugMinimal.xcconfig; path = Configs/DebugMinimal.xcconfig; sourceTree = SOURCE_ROOT; };
+		7411758DD163170CAD601333 /* DebugVerbose.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = DebugVerbose.xcconfig; path = Configs/DebugVerbose.xcconfig; sourceTree = SOURCE_ROOT; };
+		0F8194E5C28F590489CFB569 /* DebugFallback.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = DebugFallback.xcconfig; path = Configs/DebugFallback.xcconfig; sourceTree = SOURCE_ROOT; };
+		C176A84F8601C687D4CC2395 /* Production.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Production.xcconfig; path = Configs/Production.xcconfig; sourceTree = SOURCE_ROOT; };
+		D36E9A5D728CB8EA5F5189C8 /* ProductionFallback.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = ProductionFallback.xcconfig; path = Configs/ProductionFallback.xcconfig; sourceTree = SOURCE_ROOT; };
+		E4DAE0A66EFAE39449852206 /* ProductionProfile.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = ProductionProfile.xcconfig; path = Configs/ProductionProfile.xcconfig; sourceTree = SOURCE_ROOT; };
+		BAB039A2C95AD8DD7C219B0C /* ProductionFallbackProfile.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = ProductionFallbackProfile.xcconfig; path = Configs/ProductionFallbackProfile.xcconfig; sourceTree = SOURCE_ROOT; };
+		1DACDF0F5A98DA3C79EF2056 /* Library.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Library.xcconfig; path = Configs/Library.xcconfig; sourceTree = SOURCE_ROOT; };
+		F16CA30B9E3FCF906EC7912D /* Base.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Base.xcconfig; path = Configs/Base.xcconfig; sourceTree = SOURCE_ROOT; };
+		6960390CFB747E68ECAA34F4 /* AppKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppKit.framework; path = System/Library/Frameworks/AppKit.framework; sourceTree = SDKROOT; };
+		D6B62CF1F3C9BD64275EFF04 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
+		6B3DDE583D98730BFF9EDE70 /* CoreFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreFoundation.framework; path = System/Library/Frameworks/CoreFoundation.framework; sourceTree = SDKROOT; };
+		7DD7D61E1F7D6083A93B2601 /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
+		6A1053725482E6333E9867BF /* CoreMedia.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreMedia.framework; path = System/Library/Frameworks/CoreMedia.framework; sourceTree = SDKROOT; };
+		A3F3E1021F96963433BFA361 /* CoreVideo.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreVideo.framework; path = System/Library/Frameworks/CoreVideo.framework; sourceTree = SDKROOT; };
+		68DCEA15427C44547CD3DD3F /* IOKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = IOKit.framework; path = System/Library/Frameworks/IOKit.framework; sourceTree = SDKROOT; };
+		133E45B6B4E8778A6A1357F7 /* IOUSBHost.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = IOUSBHost.framework; path = System/Library/Frameworks/IOUSBHost.framework; sourceTree = SDKROOT; };
+		1611D29C69F038A379A6256B /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
+		508FCEC1FFB54BE8DE65E6C0 /* ScreenCaptureKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = ScreenCaptureKit.framework; path = System/Library/Frameworks/ScreenCaptureKit.framework; sourceTree = SDKROOT; };
+		A97F0B1BA1D23D3882C9D6D0 /* ImageIO.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = ImageIO.framework; path = System/Library/Frameworks/ImageIO.framework; sourceTree = SDKROOT; };
+		C0CDFB53944F250CE0F1A8F2 /* UniformTypeIdentifiers.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UniformTypeIdentifiers.framework; path = System/Library/Frameworks/UniformTypeIdentifiers.framework; sourceTree = SDKROOT; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		FEBB993625E422CD645775E1 = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C66B5BA8C637816919834095 /* AppKit */,
+				B2DF04824D7574E2279559AA /* Foundation */,
+				367C4FDBA870A6939A4DB55E /* CoreFoundation */,
+				530B1F90C04397A1135B43AD /* CoreGraphics */,
+				230C072BC6588EDEAA187CF3 /* CoreMedia */,
+				CD4EC709DB5686D7AA3442AD /* CoreVideo */,
+				03155F9FEDE50209E6063BCA /* IOKit */,
+				674F6CD69A8BE31E14F19C99 /* IOUSBHost */,
+				059233F9738D70C186BC0FD0 /* Security */,
+				A9154007EEA9095298E078A8 /* ScreenCaptureKit */,
+				3665E4520DE4A926D94D6F93 /* ImageIO */,
+				2A50A8FD773CDF2EFABC3505 /* UniformTypeIdentifiers */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		89F6C62140F656ECB2AA0D7E = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				44E6B4BCFC8820A0BC8AF1DF /* AppKit */,
+				FDF573656ED94E6EFA4105A3 /* Foundation */,
+				B8283442F71316C103BBBA9D /* CoreFoundation */,
+				FECDE74E4AE4C3B91A924DD0 /* CoreGraphics */,
+				D98927BE459FA146BA8E630E /* CoreMedia */,
+				E2CFBD53D06CB0AF9F8C68F0 /* CoreVideo */,
+				A9EFB3805F6EEA56B4DAF016 /* IOKit */,
+				919AE2A95B0C5D644C0B0A4C /* IOUSBHost */,
+				8C44EB2C7E51A858EA28C08E /* Security */,
+				5FF9241A4929305E790423D6 /* ScreenCaptureKit */,
+				64E196210333828D5E4066B1 /* ImageIO */,
+				B1E39D8FCD1ADE7689753739 /* UniformTypeIdentifiers */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		15E03127122886B5E334FBE9 = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F8B2A95CA051A849364B80C3 /* AppKit */,
+				96F0F846479C78013B259767 /* Foundation */,
+				5BA015528FD72E348ED8A1CF /* CoreFoundation */,
+				849329AD24B6ADBFD48EC025 /* CoreGraphics */,
+				12542D4B22B9F60555560E2A /* CoreMedia */,
+				597E7A89B68EA17A3430D708 /* CoreVideo */,
+				6F88414CF130858C59AA217D /* IOKit */,
+				54411BBD899E95D21527F1E4 /* IOUSBHost */,
+				0C25C2CF02C6CA02EDB3102D /* Security */,
+				56BC197363A3A409EF57A8DC /* ScreenCaptureKit */,
+				03E516F4261AD33BFB2D4940 /* ImageIO */,
+				859A97A4FD8EA45B24A7ED4C /* UniformTypeIdentifiers */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CE5F03EF65AF72628D6C396D = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4AEA78AE5F875D725B5ADE25 /* AppKit */,
+				2C11A7D7683FBA3325001B34 /* Foundation */,
+				47BD4DD12199609F1736FF84 /* CoreFoundation */,
+				7CFBE5971497916F7748E991 /* CoreGraphics */,
+				6D526DA7CA74D2A6D7B11B13 /* CoreMedia */,
+				28C30B170DC24869DCDB9751 /* CoreVideo */,
+				FAD65D7B705FAF8F1FF08123 /* IOKit */,
+				83269B47315DC0575272A7DA /* IOUSBHost */,
+				C28D789674D27139E6508E00 /* Security */,
+				5AEC08A05F7B01E7BFFCD959 /* ScreenCaptureKit */,
+				FD5B9E39F967CF8FB2E2A6E1 /* ImageIO */,
+				D91543A62B1A53823CCE4E85 /* UniformTypeIdentifiers */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		4B6448C060074591296EC9A4 /* Oizys */ = {
+			isa = PBXGroup;
+			children = (
+				0639E17437374C72B1E59A24 /* Sources */,
+				9EE404D2FC0E41C9BB7610E4 /* Configs */,
+				324057C89DCE042EB833ED69 /* ToolsTestsDocs */,
+				E3E402DE833C3C09618243B7 /* Frameworks */,
+				E4493279C5E0CE01D5EA3D44 /* Products */,
+			);
+			name = Oizys;
+			sourceTree = "<group>";
+		};
+		0639E17437374C72B1E59A24 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				1550E1718F3AB372668A12DD /* OizysCore */,
+				99EA8B291672A60CE35E6A46 /* oizys */,
+				4ED5B5C271D5C4638B51E954 /* OizysApp */,
+				37BDA56A67C26C32E4C8D061 /* XcodeTests */,
+			);
+			name = Sources;
+			sourceTree = "<group>";
+		};
+		1550E1718F3AB372668A12DD /* OizysCore */ = {
+			isa = PBXGroup;
+			children = (
+				E7F946B3826CDD418864299C /* include */,
+				0EEB566E0BCDC6A7067DF4BD /* Capture.swift */,
+				DE1672BC58629EB9C49013C0 /* ConfigStore.swift */,
+				2D523F3D48DA3B99FC5AE500 /* OizysLifecycle.swift */,
+				28A8EB7B7AA353DF636743BA /* VirtualDisplay.swift */,
+				458C2E28700DA1184E0BDAC2 /* bench.c */,
+				ED0EEB4EBCACE0D053E738AD /* capture_frame.c */,
+				D84D26C78DEF97C8F1123C16 /* config.c */,
+				3B32423357F906EBA67305CD /* crypto.c */,
+				6E923A000FA6991C4973A5DF /* ddc_native.c */,
+				BBCD0F1FE7BBD144E1376A42 /* display.c */,
+				A0E0F016740BCCB3D349E1E8 /* dl3.c */,
+				F57E32910C395FEEBF5C17D9 /* driver.c */,
+				DE4B0A2652A590797A2DA7F8 /* encode.c */,
+				96E4E0F8AC502FFB55F7CEAD /* log.c */,
+				029C381021032EA9E5AD0D79 /* profile.c */,
+				3B6B6273958EF4109954EB42 /* usb_probe.c */,
+				9C753C6EA135B5B29A5D07CA /* usb_session.c */,
+				2E77A962705E2AD2553840D9 /* wht.c */,
+			);
+			name = OizysCore;
+			sourceTree = "<group>";
+		};
+		E7F946B3826CDD418864299C /* include */ = {
+			isa = PBXGroup;
+			children = (
+				4EABC461870478C12B55B408 /* oizys.h */,
+				8342AA8919989AC72F94AF85 /* oizys_build.h */,
+				A7462DBC420BD9989E18DBBE /* oizys_capture.h */,
+				A9493B2960D156BFEF2A6130 /* oizys_capture_frame.h */,
+				BAB11EB198EF479E9D90FDED /* oizys_config.h */,
+				2FD582AA360BA119CF9FD877 /* oizys_ddc.h */,
+				A2D30429742EC733B060EF94 /* oizys_display.h */,
+				A5CF28589715AB82973C2DE8 /* oizys_dl3.h */,
+				BDB6258FC55086FD38077AF6 /* oizys_encode.h */,
+				874F70ACEEE81C7D3FED7E5A /* oizys_platform.h */,
+				468FB9C93F3C92781367C06B /* oizys_profile.h */,
+				5E15EE1D433B9BC1117187B5 /* oizys_usb.h */,
+				2B86D95D18914F714F25C86A /* supervisor.h */,
+				2B535736F94B18EFDBD64C46 /* terminal.h */,
+			);
+			name = include;
+			sourceTree = "<group>";
+		};
+		99EA8B291672A60CE35E6A46 /* oizys */ = {
+			isa = PBXGroup;
+			children = (
+				C593A3109A47D53AB431DAFD /* main.c */,
+				B360A9AEDDC0C8C5BDF0CEB2 /* supervisor.c */,
+				B410E56E518D7B8C0F6E7312 /* terminal.c */,
+			);
+			name = oizys;
+			sourceTree = "<group>";
+		};
+		4ED5B5C271D5C4638B51E954 /* OizysApp */ = {
+			isa = PBXGroup;
+			children = (
+				3DEE5D5E5D207CD24CEA8780 /* DebugPermissions.swift */,
+				FEA78EF48E937C1FA9802574 /* DevDiagnostics.swift */,
+				128BD5F987CB6D3B259C5A90 /* DiagnosticReport.swift */,
+				945D4B4A37A269A4CE6589DF /* Main.swift */,
+				3F745877C8CFAB87E33E20F1 /* Production.swift */,
+			);
+			name = OizysApp;
+			sourceTree = "<group>";
+		};
+		37BDA56A67C26C32E4C8D061 /* XcodeTests */ = {
+			isa = PBXGroup;
+			children = (
+				A9B7EB1B7BE89C6D48072F43 /* SuiteTests.swift */,
+			);
+			name = XcodeTests;
+			sourceTree = "<group>";
+		};
+		324057C89DCE042EB833ED69 /* ToolsTestsDocs */ = {
+			isa = PBXGroup;
+			children = (
+				B5DDBF3F89114336EC0E08B7 /* Architecture.md */,
+				BE64DCC9992D21937DD471DF /* Monitor-Startup-Handoff-2026-08-31.md */,
+				8CDA9285FD41E3077587483A /* OriginalBrief.md */,
+				CF05053E159299B83ACD7B00 /* Performance-2026-08-30.md */,
+				B348D2F3794A333F06CCCDA3 /* Protocol.md */,
+				EA87C733CE8C41B98948CC91 /* Routing.md */,
+				F276D2CABF3D0FCCCC182759 /* Testing.md */,
+				225DB77BA9C39FB96D5E66FD /* Xcode.md */,
+				95F400267BCE4521576DA2CB /* asan_runner.c */,
+				26AE79822092186F35ABFC2F /* capture_test.c */,
+				AB3E4A7CE5B83C3DEDDC341E /* ddc_native_test.c */,
+				8E8B6084D129FE3519110A7C /* debug_permissions_test.swift */,
+				023EA7B4A03F34571AA15F61 /* oizyscore.py */,
+				320EC1CA2CCE79B2D6C43B54 /* reference.py */,
+				C7948E4A3AC7F3005DFFE893 /* supervisor_test.c */,
+				6673C227F9C7BB35A6ABD767 /* usb_frame_test.c */,
+				BEE555D432F9BAFE40F1BED0 /* conftest.py */,
+				4F4DF7FDB482C869604CC941 /* test_capture.py */,
+				58EB06910DCF5ABE446E9851 /* test_codec.py */,
+				FB672CB9A4C7E21C05254C87 /* test_config.py */,
+				B3AD56AE2BC0333262B7D308 /* test_crypto.py */,
+				2888A24A61E19ADAC3D463A7 /* test_damage.py */,
+				F929532D04321AA564ACA42D /* test_ddc.py */,
+				4921F74DE582B01B712B5121 /* test_debug_permissions.py */,
+				1946E91367E67FD756B332BA /* test_debug_session.py */,
+				6162FAEDF49874AFB8D1709C /* test_fixture.py */,
+				ECA0DC486912A78EDFB710A3 /* test_fixture_runtime.py */,
+				76914F8BD3D0C35EBCDCD136 /* test_profiler.py */,
+				0C38FDBD5F5D4D68A1ECE7AD /* test_protocol.py */,
+				26E17847289BED0F04C5A525 /* test_supervisor.py */,
+				8214AA2F1D3B061D056911E8 /* test_usb_frames.py */,
+				B3F21D01661BE53C03DE0FE6 /* test_wire.py */,
+				FDB68CB8660E88A7BF2B1BED /* FixtureBench.swift */,
+				B435DDA2CA384C83F6AE6CFC /* MotionBench.swift */,
+				E37252CA0186E55BF1ECCE02 /* PortableDebug.m */,
+				7F8330C7A8D9ECFB63DF215B /* build_app.py */,
+				A104FD1EB10AB41318C9BA4D /* debug_session.py */,
+				F95F0604183B1CEFD4ECBC64 /* dev_runner.py */,
+				8DBE07C50FDD24734CD54D12 /* fixture.py */,
+				EAA4E0C658C19CC6326E57A4 /* fixture_browser.py */,
+				699E20D3B627876512B48885 /* fixture_runtime.py */,
+				5D93F226019C404676645007 /* install_app.py */,
+				A84EBF5462C6F2508751D12C /* make_xcodeproj.py */,
+				4CCBF8D93ECE1B037B73DAF5 /* measure_processes.py */,
+				6C75A42862F4CC73D7D0FB88 /* mutate.py */,
+				A03C030E26E308B104040A94 /* package_resources.py */,
+				3E955C9A53EEE6EB1D64F82E /* profile.py */,
+				F032671C5658B4B70F60B44E /* report.py */,
+				1064A5399B4A5D6422558D7E /* setup_debug.py */,
+				BC7120CA10A1BDE777791428 /* test.py */,
+				BBC30E87AFE96CF51FBB0E23 /* dev.sh */,
+				8DB8F481D5E69BA66D9161D7 /* README.md */,
+				8A6B08D2E621841BD6E5AB06 /* VERSION */,
+				3C33486C2F209E6AF59FECFB /* Info.plist */,
+				AE50061E3AD89B2597210370 /* Debug.entitlements */,
+			);
+			name = ToolsTestsDocs;
+			sourceTree = "<group>";
+		};
+		9EE404D2FC0E41C9BB7610E4 /* Configs */ = {
+			isa = PBXGroup;
+			children = (
+				D8BF94C905C13E87D9C1CC29 /* Debug.xcconfig */,
+				10ED73FF5BEFD6D01C934A9E /* Release.xcconfig */,
+				F46E2F9BE32669DA3B2CEE2A /* Profile.xcconfig */,
+				DA000A0C9D3A5C047E7B9680 /* DebugMinimal.xcconfig */,
+				7411758DD163170CAD601333 /* DebugVerbose.xcconfig */,
+				0F8194E5C28F590489CFB569 /* DebugFallback.xcconfig */,
+				C176A84F8601C687D4CC2395 /* Production.xcconfig */,
+				D36E9A5D728CB8EA5F5189C8 /* ProductionFallback.xcconfig */,
+				E4DAE0A66EFAE39449852206 /* ProductionProfile.xcconfig */,
+				BAB039A2C95AD8DD7C219B0C /* ProductionFallbackProfile.xcconfig */,
+				1DACDF0F5A98DA3C79EF2056 /* Library.xcconfig */,
+				F16CA30B9E3FCF906EC7912D /* Base.xcconfig */,
+			);
+			name = Configs;
+			sourceTree = "<group>";
+		};
+		E3E402DE833C3C09618243B7 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				6960390CFB747E68ECAA34F4 /* AppKit.framework */,
+				D6B62CF1F3C9BD64275EFF04 /* Foundation.framework */,
+				6B3DDE583D98730BFF9EDE70 /* CoreFoundation.framework */,
+				7DD7D61E1F7D6083A93B2601 /* CoreGraphics.framework */,
+				6A1053725482E6333E9867BF /* CoreMedia.framework */,
+				A3F3E1021F96963433BFA361 /* CoreVideo.framework */,
+				68DCEA15427C44547CD3DD3F /* IOKit.framework */,
+				133E45B6B4E8778A6A1357F7 /* IOUSBHost.framework */,
+				1611D29C69F038A379A6256B /* Security.framework */,
+				508FCEC1FFB54BE8DE65E6C0 /* ScreenCaptureKit.framework */,
+				A97F0B1BA1D23D3882C9D6D0 /* ImageIO.framework */,
+				C0CDFB53944F250CE0F1A8F2 /* UniformTypeIdentifiers.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		E4493279C5E0CE01D5EA3D44 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				57FBC0BE93DE512BAE2A0045 /* libOizysCore.dylib */,
+				3E3A71E6953A012528C0927C /* oizys */,
+				F6C868DA022C925587A8358C /* Oizys.app */,
+				2827362FAFFED6902E5BBA81 /* OizysTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		132A5EBE4BA14D2F67924507 /* OizysCoreDylib */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 663AF199F1D2C0891C81526A;
+			buildPhases = (
+				1E946E23C28E7545A5F55C3B,
+				FEBB993625E422CD645775E1,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = OizysCoreDylib;
+			productName = OizysCoreDylib;
+			productReference = 57FBC0BE93DE512BAE2A0045 /* libOizysCore.dylib */;
+			productType = "com.apple.product-type.library.dynamic";
+		};
+		6A7AFA8ED788DA45E70273D5 /* oizys */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F3AFB5ECA4B422A055C6EC97;
+			buildPhases = (
+				E54D1925672210342C8B88B1,
+				89F6C62140F656ECB2AA0D7E,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = oizys;
+			productName = oizys;
+			productReference = 3E3A71E6953A012528C0927C /* oizys */;
+			productType = "com.apple.product-type.tool";
+		};
+		73138023C98EA8B11A6FB4E5 /* OizysApp */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 02F01B876BEB7B4FC1DFA7A0;
+			buildPhases = (
+				9AA93E974A6D19866628AFEF,
+				15E03127122886B5E334FBE9,
+				F81A85BB72B248DA67937D73,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				B2E89BCACE74462176EC2C91,
+			);
+			name = OizysApp;
+			productName = OizysApp;
+			productReference = F6C868DA022C925587A8358C /* Oizys.app */;
+			productType = "com.apple.product-type.application";
+		};
+		DE2F51C13C61E4893A8B4134 /* OizysTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 281319DBEC6684279005A262;
+			buildPhases = (
+				0EA84DCE39DD8B4BB9A54152,
+				CE5F03EF65AF72628D6C396D,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				53C63A855269C5E6B11E8D16,
+			);
+			name = OizysTests;
+			productName = OizysTests;
+			productReference = 2827362FAFFED6902E5BBA81 /* OizysTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+		F81A85BB72B248DA67937D73 = {isa = PBXShellScriptBuildPhase; buildActionMask = 2147483647; files = (); inputPaths = (); outputPaths = ("$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/build-info.json", "$(TARGET_BUILD_DIR)/$(EXECUTABLE_FOLDER_PATH)/OizysDriver"); alwaysOutOfDate = 1; runOnlyForDeploymentPostprocessing = 0; name = "Bundle driver and developer resources"; shellPath = /bin/bash; shellScript = "/usr/bin/python3 \"$SRCROOT/Tools/package_resources.py\" --xcode\n"; };
+		0BBACB9F9BFC81309BD0ADC2 = {isa = PBXContainerItemProxy; containerPortal = 244210E48437B6556980A702; proxyType = 1; remoteGlobalIDString = 6A7AFA8ED788DA45E70273D5; remoteInfo = oizys; };
+		B2E89BCACE74462176EC2C91 = {isa = PBXTargetDependency; target = 6A7AFA8ED788DA45E70273D5; targetProxy = 0BBACB9F9BFC81309BD0ADC2; };
+		6C782F46AE5FC9F34DCE0D73 = {isa = PBXContainerItemProxy; containerPortal = 244210E48437B6556980A702; proxyType = 1; remoteGlobalIDString = 132A5EBE4BA14D2F67924507; remoteInfo = OizysCoreDylib; };
+		53C63A855269C5E6B11E8D16 = {isa = PBXTargetDependency; target = 132A5EBE4BA14D2F67924507; targetProxy = 6C782F46AE5FC9F34DCE0D73; };
+/* Begin PBXProject section */
+		244210E48437B6556980A702 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				LastUpgradeCheck = 2600;
+			};
+			buildConfigurationList = A15C1660503C9D18B9702A73;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+			);
+			mainGroup = 4B6448C060074591296EC9A4;
+			productRefGroup = E4493279C5E0CE01D5EA3D44 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				132A5EBE4BA14D2F67924507 /* OizysCoreDylib */,
+				6A7AFA8ED788DA45E70273D5 /* oizys */,
+				73138023C98EA8B11A6FB4E5 /* OizysApp */,
+				DE2F51C13C61E4893A8B4134 /* OizysTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		1E946E23C28E7545A5F55C3B = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0D9C3939943FB277F3DBF00D /* Capture.swift */,
+				58C4C896F87DA4741763AC5A /* ConfigStore.swift */,
+				326FE7DE0BCBCED53738EE4F /* OizysLifecycle.swift */,
+				012A7339043C5873D643D87D /* VirtualDisplay.swift */,
+				E499DB1DF7B0EFF40D266039 /* bench.c */,
+				133F099A39DAFA610B7D4403 /* capture_frame.c */,
+				87F457E443E6B0CC4850CC10 /* config.c */,
+				51F6F4A75C46BB6CA18E3C27 /* crypto.c */,
+				E70341836FB6BDD07A77D8D5 /* ddc_native.c */,
+				D76C083E4C265B0B756BCCE2 /* display.c */,
+				CDD70DA9F1CC36F32D8B59A6 /* dl3.c */,
+				FBA84444E83625C62A7A9E1C /* driver.c */,
+				BD741D2A8F4FB0C4060E3FA4 /* encode.c */,
+				E79E12B677A2AA80159EFFE7 /* log.c */,
+				38748F5A0662F66BA5D87D1F /* profile.c */,
+				1F3756ED92FBD5F06A9CBBBB /* usb_probe.c */,
+				EE87A051CC694B8DA023194D /* usb_session.c */,
+				ED379B2D5F07C2EE264B2415 /* wht.c */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E54D1925672210342C8B88B1 = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1A75FC126DB72404470A8F45 /* main.c */,
+				4141A9AEF5CF36EF8653716C /* supervisor.c */,
+				1FFD9DC8765DC53D9A47DC11 /* terminal.c */,
+				D5A83486A57253F7F74C7383 /* Capture.swift */,
+				39BF92B23AA03B51EB79FB7B /* ConfigStore.swift */,
+				D7003A3070DFFAB95CE14744 /* OizysLifecycle.swift */,
+				100A6C539A6B479B793574F4 /* VirtualDisplay.swift */,
+				9AABA441294486640DED0716 /* bench.c */,
+				107F347DC796AECDF0882681 /* capture_frame.c */,
+				AEA1EEAB76E0A3AEE0C45A56 /* config.c */,
+				2752BDB59A24B1E5867C9B4D /* crypto.c */,
+				1C431784C109DC7578247593 /* ddc_native.c */,
+				F23DDB6DC87994557EBD37FA /* display.c */,
+				F680AD6EFD17ADB3CB9A4E34 /* dl3.c */,
+				91A29460027136E1EC1BD620 /* driver.c */,
+				363DB6102698D157C8ABBEC2 /* encode.c */,
+				6F4FE6D5F17E142F3F954560 /* log.c */,
+				675EDAE83ED651614FB35789 /* profile.c */,
+				36A8DC267A822883AD29B707 /* usb_probe.c */,
+				4900BA53993B89BF9C33B617 /* usb_session.c */,
+				040CB5F9CEB5666B7AB39AF4 /* wht.c */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9AA93E974A6D19866628AFEF = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B7560249CA6BB9A813AA7CE5 /* DebugPermissions.swift */,
+				A34FC258810ACE6E9F7D99D6 /* DevDiagnostics.swift */,
+				F3E6D66195D05E2FB51CCEFE /* DiagnosticReport.swift */,
+				2953351EF9776F1F663E868B /* Main.swift */,
+				B70C2A170864AE54B691923A /* Production.swift */,
+				EC708FDCCDBE549E12B05B04 /* OizysLifecycle.swift */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		0EA84DCE39DD8B4BB9A54152 = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E7D7FCB74B49573B749E170D /* SuiteTests.swift */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		1718AAF4E5CB68E01B8646DA /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = D8BF94C905C13E87D9C1CC29 /* Debug.xcconfig */;
+			buildSettings = {
+			};
+			name = Debug;
+		};
+		33463152ED1CFFD4190C6F38 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 10ED73FF5BEFD6D01C934A9E /* Release.xcconfig */;
+			buildSettings = {
+			};
+			name = Release;
+		};
+		552FA9E70A1FF9AAAB581ED4 /* Profile */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = F46E2F9BE32669DA3B2CEE2A /* Profile.xcconfig */;
+			buildSettings = {
+			};
+			name = Profile;
+		};
+		9679DCCB99A80FB0841FC5DB /* DebugMinimal */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = DA000A0C9D3A5C047E7B9680 /* DebugMinimal.xcconfig */;
+			buildSettings = {
+			};
+			name = DebugMinimal;
+		};
+		EC8E67187E8E76BB3E6C5486 /* DebugVerbose */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 7411758DD163170CAD601333 /* DebugVerbose.xcconfig */;
+			buildSettings = {
+			};
+			name = DebugVerbose;
+		};
+		C558333FAEB4BEEBC7B057B3 /* DebugFallback */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 0F8194E5C28F590489CFB569 /* DebugFallback.xcconfig */;
+			buildSettings = {
+			};
+			name = DebugFallback;
+		};
+		652BB29C6508A02F4C10B1D8 /* Production */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = C176A84F8601C687D4CC2395 /* Production.xcconfig */;
+			buildSettings = {
+			};
+			name = Production;
+		};
+		86CC2EBA39373AAF0C49092A /* ProductionFallback */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = D36E9A5D728CB8EA5F5189C8 /* ProductionFallback.xcconfig */;
+			buildSettings = {
+			};
+			name = ProductionFallback;
+		};
+		C2FB73879A155C3F71249E9F /* ProductionProfile */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = E4DAE0A66EFAE39449852206 /* ProductionProfile.xcconfig */;
+			buildSettings = {
+			};
+			name = ProductionProfile;
+		};
+		15940F7BE6D483E80E92658E /* ProductionFallbackProfile */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = BAB039A2C95AD8DD7C219B0C /* ProductionFallbackProfile.xcconfig */;
+			buildSettings = {
+			};
+			name = ProductionFallbackProfile;
+		};
+		CD9BD6069E854820E6CBDB35 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 1DACDF0F5A98DA3C79EF2056 /* Library.xcconfig */;
+			buildSettings = {
+				PRODUCT_NAME = OizysCore;
+				SKIP_INSTALL = YES;
+			};
+			name = Debug;
+		};
+		85ACDB491821E877A2E50573 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 1DACDF0F5A98DA3C79EF2056 /* Library.xcconfig */;
+			buildSettings = {
+				PRODUCT_NAME = OizysCore;
+				SKIP_INSTALL = YES;
+			};
+			name = Release;
+		};
+		E7EFE9CFF9BF0E0B1FBD8CC3 /* Profile */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 1DACDF0F5A98DA3C79EF2056 /* Library.xcconfig */;
+			buildSettings = {
+				PRODUCT_NAME = OizysCore;
+				SKIP_INSTALL = YES;
+			};
+			name = Profile;
+		};
+		31E236ECDBC15358726457FA /* DebugMinimal */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 1DACDF0F5A98DA3C79EF2056 /* Library.xcconfig */;
+			buildSettings = {
+				PRODUCT_NAME = OizysCore;
+				SKIP_INSTALL = YES;
+			};
+			name = DebugMinimal;
+		};
+		599A0CB9F0C75B8F31ED6150 /* DebugVerbose */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 1DACDF0F5A98DA3C79EF2056 /* Library.xcconfig */;
+			buildSettings = {
+				PRODUCT_NAME = OizysCore;
+				SKIP_INSTALL = YES;
+			};
+			name = DebugVerbose;
+		};
+		55F2D88F34D6E876FF799E79 /* DebugFallback */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 1DACDF0F5A98DA3C79EF2056 /* Library.xcconfig */;
+			buildSettings = {
+				PRODUCT_NAME = OizysCore;
+				SKIP_INSTALL = YES;
+			};
+			name = DebugFallback;
+		};
+		5218D6E75A9BCEF23EF2D0CE /* Production */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 1DACDF0F5A98DA3C79EF2056 /* Library.xcconfig */;
+			buildSettings = {
+				PRODUCT_NAME = OizysCore;
+				SKIP_INSTALL = YES;
+			};
+			name = Production;
+		};
+		3AB8C161D79FE4DBDD01653D /* ProductionFallback */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 1DACDF0F5A98DA3C79EF2056 /* Library.xcconfig */;
+			buildSettings = {
+				PRODUCT_NAME = OizysCore;
+				SKIP_INSTALL = YES;
+			};
+			name = ProductionFallback;
+		};
+		A1C4705A7350E03A41B822C2 /* ProductionProfile */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 1DACDF0F5A98DA3C79EF2056 /* Library.xcconfig */;
+			buildSettings = {
+				PRODUCT_NAME = OizysCore;
+				SKIP_INSTALL = YES;
+			};
+			name = ProductionProfile;
+		};
+		A2F30330FD388BDF65E65DAB /* ProductionFallbackProfile */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 1DACDF0F5A98DA3C79EF2056 /* Library.xcconfig */;
+			buildSettings = {
+				PRODUCT_NAME = OizysCore;
+				SKIP_INSTALL = YES;
+			};
+			name = ProductionFallbackProfile;
+		};
+		231483816714AC9B59EE10A5 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = D8BF94C905C13E87D9C1CC29 /* Debug.xcconfig */;
+			buildSettings = {
+				SKIP_INSTALL = YES;
+			};
+			name = Debug;
+		};
+		F296F8A08B3D6167ACD700CB /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 10ED73FF5BEFD6D01C934A9E /* Release.xcconfig */;
+			buildSettings = {
+				SKIP_INSTALL = YES;
+			};
+			name = Release;
+		};
+		83DE592D6A1E30ABE73FD0FE /* Profile */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = F46E2F9BE32669DA3B2CEE2A /* Profile.xcconfig */;
+			buildSettings = {
+				SKIP_INSTALL = YES;
+			};
+			name = Profile;
+		};
+		325370B83D0E3BC0BA54C404 /* DebugMinimal */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = DA000A0C9D3A5C047E7B9680 /* DebugMinimal.xcconfig */;
+			buildSettings = {
+				SKIP_INSTALL = YES;
+			};
+			name = DebugMinimal;
+		};
+		A50C51C74972330E6D2B06F9 /* DebugVerbose */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 7411758DD163170CAD601333 /* DebugVerbose.xcconfig */;
+			buildSettings = {
+				SKIP_INSTALL = YES;
+			};
+			name = DebugVerbose;
+		};
+		17DF35554A2D3B6457AE8EA1 /* DebugFallback */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 0F8194E5C28F590489CFB569 /* DebugFallback.xcconfig */;
+			buildSettings = {
+				SKIP_INSTALL = YES;
+			};
+			name = DebugFallback;
+		};
+		EC3E0B43EB7EF124A3869877 /* Production */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = C176A84F8601C687D4CC2395 /* Production.xcconfig */;
+			buildSettings = {
+				SKIP_INSTALL = YES;
+			};
+			name = Production;
+		};
+		ECF5C228F0CBC208CF42A186 /* ProductionFallback */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = D36E9A5D728CB8EA5F5189C8 /* ProductionFallback.xcconfig */;
+			buildSettings = {
+				SKIP_INSTALL = YES;
+			};
+			name = ProductionFallback;
+		};
+		D72D3C37C6E4B51A4D7D2770 /* ProductionProfile */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = E4DAE0A66EFAE39449852206 /* ProductionProfile.xcconfig */;
+			buildSettings = {
+				SKIP_INSTALL = YES;
+			};
+			name = ProductionProfile;
+		};
+		1F5ED7C44C6E10149E825035 /* ProductionFallbackProfile */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = BAB039A2C95AD8DD7C219B0C /* ProductionFallbackProfile.xcconfig */;
+			buildSettings = {
+				SKIP_INSTALL = YES;
+			};
+			name = ProductionFallbackProfile;
+		};
+		9E28F741D95B53E1A86B23C5 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = D8BF94C905C13E87D9C1CC29 /* Debug.xcconfig */;
+			buildSettings = {
+				PRODUCT_NAME = "Oizys-debug";
+				PRODUCT_MODULE_NAME = OizysApplication;
+				PRODUCT_BUNDLE_IDENTIFIER = "org.oizys.Oizys.debug-minimal";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Sources/OizysApp/Info.plist;
+				SWIFT_OBJC_BRIDGING_HEADER = "";
+				OIZYS_DISPLAY_NAME = "Oizys-debug $(MARKETING_VERSION)";
+				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_NSHighResolutionCapable = YES;
+				OIZYS_VARIANT = "debug-minimal";
+				OIZYS_FALLBACK = NO;
+				MARKETING_VERSION = "0.3.0";
+				CURRENT_PROJECT_VERSION = "0.3.0";
+				CODE_SIGN_STYLE = Manual;
+				CODE_SIGN_IDENTITY = "-";
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				INSTALL_PATH = "$(LOCAL_APPS_DIR)";
+				SKIP_INSTALL = NO;
+			};
+			name = Debug;
+		};
+		8453E3D7988E2D92DE2B6BC6 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 10ED73FF5BEFD6D01C934A9E /* Release.xcconfig */;
+			buildSettings = {
+				PRODUCT_NAME = "Oizys-debug";
+				PRODUCT_MODULE_NAME = OizysApplication;
+				PRODUCT_BUNDLE_IDENTIFIER = "org.oizys.Oizys.debug-minimal";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Sources/OizysApp/Info.plist;
+				SWIFT_OBJC_BRIDGING_HEADER = "";
+				OIZYS_DISPLAY_NAME = "Oizys-debug $(MARKETING_VERSION)";
+				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_NSHighResolutionCapable = YES;
+				OIZYS_VARIANT = "debug-minimal";
+				OIZYS_FALLBACK = NO;
+				MARKETING_VERSION = "0.3.0";
+				CURRENT_PROJECT_VERSION = "0.3.0";
+				CODE_SIGN_STYLE = Manual;
+				CODE_SIGN_IDENTITY = "-";
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				INSTALL_PATH = "$(LOCAL_APPS_DIR)";
+				SKIP_INSTALL = NO;
+			};
+			name = Release;
+		};
+		0D874A0050539A71F2DA977C /* Profile */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = F46E2F9BE32669DA3B2CEE2A /* Profile.xcconfig */;
+			buildSettings = {
+				PRODUCT_NAME = "Oizys-debug";
+				PRODUCT_MODULE_NAME = OizysApplication;
+				PRODUCT_BUNDLE_IDENTIFIER = "org.oizys.Oizys.debug-minimal";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Sources/OizysApp/Info.plist;
+				SWIFT_OBJC_BRIDGING_HEADER = "";
+				OIZYS_DISPLAY_NAME = "Oizys-debug $(MARKETING_VERSION)";
+				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_NSHighResolutionCapable = YES;
+				OIZYS_VARIANT = "debug-minimal";
+				OIZYS_FALLBACK = NO;
+				MARKETING_VERSION = "0.3.0";
+				CURRENT_PROJECT_VERSION = "0.3.0";
+				CODE_SIGN_STYLE = Manual;
+				CODE_SIGN_IDENTITY = "-";
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				INSTALL_PATH = "$(LOCAL_APPS_DIR)";
+				SKIP_INSTALL = NO;
+			};
+			name = Profile;
+		};
+		6960A1334FDCC634AF605F88 /* DebugMinimal */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = DA000A0C9D3A5C047E7B9680 /* DebugMinimal.xcconfig */;
+			buildSettings = {
+				PRODUCT_NAME = "Oizys-debug";
+				PRODUCT_MODULE_NAME = OizysApplication;
+				PRODUCT_BUNDLE_IDENTIFIER = "org.oizys.Oizys.debug-minimal";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Sources/OizysApp/Info.plist;
+				SWIFT_OBJC_BRIDGING_HEADER = "";
+				OIZYS_DISPLAY_NAME = "Oizys-debug $(MARKETING_VERSION)";
+				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_NSHighResolutionCapable = YES;
+				OIZYS_VARIANT = "debug-minimal";
+				OIZYS_FALLBACK = NO;
+				MARKETING_VERSION = "0.3.0";
+				CURRENT_PROJECT_VERSION = "0.3.0";
+				CODE_SIGN_STYLE = Manual;
+				CODE_SIGN_IDENTITY = "-";
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				INSTALL_PATH = "$(LOCAL_APPS_DIR)";
+				SKIP_INSTALL = NO;
+			};
+			name = DebugMinimal;
+		};
+		73BC189EEE7DFFB498224A9F /* DebugVerbose */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 7411758DD163170CAD601333 /* DebugVerbose.xcconfig */;
+			buildSettings = {
+				PRODUCT_NAME = "Oizys-debug";
+				PRODUCT_MODULE_NAME = OizysApplication;
+				PRODUCT_BUNDLE_IDENTIFIER = "org.oizys.Oizys.debug-verbose";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Sources/OizysApp/Info.plist;
+				SWIFT_OBJC_BRIDGING_HEADER = "";
+				OIZYS_DISPLAY_NAME = "Oizys-debug $(MARKETING_VERSION)";
+				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_NSHighResolutionCapable = YES;
+				OIZYS_VARIANT = "debug-verbose";
+				OIZYS_FALLBACK = NO;
+				MARKETING_VERSION = "0.3.0";
+				CURRENT_PROJECT_VERSION = "0.3.0";
+				CODE_SIGN_STYLE = Manual;
+				CODE_SIGN_IDENTITY = "-";
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				INSTALL_PATH = "$(LOCAL_APPS_DIR)";
+				SKIP_INSTALL = NO;
+			};
+			name = DebugVerbose;
+		};
+		9367A37CC0C8EB225FB7F0B8 /* DebugFallback */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 0F8194E5C28F590489CFB569 /* DebugFallback.xcconfig */;
+			buildSettings = {
+				PRODUCT_NAME = "Oizys-debug";
+				PRODUCT_MODULE_NAME = OizysApplication;
+				PRODUCT_BUNDLE_IDENTIFIER = "org.oizys.Oizys.debug-fallback";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Sources/OizysApp/Info.plist;
+				SWIFT_OBJC_BRIDGING_HEADER = "";
+				OIZYS_DISPLAY_NAME = "Oizys-debug $(MARKETING_VERSION)";
+				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_NSHighResolutionCapable = YES;
+				OIZYS_VARIANT = "debug-fallback";
+				OIZYS_FALLBACK = YES;
+				MARKETING_VERSION = "0.3.0";
+				CURRENT_PROJECT_VERSION = "0.3.0";
+				CODE_SIGN_STYLE = Manual;
+				CODE_SIGN_IDENTITY = "-";
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				INSTALL_PATH = "$(LOCAL_APPS_DIR)";
+				SKIP_INSTALL = NO;
+			};
+			name = DebugFallback;
+		};
+		FC4C8B10433166C19C9AA219 /* Production */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = C176A84F8601C687D4CC2395 /* Production.xcconfig */;
+			buildSettings = {
+				PRODUCT_NAME = "Oizys";
+				PRODUCT_MODULE_NAME = OizysApplication;
+				PRODUCT_BUNDLE_IDENTIFIER = "org.oizys.Oizys.production";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Sources/OizysApp/Info.plist;
+				SWIFT_OBJC_BRIDGING_HEADER = "";
+				OIZYS_DISPLAY_NAME = "Oizys";
+				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_NSHighResolutionCapable = YES;
+				OIZYS_VARIANT = "production";
+				OIZYS_FALLBACK = NO;
+				MARKETING_VERSION = "0.3.0";
+				CURRENT_PROJECT_VERSION = "0.3.0";
+				CODE_SIGN_STYLE = Manual;
+				CODE_SIGN_IDENTITY = "-";
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				INSTALL_PATH = "$(LOCAL_APPS_DIR)";
+				SKIP_INSTALL = NO;
+			};
+			name = Production;
+		};
+		F6C1AFCA6404E8CF50BABA11 /* ProductionFallback */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = D36E9A5D728CB8EA5F5189C8 /* ProductionFallback.xcconfig */;
+			buildSettings = {
+				PRODUCT_NAME = "Oizys";
+				PRODUCT_MODULE_NAME = OizysApplication;
+				PRODUCT_BUNDLE_IDENTIFIER = "org.oizys.Oizys.production";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Sources/OizysApp/Info.plist;
+				SWIFT_OBJC_BRIDGING_HEADER = "";
+				OIZYS_DISPLAY_NAME = "Oizys";
+				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_NSHighResolutionCapable = YES;
+				OIZYS_VARIANT = "production-fallback";
+				OIZYS_FALLBACK = YES;
+				MARKETING_VERSION = "0.3.0";
+				CURRENT_PROJECT_VERSION = "0.3.0";
+				CODE_SIGN_STYLE = Manual;
+				CODE_SIGN_IDENTITY = "-";
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				INSTALL_PATH = "$(LOCAL_APPS_DIR)";
+				SKIP_INSTALL = NO;
+			};
+			name = ProductionFallback;
+		};
+		D599E46AD98360CB60D1C90B /* ProductionProfile */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = E4DAE0A66EFAE39449852206 /* ProductionProfile.xcconfig */;
+			buildSettings = {
+				PRODUCT_NAME = "Oizys";
+				PRODUCT_MODULE_NAME = OizysApplication;
+				PRODUCT_BUNDLE_IDENTIFIER = "org.oizys.Oizys.production";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Sources/OizysApp/Info.plist;
+				SWIFT_OBJC_BRIDGING_HEADER = "";
+				OIZYS_DISPLAY_NAME = "Oizys";
+				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_NSHighResolutionCapable = YES;
+				OIZYS_VARIANT = "production";
+				OIZYS_FALLBACK = NO;
+				MARKETING_VERSION = "0.3.0";
+				CURRENT_PROJECT_VERSION = "0.3.0";
+				CODE_SIGN_STYLE = Manual;
+				CODE_SIGN_IDENTITY = "-";
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				INSTALL_PATH = "$(LOCAL_APPS_DIR)";
+				SKIP_INSTALL = NO;
+			};
+			name = ProductionProfile;
+		};
+		9A1C2E83D089EEA6F18C2C00 /* ProductionFallbackProfile */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = BAB039A2C95AD8DD7C219B0C /* ProductionFallbackProfile.xcconfig */;
+			buildSettings = {
+				PRODUCT_NAME = "Oizys";
+				PRODUCT_MODULE_NAME = OizysApplication;
+				PRODUCT_BUNDLE_IDENTIFIER = "org.oizys.Oizys.production";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Sources/OizysApp/Info.plist;
+				SWIFT_OBJC_BRIDGING_HEADER = "";
+				OIZYS_DISPLAY_NAME = "Oizys";
+				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_NSHighResolutionCapable = YES;
+				OIZYS_VARIANT = "production-fallback";
+				OIZYS_FALLBACK = YES;
+				MARKETING_VERSION = "0.3.0";
+				CURRENT_PROJECT_VERSION = "0.3.0";
+				CODE_SIGN_STYLE = Manual;
+				CODE_SIGN_IDENTITY = "-";
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				INSTALL_PATH = "$(LOCAL_APPS_DIR)";
+				SKIP_INSTALL = NO;
+			};
+			name = ProductionFallbackProfile;
+		};
+		5C1D87FD78991AFDF48AFDE0 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = D8BF94C905C13E87D9C1CC29 /* Debug.xcconfig */;
+			buildSettings = {
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = org.oizys.tests;
+				SWIFT_OBJC_BRIDGING_HEADER = "";
+				ENABLE_TESTING_SEARCH_PATHS = YES;
+				CODE_SIGN_IDENTITY = "-";
+				SKIP_INSTALL = YES;
+				TEST_HOST = "";
+			};
+			name = Debug;
+		};
+		0CA149B8F56E3F594E40A83A /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 10ED73FF5BEFD6D01C934A9E /* Release.xcconfig */;
+			buildSettings = {
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = org.oizys.tests;
+				SWIFT_OBJC_BRIDGING_HEADER = "";
+				ENABLE_TESTING_SEARCH_PATHS = YES;
+				CODE_SIGN_IDENTITY = "-";
+				SKIP_INSTALL = YES;
+				TEST_HOST = "";
+			};
+			name = Release;
+		};
+		7AD9B015B212441A72CBB92C /* Profile */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = F46E2F9BE32669DA3B2CEE2A /* Profile.xcconfig */;
+			buildSettings = {
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = org.oizys.tests;
+				SWIFT_OBJC_BRIDGING_HEADER = "";
+				ENABLE_TESTING_SEARCH_PATHS = YES;
+				CODE_SIGN_IDENTITY = "-";
+				SKIP_INSTALL = YES;
+				TEST_HOST = "";
+			};
+			name = Profile;
+		};
+		FF2038063D3CF5605D801B51 /* DebugMinimal */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = DA000A0C9D3A5C047E7B9680 /* DebugMinimal.xcconfig */;
+			buildSettings = {
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = org.oizys.tests;
+				SWIFT_OBJC_BRIDGING_HEADER = "";
+				ENABLE_TESTING_SEARCH_PATHS = YES;
+				CODE_SIGN_IDENTITY = "-";
+				SKIP_INSTALL = YES;
+				TEST_HOST = "";
+			};
+			name = DebugMinimal;
+		};
+		D63810550F46E4CEB6921951 /* DebugVerbose */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 7411758DD163170CAD601333 /* DebugVerbose.xcconfig */;
+			buildSettings = {
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = org.oizys.tests;
+				SWIFT_OBJC_BRIDGING_HEADER = "";
+				ENABLE_TESTING_SEARCH_PATHS = YES;
+				CODE_SIGN_IDENTITY = "-";
+				SKIP_INSTALL = YES;
+				TEST_HOST = "";
+			};
+			name = DebugVerbose;
+		};
+		C160D5189F602F82EC58E48B /* DebugFallback */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 0F8194E5C28F590489CFB569 /* DebugFallback.xcconfig */;
+			buildSettings = {
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = org.oizys.tests;
+				SWIFT_OBJC_BRIDGING_HEADER = "";
+				ENABLE_TESTING_SEARCH_PATHS = YES;
+				CODE_SIGN_IDENTITY = "-";
+				SKIP_INSTALL = YES;
+				TEST_HOST = "";
+			};
+			name = DebugFallback;
+		};
+		7F0DD0351A6DA03C3B62F8A7 /* Production */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = C176A84F8601C687D4CC2395 /* Production.xcconfig */;
+			buildSettings = {
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = org.oizys.tests;
+				SWIFT_OBJC_BRIDGING_HEADER = "";
+				ENABLE_TESTING_SEARCH_PATHS = YES;
+				CODE_SIGN_IDENTITY = "-";
+				SKIP_INSTALL = YES;
+				TEST_HOST = "";
+			};
+			name = Production;
+		};
+		A1B8CCEBB85D16FBF764CCD0 /* ProductionFallback */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = D36E9A5D728CB8EA5F5189C8 /* ProductionFallback.xcconfig */;
+			buildSettings = {
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = org.oizys.tests;
+				SWIFT_OBJC_BRIDGING_HEADER = "";
+				ENABLE_TESTING_SEARCH_PATHS = YES;
+				CODE_SIGN_IDENTITY = "-";
+				SKIP_INSTALL = YES;
+				TEST_HOST = "";
+			};
+			name = ProductionFallback;
+		};
+		ED63FA07D4FC864FF6F964AC /* ProductionProfile */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = E4DAE0A66EFAE39449852206 /* ProductionProfile.xcconfig */;
+			buildSettings = {
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = org.oizys.tests;
+				SWIFT_OBJC_BRIDGING_HEADER = "";
+				ENABLE_TESTING_SEARCH_PATHS = YES;
+				CODE_SIGN_IDENTITY = "-";
+				SKIP_INSTALL = YES;
+				TEST_HOST = "";
+			};
+			name = ProductionProfile;
+		};
+		E126A171F5CE0384C4B5880C /* ProductionFallbackProfile */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = BAB039A2C95AD8DD7C219B0C /* ProductionFallbackProfile.xcconfig */;
+			buildSettings = {
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = org.oizys.tests;
+				SWIFT_OBJC_BRIDGING_HEADER = "";
+				ENABLE_TESTING_SEARCH_PATHS = YES;
+				CODE_SIGN_IDENTITY = "-";
+				SKIP_INSTALL = YES;
+				TEST_HOST = "";
+			};
+			name = ProductionFallbackProfile;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		A15C1660503C9D18B9702A73 = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1718AAF4E5CB68E01B8646DA /* Debug */,
+				33463152ED1CFFD4190C6F38 /* Release */,
+				552FA9E70A1FF9AAAB581ED4 /* Profile */,
+				9679DCCB99A80FB0841FC5DB /* DebugMinimal */,
+				EC8E67187E8E76BB3E6C5486 /* DebugVerbose */,
+				C558333FAEB4BEEBC7B057B3 /* DebugFallback */,
+				652BB29C6508A02F4C10B1D8 /* Production */,
+				86CC2EBA39373AAF0C49092A /* ProductionFallback */,
+				C2FB73879A155C3F71249E9F /* ProductionProfile */,
+				15940F7BE6D483E80E92658E /* ProductionFallbackProfile */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		663AF199F1D2C0891C81526A = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				CD9BD6069E854820E6CBDB35 /* Debug */,
+				85ACDB491821E877A2E50573 /* Release */,
+				E7EFE9CFF9BF0E0B1FBD8CC3 /* Profile */,
+				31E236ECDBC15358726457FA /* DebugMinimal */,
+				599A0CB9F0C75B8F31ED6150 /* DebugVerbose */,
+				55F2D88F34D6E876FF799E79 /* DebugFallback */,
+				5218D6E75A9BCEF23EF2D0CE /* Production */,
+				3AB8C161D79FE4DBDD01653D /* ProductionFallback */,
+				A1C4705A7350E03A41B822C2 /* ProductionProfile */,
+				A2F30330FD388BDF65E65DAB /* ProductionFallbackProfile */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		F3AFB5ECA4B422A055C6EC97 = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				231483816714AC9B59EE10A5 /* Debug */,
+				F296F8A08B3D6167ACD700CB /* Release */,
+				83DE592D6A1E30ABE73FD0FE /* Profile */,
+				325370B83D0E3BC0BA54C404 /* DebugMinimal */,
+				A50C51C74972330E6D2B06F9 /* DebugVerbose */,
+				17DF35554A2D3B6457AE8EA1 /* DebugFallback */,
+				EC3E0B43EB7EF124A3869877 /* Production */,
+				ECF5C228F0CBC208CF42A186 /* ProductionFallback */,
+				D72D3C37C6E4B51A4D7D2770 /* ProductionProfile */,
+				1F5ED7C44C6E10149E825035 /* ProductionFallbackProfile */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		02F01B876BEB7B4FC1DFA7A0 = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				9E28F741D95B53E1A86B23C5 /* Debug */,
+				8453E3D7988E2D92DE2B6BC6 /* Release */,
+				0D874A0050539A71F2DA977C /* Profile */,
+				6960A1334FDCC634AF605F88 /* DebugMinimal */,
+				73BC189EEE7DFFB498224A9F /* DebugVerbose */,
+				9367A37CC0C8EB225FB7F0B8 /* DebugFallback */,
+				FC4C8B10433166C19C9AA219 /* Production */,
+				F6C1AFCA6404E8CF50BABA11 /* ProductionFallback */,
+				D599E46AD98360CB60D1C90B /* ProductionProfile */,
+				9A1C2E83D089EEA6F18C2C00 /* ProductionFallbackProfile */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		281319DBEC6684279005A262 = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5C1D87FD78991AFDF48AFDE0 /* Debug */,
+				0CA149B8F56E3F594E40A83A /* Release */,
+				7AD9B015B212441A72CBB92C /* Profile */,
+				FF2038063D3CF5605D801B51 /* DebugMinimal */,
+				D63810550F46E4CEB6921951 /* DebugVerbose */,
+				C160D5189F602F82EC58E48B /* DebugFallback */,
+				7F0DD0351A6DA03C3B62F8A7 /* Production */,
+				A1B8CCEBB85D16FBF764CCD0 /* ProductionFallback */,
+				ED63FA07D4FC864FF6F964AC /* ProductionProfile */,
+				E126A171F5CE0384C4B5880C /* ProductionFallbackProfile */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+	};
+	rootObject = 244210E48437B6556980A702 /* Project object */;
+}

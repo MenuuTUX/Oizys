@@ -11,10 +11,13 @@ DEAD_CODE_STRIPPING = YES
 GCC_SYMBOLS_PRIVATE_EXTERN = YES
 
 ENABLE_HARDENED_RUNTIME = YES
-OTHER_CFLAGS = $(MVIEW_CPU) -fno-common -fstack-protector-strong
+OTHER_CFLAGS = $(OIZYS_CPU) -fno-common -fstack-protector-strong
 
 // Profile-guided optimisation. Empty until Tools/pgo.py has produced a profile, at which
 // point it points at one. Measured worth on this workload is small — the hot loops are
 // branchless SIMD or branch on pixel data no profile predicts — but the plumbing is here.
-MVIEW_PGO =
-OTHER_CFLAGS = $(inherited) $(MVIEW_PGO)
+OIZYS_PGO =
+OTHER_CFLAGS = $(inherited) $(OIZYS_PGO)
+
+// Keep optimized driver stacks usable in Instruments and crash reports.
+OTHER_CFLAGS = $(inherited) -fno-omit-frame-pointer

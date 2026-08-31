@@ -13,7 +13,7 @@ import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from Support import mviewcore as core
+from Support import oizyscore as core
 
 KEY = bytes.fromhex("2b7e151628aed2a6abf7158809cf4f3c")
 
@@ -30,21 +30,21 @@ CMAC_VECTORS = [
 
 def cmac(key: bytes, message: bytes) -> bytes:
     tag = core.buffer(16)
-    core.lib.mview_aes_cmac(core.as_u8(key), core.as_u8(message), len(message),
+    core.lib.oizys_aes_cmac(core.as_u8(key), core.as_u8(message), len(message),
                             ctypes.cast(tag, ctypes.POINTER(ctypes.c_uint8)))
     return bytes(tag)
 
 
 def hmac(key: bytes, message: bytes) -> bytes:
     out = core.buffer(32)
-    core.lib.mview_hmac_sha256(core.as_u8(key), len(key), core.as_u8(message), len(message),
+    core.lib.oizys_hmac_sha256(core.as_u8(key), len(key), core.as_u8(message), len(message),
                                ctypes.cast(out, ctypes.POINTER(ctypes.c_uint8)))
     return bytes(out)
 
 
 def ctr(key: bytes, riv: bytes, seq: int, data: bytes) -> bytes:
     out = core.buffer(len(data))
-    core.lib.mview_aes_ctr_xor(core.as_u8(key), core.as_u8(riv), seq, core.as_u8(data),
+    core.lib.oizys_aes_ctr_xor(core.as_u8(key), core.as_u8(riv), seq, core.as_u8(data),
                                ctypes.cast(out, ctypes.POINTER(ctypes.c_uint8)), len(data))
     return bytes(out)
 
@@ -96,7 +96,7 @@ def test_kd_depends_on_every_input_byte(km, rtx, rrx, index):
     wrong, and it still produces 32 convincing bytes."""
     def derive(km_, rtx_, rrx_):
         out = core.buffer(32)
-        core.lib.mview_hdcp_derive_kd(core.as_u8(km_), core.as_u8(rtx_), core.as_u8(rrx_),
+        core.lib.oizys_hdcp_derive_kd(core.as_u8(km_), core.as_u8(rtx_), core.as_u8(rrx_),
                                       ctypes.cast(out, ctypes.POINTER(ctypes.c_uint8)))
         return bytes(out)
 
@@ -120,8 +120,8 @@ def test_h_distinguishes_a_repeater():
     kd, rtx = bytes(range(32)), bytes(range(8))
     out_a, out_b = core.buffer(32), core.buffer(32)
     p = ctypes.POINTER(ctypes.c_uint8)
-    core.lib.mview_hdcp_compute_h(core.as_u8(kd), core.as_u8(rtx), 0, ctypes.cast(out_a, p))
-    core.lib.mview_hdcp_compute_h(core.as_u8(kd), core.as_u8(rtx), 1, ctypes.cast(out_b, p))
+    core.lib.oizys_hdcp_compute_h(core.as_u8(kd), core.as_u8(rtx), 0, ctypes.cast(out_a, p))
+    core.lib.oizys_hdcp_compute_h(core.as_u8(kd), core.as_u8(rtx), 1, ctypes.cast(out_b, p))
     assert bytes(out_a) != bytes(out_b), "H ignored the repeater flag"
 
 
@@ -129,8 +129,8 @@ def test_random_is_not_stubbed():
     """A generator returning zeroes would authenticate against a permissive dock and
     silently destroy the session's security."""
     a, b = core.buffer(32), core.buffer(32)
-    core.lib.mview_hdcp_random(a, 32)
-    core.lib.mview_hdcp_random(b, 32)
+    core.lib.oizys_hdcp_random(a, 32)
+    core.lib.oizys_hdcp_random(b, 32)
     assert bytes(a) != bytes(32), "hdcp_random returned all zeroes"
     assert bytes(a) != bytes(b), "hdcp_random repeated across two calls"
 
@@ -147,7 +147,7 @@ MODULUS = bytes.fromhex(
 
 def oaep(modulus: bytes, message: bytes = bytes(16)):
     out = core.buffer(128)
-    status = core.lib.mview_hdcp_rsa_oaep_encrypt(
+    status = core.lib.oizys_hdcp_rsa_oaep_encrypt(
         core.as_u8(modulus), core.as_u8(bytes([0x01, 0x00, 0x01])), core.as_u8(message),
         ctypes.cast(out, ctypes.POINTER(ctypes.c_uint8)))
     return status, bytes(out)

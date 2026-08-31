@@ -26,7 +26,7 @@ import subprocess
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-SRC = ROOT / "Sources" / "MViewCore"
+SRC = ROOT / "Sources" / "OizysCore"
 BUILD = ROOT / "build" / "mutants"
 PYTHON = ROOT / ".venv" / "bin" / "python"
 
@@ -54,7 +54,7 @@ OPERATORS = [
     (r"\b(\d+)\b", None, "constant off by one"),
 ]
 
-SKIP_LINE = re.compile(r"^\s*(//|\*|/\*|#include|#ifndef|#define MVIEW_\w+_H)")
+SKIP_LINE = re.compile(r"^\s*(//|\*|/\*|#include|#ifndef|#define OIZYS_\w+_H)")
 
 
 def strip_block_comments(text: str) -> str:
@@ -111,7 +111,7 @@ def build_library(workdir: pathlib.Path):
     mutant would spend most of the run in the build system."""
     sdk = subprocess.run(["xcrun", "--show-sdk-path"], capture_output=True,
                          text=True).stdout.strip()
-    output = workdir / "libMViewCore.dylib"
+    output = workdir / "libOizysCore.dylib"
     sources = [str(p) for p in sorted(workdir.glob("*.c"))]
     sources += [str(p) for p in sorted(SRC.glob("*.m"))]
     command = [
@@ -131,7 +131,7 @@ def build_library(workdir: pathlib.Path):
 
 
 def run_suites(library: pathlib.Path, suites) -> str:
-    env = dict(os.environ, MVIEW_DYLIB=str(library), PYTHONDONTWRITEBYTECODE="1")
+    env = dict(os.environ, OIZYS_DYLIB=str(library), PYTHONDONTWRITEBYTECODE="1")
     for suite in suites:
         try:
             result = subprocess.run([str(PYTHON), "-m", "pytest", suite, "-x", "-q",

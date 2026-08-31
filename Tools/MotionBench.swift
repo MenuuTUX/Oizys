@@ -1,6 +1,6 @@
 // A repeatable compositor workload for comparing display drivers. No screen recording.
 // Build: swiftc -O Tools/MotionBench.swift -o build/MotionBench
-// Run:   build/MotionBench [seconds] [--pattern NAME] [--dwell S] [--windowed [--fraction F]]
+// Run:   build/MotionBench [seconds] [--pattern NAME] [--dwell S] [--full | --windowed [--fraction F]]
 //
 //   seconds       how long to run before quitting. Default 120. Ctrl-C also ends it, and
 //                 the app's "Stop tests" button terminates it.
@@ -9,8 +9,8 @@
 //                 the pipeline. `--pattern scroll` reproduces the historical baseline the
 //                 comparisons in logs/ were recorded against.
 //   --dwell       seconds per pattern under `cycle`. Default 10.
-//   --windowed    the old half-screen titled window, for when the machine has to stay
-//                 usable during the run.
+//   --windowed    a draggable, borderless half-screen window on each display.
+//   --full        cover every display, including the menu bar and Dock (the default).
 //   --fraction    windowed size as a fraction of each screen. Default 0.5.
 //
 // By default the workload is a borderless, click-through, always-on-top surface covering
@@ -51,6 +51,17 @@
 // exist at launch. Any comparison made that way measured an idle encoder.
 import AppKit
 import QuartzCore
+
+final class MotionWindow: NSWindow {
+    override var canBecomeKey: Bool { true }
+    override func keyDown(with event: NSEvent) {
+        if event.keyCode == 53 || (event.modifierFlags.contains(.control) && event.keyCode == 8) {
+            NSApp.terminate(nil)
+        } else {
+            super.keyDown(with: event)
+        }
+    }
+}
 
 enum Pattern: String, CaseIterable {
     case scroll, text, noise, gradient, flash, scatter, still
@@ -283,11 +294,12 @@ final class MotionBench: NSObject, NSApplicationDelegate {
         let rect = NSRect(x: screen.frame.midX - size.width / 2,
                           y: screen.frame.midY - size.height / 2,
                           width: size.width, height: size.height)
-        let window = NSWindow(contentRect: rect,
-                              styleMask: windowed ? [.titled, .closable] : [.borderless],
+        let window = MotionWindow(contentRect: rect,
+                              styleMask: [.borderless],
                               backing: .buffered, defer: false, screen: screen)
-        window.title = "MView motion comparison • screen \(index + 1)"
+        window.title = "Oizys motion comparison • screen \(index + 1)"
         window.isReleasedWhenClosed = false
+        window.isMovableByWindowBackground = windowed
         if !windowed {
             // Above everything, on every space, and transparent to the mouse: the point is
             // to own what the driver captures, not to take the machine away from whoever

@@ -3,7 +3,7 @@ import ctypes
 import pathlib
 import subprocess
 
-from Support import mviewcore as core
+from Support import oizyscore as core
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 
@@ -12,7 +12,7 @@ def test_whole_frames_and_short_writes(tmp_path):
     output = tmp_path / "usb-frame-tests.dylib"
     result = subprocess.run([
         "xcrun", "clang", "-std=c11", "-fblocks", "-dynamiclib",
-        "-I", str(ROOT / "Sources/MViewCore/include"),
+        "-I", str(ROOT / "Sources/OizysCore/include"),
         str(ROOT / "Tests/Support/usb_frame_test.c"), str(core.LIBRARY_PATH),
         "-framework", "Foundation", "-framework", "IOKit", "-framework", "IOUSBHost",
         "-o", str(output),

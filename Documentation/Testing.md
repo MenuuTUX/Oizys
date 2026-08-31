@@ -2,7 +2,7 @@
 
 ## Overview
 
-The suite is Python driving `libMViewCore.dylib` through ctypes. It exercises the shipping
+The suite is Python driving `libOizysCore.dylib` through ctypes. It exercises the shipping
 code, not a reimplementation, and the same suite runs unchanged against a sanitised or
 instrumented build of that library.
 
@@ -15,6 +15,30 @@ python3 Tools/test.py --mutate
 ```
 
 The first run creates `.venv` and installs pytest, hypothesis and numpy.
+For Xcode’s Test navigator, first run `./dev.sh setup`, then Command-U.
+The XCTest bridge attaches the existing Python suite output to the result bundle;
+it does not rebuild recursively. See [Xcode workflows](Xcode.md).
+
+## Developer dashboard
+
+Portable debug variants expose **Developer Dashboard** in the main window and menu-bar menu.
+Debug bundles include a source snapshot, extracted into Application Support outside the
+signed app. **Prepare tools** installs its isolated Python dependencies. You can also
+choose a source checkout to run suites, coverage, sanitizers, mutation tests, scanout
+profiles and reports. Xcode tools are required for compilation. Bundled encoder diagnostics
+and motion workloads do not need Python. Each operation has a time limit, bounded output
+and a Stop control.
+
+Live metrics show system CPU, active/wired/compressed memory, thermal state, process CPU
+and RSS, display resolution, mode refresh rate, display-link cadence, and Oizys's processed
+capture FPS and latency. These are separate measurements; neither display-link cadence nor
+capture FPS proves physical panel output. Inactive or unrelated display drivers have no
+capture samples. GPU utilization and energy are not measured.
+
+Use **Record samples** while running a workload to save resource data for `Tools/report.py`.
+Recordings stop at 3,600 samples or when the dashboard closes. Hardware diagnostics require
+the running Oizys session to stop before claiming the dock. The dashboard and its repository
+tools are excluded from production app builds.
 
 ## The reference model
 
@@ -129,4 +153,4 @@ Each one is the worst case for a different stage, and the header of that file sa
 
 Nothing here proves pixels reach the panels. A faithfully encoded black frame and a broken
 encoder are indistinguishable from inside the process, which is why `overall_pass` in
-`logs/verify.json` requires a person to run `mview confirm` after looking at both monitors.
+`logs/verify.json` requires a person to run `oizys confirm` after looking at both monitors.

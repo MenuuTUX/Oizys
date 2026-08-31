@@ -17,21 +17,18 @@ OBJROOT = $(SRCROOT)/build/Intermediates
 
 GCC_C_LANGUAGE_STANDARD = c11
 SWIFT_VERSION = 5.0
-SWIFT_OBJC_BRIDGING_HEADER = $(SRCROOT)/Sources/MViewPlatform/Bridge.h
+SWIFT_OBJC_BRIDGING_HEADER = $(SRCROOT)/Sources/OizysPlatform/Bridge.h
 SWIFT_INSTALL_OBJC_HEADER = NO
 SWIFT_OPTIMIZATION_LEVEL = -O
 SWIFT_COMPILATION_MODE = wholemodule
-OTHER_LDFLAGS = $(inherited) -Wl,-rpath,/usr/lib/swift
+OTHER_LDFLAGS = $(inherited)
 CLANG_ENABLE_MODULES = YES
 
-// No Objective-C or Objective-C++ is left in the tree: the Apple-framework adapters are
-// Swift and everything below them is C. These stay because the SDK headers the C files
-// import are still C++-aware, and a stated standard beats whichever default the toolchain
-// picks next.
+// Framework adapters use Swift; the portable packaging launcher uses Objective-C.
 CLANG_CXX_LANGUAGE_STANDARD = c++20
 CLANG_CXX_LIBRARY = libc++
 
-HEADER_SEARCH_PATHS = $(SRCROOT)/Sources/MViewCore/include
+HEADER_SEARCH_PATHS = $(SRCROOT)/Sources/OizysCore/include
 
 // Warnings the driver has actually been bitten by. Return-type is an error because a C
 // function falling off the end returns a register's leftovers, which in this codebase
@@ -48,5 +45,5 @@ WARNING_CFLAGS = -Wall -Wextra -Wpointer-arith -Wcast-align -Wwrite-strings -Wno
 
 // -mcpu names the actual core so clang emits the full NEON set for this machine rather
 // than a portable arm64 baseline. The encoder depends on it.
-MVIEW_CPU = -mcpu=apple-m1
+OIZYS_CPU = -mcpu=apple-m1
 // Bridging header imports C only. Swift is limited to Apple framework integration.

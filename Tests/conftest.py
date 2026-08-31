@@ -11,7 +11,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import pytest
 from hypothesis import strategies as st
 
-from Support import mviewcore as core
+from Support import oizyscore as core
 
 STRIP_W = core.STRIP_W
 STRIP_H = core.STRIP_H

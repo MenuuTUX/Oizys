@@ -15,10 +15,10 @@ static boolean_t test_builtin(uint32_t id) { return test_displays[(id - 1) * 5 +
 #define CGDisplayModelNumber test_model
 #define CGDisplaySerialNumber test_serial
 #define CGDisplayIsBuiltin test_builtin
-#include "../../Sources/MViewCore/ddc_native.c"
+#include "../../Sources/OizysCore/ddc_native.c"
 
-void mview_log(const char *format, ...) {}
-int mview_display_is_sidecar(uint32_t id) { return test_displays[(id - 1) * 5 + 4]; }
+void oizys_log(const char *format, ...) {}
+int oizys_display_is_sidecar(uint32_t id) { return test_displays[(id - 1) * 5 + 4]; }
 
 static IOReturn test_copy_edid(IOAVServiceRef service, CFDataRef *out) {
     *out = (CFDataRef)CFRetain(test_edid);

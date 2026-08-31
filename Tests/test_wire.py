@@ -8,7 +8,7 @@ dock reads as an offset, and everything after it in the half-strip decodes off b
 import pytest
 from hypothesis import HealthCheck, given, settings
 
-from Support import mviewcore as core
+from Support import oizyscore as core
 from conftest import bgra_surface
 
 # Each region rounds up to a whole byte, then to an even byte count.

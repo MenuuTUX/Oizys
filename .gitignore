@@ -14,7 +14,7 @@ coverage/
 xcuserdata/
 *.xcworkspace/xcuserdata/
 
-# Run output. mview recreates logs/ on every run.
+# Run output. oizys recreates logs/ on every run.
 logs/
 
 # macOS
@@ -31,7 +31,7 @@ logs/
 # subdirectories and left the 13 MB .pkg tracked.
 compiled_driver/
 
-# Vino working tree and protocol probe scripts. Vino is GPL; MView is a
+# Vino working tree and protocol probe scripts. Vino is GPL; Oizys is a
 # clean-room reimplementation and keeps no copy of its source.
 work/
 artifacts/
@@ -74,3 +74,7 @@ __pycache__/
 /.ruff_cache/
 *.xcscmblueprint
 *.xccheckout
+
+# Local fixture settings and backups.
+fixture.json
+fixture.json.*

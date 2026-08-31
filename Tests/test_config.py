@@ -5,7 +5,7 @@ writing, and every field type (int, double, bool, the head bitmask, the head ref
 and the string) has its own path through it. None of it needs the dock, so all of it is
 reachable through the library once the backing file is pointed somewhere disposable.
 
-MVIEW_CONFIG_PATH must be set before the library is first loaded, because the path is
+OIZYS_CONFIG_PATH must be set before the library is first loaded, because the path is
 cached on first use. conftest imports the library at collection time, so the environment
 is set here at import, before the fixture forces a reload onto the temp file.
 """
@@ -17,33 +17,33 @@ import tempfile
 
 import pytest
 
-from Support import mviewcore as core
+from Support import oizyscore as core
 
-_CONFIG_DIR = tempfile.mkdtemp(prefix="mview-config-test-")
-os.environ["MVIEW_CONFIG_PATH"] = str(pathlib.Path(_CONFIG_DIR) / "config.json")
+_CONFIG_DIR = tempfile.mkdtemp(prefix="oizys-config-test-")
+os.environ["OIZYS_CONFIG_PATH"] = str(pathlib.Path(_CONFIG_DIR) / "config.json")
 
 
 @pytest.fixture(autouse=True)
 def clean_config():
     """Every test starts from defaults on the disposable file."""
-    core.lib.mview_config_reset()
-    core.lib.mview_config_reload()
+    core.lib.oizys_config_reset()
+    core.lib.oizys_config_reload()
     yield
-    core.lib.mview_config_reset()
+    core.lib.oizys_config_reset()
 
 
 def get(key):
     buf = ctypes.create_string_buffer(64)
-    rc = core.lib.mview_config_get(key.encode(), buf, len(buf))
+    rc = core.lib.oizys_config_get(key.encode(), buf, len(buf))
     return rc, buf.value.decode()
 
 
 def set_(key, value):
-    return core.lib.mview_config_set(key.encode(), str(value).encode())
+    return core.lib.oizys_config_set(key.encode(), str(value).encode())
 
 
 def test_the_library_selftest_passes():
-    assert core.lib.mview_config_selftest() == 0
+    assert core.lib.oizys_config_selftest() == 0
 
 
 def test_defaults_round_trip():
@@ -56,7 +56,7 @@ def test_defaults_round_trip():
 
 def test_set_then_get_persists_across_reload():
     assert set_("head.refresh_hz", "75") == 0
-    core.lib.mview_config_reload()
+    core.lib.oizys_config_reload()
     rc, value = get("head.refresh_hz")
     assert rc == 0 and value.startswith("75")
 
@@ -92,9 +92,9 @@ def test_head_bitmask_and_reference_spellings():
     for spelling, active_left, active_right in [
         ("left", 1, 0), ("right", 0, 1), ("left,right", 1, 1)]:
         assert set_("heads.active", spelling) == 0
-        core.lib.mview_config_reload()
-        assert core.lib.mview_config_head_active(0) == active_left
-        assert core.lib.mview_config_head_active(1) == active_right
+        core.lib.oizys_config_reload()
+        assert core.lib.oizys_config_head_active(0) == active_left
+        assert core.lib.oizys_config_head_active(1) == active_right
     assert set_("heads.native", "left") == 0
     assert set_("heads.native", "none") == 0
     assert set_("heads.active", "middle") == -2
@@ -122,18 +122,18 @@ def test_string_field_is_length_bounded():
 
 def test_reset_returns_to_defaults():
     set_("capture.fps", "30")
-    assert core.lib.mview_config_reset() == 0
-    core.lib.mview_config_reload()
+    assert core.lib.oizys_config_reset() == 0
+    core.lib.oizys_config_reload()
     _, value = get("capture.fps")
     assert value == "60"
 
 
 def test_path_reports_the_override():
-    assert core.lib.mview_config_path().decode() == os.environ["MVIEW_CONFIG_PATH"]
+    assert core.lib.oizys_config_path().decode() == os.environ["OIZYS_CONFIG_PATH"]
 
 
 def test_print_lists_every_key():
-    # mview_config_print writes to a FILE*; drive it through a real temp file. Every
+    # oizys_config_print writes to a FILE*; drive it through a real temp file. Every
     # libc call here needs argtypes: without them ctypes passes a FILE* as a C int and
     # truncates it to 32 bits, which segfaults inside fclose rather than failing the
     # assert.
@@ -147,7 +147,7 @@ def test_print_lists_every_key():
     try:
         stream = libc.fopen(path.encode(), b"w")
         assert stream, "could not open the temp file for the C side to write"
-        core.lib.mview_config_print(ctypes.c_void_p(stream))
+        core.lib.oizys_config_print(ctypes.c_void_p(stream))
         libc.fclose(ctypes.c_void_p(stream))
         text = pathlib.Path(path).read_text()
     finally:
