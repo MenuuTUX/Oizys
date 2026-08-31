@@ -135,13 +135,15 @@ def install(bundle, applications=Path("/Applications"), login=True):
             agent.parent.mkdir(parents=True, exist_ok=True)
             value = {
                 "Label": LABEL,
-                # LaunchServices preserves TCC identity; -W ties the job to app lifetime.
-                # Exec the binary rather than going through `open`. LaunchServices leaves the app
-            # without its own TCC identity that way, so the bundle's Screen Recording grant
-            # does not apply to it and the supervisor parks on a failed preflight forever,
-            # silently, while the CLI reports the permission as granted because that is a
-            # different binary. Launched directly the app is its own responsible process.
-            "ProgramArguments": [str(destination / "Contents/MacOS/Oizys"), "--background"],
+                # Run the driver, not the app wrapper. The wrapper treats a failed Screen
+                # Recording preflight as a hard stop and retries every five seconds forever
+                # without asking or logging, and under launchd that preflight fails even when
+                # the permission is granted, because an ad-hoc signed bundle has no TCC identity
+                # that survives a rebuild. The driver asks for the permission itself, says so on
+                # stdout, and carries the same supervisor that restarts on faults and reconnects.
+                "ProgramArguments": [str(destination / "Contents/MacOS/OizysDriver"),
+                                     "serve", "--takeover"],
+                "WorkingDirectory": str(Path.home() / "Library/Application Support/Oizys"),
                 "RunAtLoad": True, "KeepAlive": True,
                 "LimitLoadToSessionType": "Aqua", "ProcessType": "Interactive",
                 "ThrottleInterval": 10, "ExitTimeOut": 8,
