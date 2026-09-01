@@ -1,6 +1,8 @@
-# Oizys
+<p align="center">
+  <img src="Oizys.png" alt="Oizys, a face formed from white dots on black" width="240">
+</p>
 
-<img src="Oizys.png" alt="Oizys, a face formed from white dots on black" width="192">
+<h1 align="center">Oizys</h1>
 
 An open userspace driver for the DisplayLink Ridge dock. It presents two 1920×1080
 displays to macOS, captures them, and encodes the result as Ridge colour strips over USB
@@ -9,30 +11,46 @@ without loading DisplayLink Manager, vendor libraries, or firmware.
 The driver, encoder, transport and recovery supervisor are C. Swift is the glue and
 nothing more: it binds ScreenCaptureKit, `CGVirtualDisplay` and the menu-bar app, and hands
 every frame straight to C, which owns queueing, buffer lifetimes, pixel access, encoding
-and all scheduling decisions. The portable debug launcher in `Tools/PortableDebug.m` uses Objective-C. The driver does not use Objective-C++.
+and all scheduling decisions. The portable debug launcher in `Tools/PortableDebug.m` uses
+Objective-C. The driver does not use Objective-C++.
 
 Both panels have been confirmed rendering a live desktop on the hardware below, and the
 login service brings them up on its own across a restart. The wire-format corrections that
 took it there are in [Protocol.md](Documentation/Protocol.md); how they were found is in
 [Dock-Trace.md](Documentation/Dock-Trace.md).
 
-Oizys is still experimental, and one habit is worth keeping: a successful build, a USB
-acknowledgement and a clean log prove nothing about the glass. Every fault found here
-passed all three. Confirm both monitors after installing and after a cold dock reconnect.
+> Oizys is still experimental, and one habit is worth keeping: a successful build, a USB
+> acknowledgement and a clean log prove nothing about the glass. Every fault found here
+> passed all three. Confirm both monitors after installing and after a cold dock reconnect.
+
+<p align="center">
+  <a href="Documentation/Architecture.md">Architecture</a> ·
+  <a href="Documentation/Protocol.md">Protocol</a> ·
+  <a href="Documentation/Dock-Trace.md">Dock trace</a> ·
+  <a href="Documentation/Routing.md">Routing</a> ·
+  <a href="Documentation/Testing.md">Testing</a> ·
+  <a href="Documentation/Performance-2026-08-30.md">Performance</a> ·
+  <a href="Documentation/Xcode.md">Xcode</a> ·
+  <a href="CONTRIBUTING.md">Contributing</a>
+</p>
 
 ## Overview
 
-The measured ACASIS DS-0602 (DL-6950) adapter is USB `17e9:6000`; its type-`0x40` configuration record names
-`RidgeDoc`. Two Dell P2219H monitors sit on logical selectors `1` and `3`, with video
-endpoints `0x08` and `0x0b`.
+<table>
+<tr><td width="120"><strong>Dock</strong></td><td>ACASIS DS-0602 (DL-6950), USB <code>17e9:6000</code></td></tr>
+<tr><td><strong>Identity</strong></td><td>type-<code>0x40</code> configuration record names <code>RidgeDoc</code></td></tr>
+<tr><td><strong>Heads</strong></td><td>two Dell P2219H, logical selectors <code>1</code> and <code>3</code></td></tr>
+<tr><td><strong>Video</strong></td><td>endpoints <code>0x08</code> and <code>0x0b</code></td></tr>
+<tr><td><strong>Mode</strong></td><td>1920×1080 at 60 Hz, authenticated over HDCP 2.2</td></tr>
+</table>
 
-A run authenticates the dock over HDCP 2.2, sets both heads to 1920×1080 at 60 Hz, creates
-two virtual displays, and captures them with ScreenCaptureKit. The first frame after a
-mode set is a keyframe covering the whole strip grid, presented three times so it reaches
-every buffer the dock rotates through. After that only the macro tiles whose pixels moved
-are encoded, each riding three consecutive frames for the same reason. A still desktop puts
-zero bytes on the video endpoints; the link is held up by the control session's own clocks,
-a 13 ms status poll and a 3 s heartbeat, which run whether or not anything moved.
+A run authenticates the dock, sets both heads, creates two virtual displays, and captures
+them with ScreenCaptureKit. The first frame after a mode set is a keyframe covering the
+whole strip grid, presented three times so it reaches every buffer the dock rotates through.
+After that only the macro tiles whose pixels moved are encoded, each riding three consecutive
+frames for the same reason. A still desktop puts zero bytes on the video endpoints; the
+link is held up by the control session's own clocks, a 13 ms status poll and a 3 s
+heartbeat, which run whether or not anything moved.
 
 ## Requirements
 
@@ -41,12 +59,16 @@ the built binary. The encoder is NEON and is compiled for the host core.
 
 ## Installing a release
 
-Tagged builds are published from `.github/workflows/release.yml`. Take
-`Oizys-<version>.dmg`, open it and drag Oizys to Applications, then launch it once so macOS
-can ask for Screen Recording — the driver captures the desktop to send it over USB and
-cannot drive a panel without it. `Oizys-debug-<version>.dmg` holds the portable diagnostic
-build, which installs nothing and owns the dock only while it runs. ZIP and PKG of the same
-builds are published alongside for scripted installs, with `SHA256SUMS.txt`.
+Tagged builds are published from `.github/workflows/release.yml`.
+
+| File | What it is |
+| --- | --- |
+| `Oizys-<version>.dmg` | production app; drag to Applications |
+| `Oizys-debug-<version>.dmg` | portable diagnostic; installs nothing, owns the dock only while it runs |
+| ZIP / PKG + `SHA256SUMS.txt` | the same builds, for scripted installs |
+
+Launch the production app once so macOS can ask for Screen Recording. The driver captures
+the desktop to send it over USB and cannot drive a panel without it.
 
 Those bundles are signed ad hoc. macOS will refuse them on a machine other than the one
 that built them without an explicit Gatekeeper override, and they are not notarized, so
@@ -70,23 +92,36 @@ Installation replaces other Oizys apps in `/Applications` and `~/Applications` w
 directory on PATH when available. Debug is never installed. Its executable is
 `dist/Oizys-debug-<version>-<variant>`; the version comes from `VERSION`.
 
+The developer menu also covers cleaning, dependency setup, tests, coverage, three
+sanitizers, encoder and GUI profiling, static analysis, Xcode archives, status and privacy
+settings. Builds do not run tests. See [Xcode workflows](Documentation/Xcode.md) for IDE
+details.
+
+### Debug beside production
+
 A debug executable carries its signed runtime bundle and extracts it into
 `~/Library/Caches/Oizys/Portable/`. Opening the GUI leaves production running.
 **Start debug driver** pauses production and takes the dock; **Stop debug and restore
 production** returns it. Hardware diagnostics use the same handoff. Only one debug
 session can own the dock, but idle developer windows and software tests can coexist.
+
 It does not install a login item. A crashed portable GUI is recovered by its launcher;
 a direct Xcode debug session that crashes can be recovered with `oizys service recover-debug`.
 Debug settings, logs and embedded tools stay under
 `~/Library/Application Support/Oizys/Debug/<variant>/`. They do not change production
-settings. `./dev.sh debug` uses the current checkout and its shared `.venv`; portable
-executables launched separately use embedded source tools unless you choose a checkout.
-**Prepare tools** installs their isolated Python dependencies. Launching the GUI does
-not start tests or video playback.
+settings.
+
+`./dev.sh debug` uses the current checkout and its shared `.venv`; portable executables
+launched separately use embedded source tools unless you choose a checkout. **Prepare
+tools** installs their isolated Python dependencies. Launching the GUI does not start
+tests or video playback.
+
 Repeat `./dev.sh debug debug-verbose` after edits to close the previous verbose debug
 session, rebuild, and run the new version. Active tests in that session stop first;
 production resumes if debug had taken the dock. Nothing is installed, and the command
 does not reset permissions.
+
+### Capture lifetime
 
 Grant **Oizys** Screen Recording access if macOS asks. Login startup never waits for
 permission dialogs. A small event listener remains resident without USB polling while
@@ -95,13 +130,17 @@ Capture starts only for one supported dock in an awake, logged-in console sessio
 stops on unplug, sleep or session deactivation. Reconnection still requires hardware
 initialization. No application can guarantee zero RAM use or eliminate macOS login delays.
 
+### Signing and Screen Recording
+
 Production uses C `-O3`, Swift `-O`, link-time optimization, dead stripping and hardened
 runtime. It excludes the developer GUI and diagnostic commands. `production-fallback`
 adds vendor recovery and replaces the same production app if installed. Both use the
-same bundle identifier for privacy identity. Local builds are signed ad hoc; a changed
-signature may require macOS permission again. Developer ID signing and notarization are
-still required for frictionless distribution to other Macs. `OIZYS_SIGN_IDENTITY` selects
-a signing identity for `dev.sh`; no script grants privacy permissions or disables Gatekeeper.
+same bundle identifier for privacy identity.
+
+Local builds are signed ad hoc; a changed signature may require macOS permission again.
+Developer ID signing and notarization are still required for frictionless distribution to
+other Macs. `OIZYS_SIGN_IDENTITY` selects a signing identity for `dev.sh`; no script
+grants privacy permissions or disables Gatekeeper.
 
 When a debug app lacks Screen Recording access, it clears registered debug Screen
 Recording permissions before requesting its own approval. Production and other apps
@@ -113,9 +152,8 @@ running copy of the same debug variant keeps its shared permission until it quit
 Ad-hoc rebuilds can also require approval; an Apple Development signing identity keeps
 the signing requirement stable across edits.
 
-The developer menu includes cleaning, dependency setup, tests, coverage, three sanitizers,
-encoder and GUI profiling, static analysis, Xcode archives, status and privacy settings.
-Builds do not run tests. See [Xcode workflows](Documentation/Xcode.md) for IDE details.
+### Icons and packages
+
 `Oizys.png` is the repository logo and the source for every app icon. Xcode packaging
 uses macOS `sips` and `iconutil` to build the required icon sizes. Replace that PNG and
 rebuild to update Finder, application dialogs, and the debug menu-bar icon.
@@ -127,10 +165,17 @@ Production ZIP and PKG packaging remain available through
 
 Running `oizys` with no arguments opens a full-screen terminal UI on the alternate screen,
 so it leaves the scrollback alone. The left column carries the logo, the live service state
-and every attached display; the right column is a menu over an output pane. Arrows or
-`j`/`k` move, Return runs, `PgUp`/`PgDn` scroll the output, `r` refreshes and `q` quits.
-Below 92 columns the logo column drops and the menu takes the full width. The older numbered
-menu is still there as `oizys tui --menu`.
+and every attached display; the right column is a menu over an output pane. Below 92
+columns the logo column drops and the menu takes the full width. The older numbered menu
+is still there as `oizys tui --menu`.
+
+| Key | Action |
+| --- | --- |
+| arrows or `j`/`k` | move |
+| Return | run |
+| `PgUp` / `PgDn` | scroll the output |
+| `r` | refresh |
+| `q` | quit |
 
 The ASCII art is generated from `Oizys.png` by `Tools/ascii_logo.py`, which writes
 `Sources/oizys/logo.h`. Point it at another image to change it.
@@ -142,10 +187,10 @@ The production app executable also accepts `--cli`.
 ```bash
 oizys monitors                         # current monitors, pixels, desktop size and mode Hz
 oizys monitor 1 modes                  # replace 1 with an ID from monitors
-oizys monitor 1 mode 3                  # select a listed mode index
-oizys monitor 1 position 1920 0         # session arrangement, in desktop points
+oizys monitor 1 mode 3                 # select a listed mode index
+oizys monitor 1 position 1920 0        # session arrangement, in desktop points
 oizys monitor 1 mirror off
-oizys ddc get 0x10 --display 1          # brightness on a supported native DDC connection
+oizys ddc get 0x10 --display 1         # brightness on a supported native DDC connection
 oizys config list
 oizys config set capture.fps 60
 oizys service restart                  # apply changed driver settings
@@ -195,8 +240,9 @@ with no separate native output. See [the routing investigation](Documentation/Ro
 
 `oizys ddc list` reports native I2C services matched to a unique online monitor EDID.
 DDC reads and writes over this backend still need validation on a natively connected
-monitor. Ridge USB DDC tunnelling is not implemented. The Swift app currently provides connection,
-recovery status, permission guidance and diagnostics; it does not yet expose monitor settings.
+monitor. Ridge USB DDC tunnelling is not implemented. The Swift app currently provides
+connection, recovery status, permission guidance and diagnostics; it does not yet expose
+monitor settings.
 
 ## Verification
 
@@ -237,8 +283,6 @@ recorded vector it says something about inputs nobody thought to record. Mutatio
 scores 100% on `wht.c` against it: no single-operator change to the encoder survives,
 because any behavioural change makes the two disagree.
 
-See [Documentation/Testing.md](Documentation/Testing.md).
-
 ## Profiling
 
 `run --takeover --stats` reports capture cadence, pending-frame replacements, processing
@@ -249,7 +293,6 @@ overhead; do not use it for a CPU comparison against the vendor.
 Frame PNG/binary dumps are off by default. Set `capture.dump_frames` only for an explicit
 diagnostic capture: files in `logs/` can contain private screen content, including failure
 dumps. Normal operation does not write pixel dumps.
-
 
 ```bash
 python3 Tools/profile.py
