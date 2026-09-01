@@ -73,6 +73,12 @@ def run_pytest(python, extra_args, environment=None):
 
 def coverage(python, passthrough, floor, project_floor=0):
     """Measure native products, native test adapters, and all Python tools separately."""
+    # The baseline export below needs --empty-profile, which arrived in the Xcode 26
+    # toolchain. Older llvm-cov drops the mismatched functions instead, which would read
+    # as a coverage improvement. Say so now rather than after a full build and test run.
+    if "--empty-profile" not in subprocess.run(["xcrun", "llvm-cov", "export", "--help"],
+                                               capture_output=True, text=True).stdout:
+        raise SystemExit("llvm-cov has no --empty-profile; coverage needs Xcode 26 or newer")
     if subprocess.run([str(python), "-c", "import coverage"], capture_output=True).returncode:
         subprocess.run([str(python), "-m", "pip", "install", "coverage>=7,<8"], check=True)
     raw = ROOT / "build/coverage"

@@ -14,7 +14,9 @@ jobs:
   tests:
     # Apple Silicon. Base.xcconfig pins ARCHS=arm64 and -mcpu=apple-m1, and the encoder
     # uses ARM CRC32 and NEON intrinsics, so an Intel runner cannot build this at all.
-    runs-on: macos-15
+    # macos-26 for its Xcode 26 llvm-cov: the coverage step's baseline export needs
+    # --empty-profile, which the Xcode 16.4 on macos-15 does not have.
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v5
       - run: xcodebuild -version && swift --version
