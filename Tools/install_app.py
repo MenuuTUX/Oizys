@@ -8,10 +8,13 @@ import plistlib
 import shutil
 import signal
 import subprocess
+import sys
 import tempfile
 import time
 
 LABEL = "org.oizys.Oizys.login"
+# The one privacy permission Oizys asks for. Nothing else here touches TCC.
+TCC_SERVICE = "ScreenCapture"
 
 
 def app_info(bundle):
@@ -77,7 +80,95 @@ def cli_location():
     raise RuntimeError("No writable CLI directory")
 
 
-def install(bundle, applications=Path("/Applications"), login=True):
+def oizys_identifiers(bundles):
+    """Every org.oizys.* bundle identifier among these bundles, and nothing else."""
+    found = set()
+    for path in bundles:
+        identifier = str(app_info(path).get("CFBundleIdentifier", ""))
+        if identifier.startswith("org.oizys."):
+            found.add(identifier)
+    return sorted(found)
+
+
+def reset_permissions(identifiers):
+    """
+    Drop Oizys's own Screen Recording approval so the build being installed asks for its own.
+
+    macOS keys this permission to a code-signing identity, and an ad-hoc signed build gets a
+    fresh one every time it is rebuilt. The old approval outlives the bundle it was granted
+    to, which produces the worst of both states: System Settings shows Oizys ticked, every
+    preflight fails, and the login agent exits, is respawned ten seconds later, and repeats
+    that forever without a prompt or a line of output. Clearing the entry costs one question
+    the user can actually answer.
+
+    The running service still never goes near TCC -- see OizysLifecycle.command. This is an
+    installer, acting on identifiers it owns, during an install somebody asked for, and it
+    says on stdout what it cleared.
+    """
+    cleared = []
+    for identifier in identifiers:
+        if not identifier.startswith("org.oizys."):
+            continue
+        result = subprocess.run(["/usr/bin/tccutil", "reset", TCC_SERVICE, identifier],
+                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if result.returncode == 0:
+            cleared.append(identifier)
+    return cleared
+
+
+def screen_recording_granted(destination):
+    """What the driver's own preflight says. The agent runs the driver, not the app wrapper,
+    and on an ad-hoc bundle the two do not necessarily share an identity."""
+    driver = destination / "Contents/MacOS/OizysDriver"
+    try:
+        result = subprocess.run([str(driver), "service", "status"], text=True,
+                                capture_output=True, check=False, timeout=20)
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return "access for this executable: granted" in (result.stdout or "")
+
+
+SCREEN_RECORDING_PANE = ("x-apple.systempreferences:"
+                         "com.apple.preference.security?Privacy_ScreenCapture")
+
+
+def request_permission(destination, timeout=300, settle=90):
+    """Ask while somebody is still at the keyboard.
+
+    The alternative is an install that reports success and leaves a dark desk, because the
+    only thing between the two is a checkbox nothing has prompted for yet.
+
+    Two attempts, because the first one is not dependable. The app's own dialog is the nicer
+    of the two, but an installer run from a shell does not always hold a window server session
+    to put a modal on, and when it does not the dialog never appears and nothing says so. The
+    settings pane always opens, so that is the fallback, and then this waits: an install that
+    ends the moment it opens a pane has handed the problem back rather than finished it.
+    """
+    app = destination / "Contents/MacOS/Oizys"
+    if app.exists():
+        try:
+            subprocess.run([str(app), "--permissions-only"], check=False, timeout=timeout)
+        except (OSError, subprocess.SubprocessError):
+            pass
+    if screen_recording_granted(destination):
+        return True
+    # Only wait when a person is watching. Under CI or a pipe there is nobody to tick it, and
+    # a scripted install must not sit here for a minute and a half to find that out.
+    if not (settle and sys.stdout.isatty()):
+        return False
+    subprocess.run(["/usr/bin/open", SCREEN_RECORDING_PANE], check=False)
+    print("Waiting for Screen Recording: tick Oizys in the window that just opened…",
+          flush=True)
+    deadline = time.monotonic() + settle
+    while time.monotonic() < deadline:
+        if screen_recording_granted(destination):
+            return True
+        time.sleep(2)
+    return False
+
+
+def install(bundle, applications=Path("/Applications"), login=True,
+            keep_permissions=False, prompt=True):
     if os.getuid() == 0:
         raise RuntimeError("Run as the logged-in user, not sudo: the login service and privacy identity are per-user.")
     info = app_info(bundle)
@@ -96,12 +187,17 @@ def install(bundle, applications=Path("/Applications"), login=True):
     for directory in {applications, Path("/Applications"), Path.home() / "Applications"}:
         if directory.is_dir():
             installed.update(path for path in directory.glob("*.app") if owned(path) and not path.is_symlink())
+    # Read the identifiers now: the bundles carrying them are about to be removed, and a
+    # superseded variant's stale approval is exactly the one worth clearing.
+    identifiers = oizys_identifiers({*installed, bundle})
     agent = Path.home() / "Library/LaunchAgents" / (LABEL + ".plist")
     domain = f"gui/{os.getuid()}"
     loaded = launchctl("print", f"{domain}/{LABEL}").returncode == 0
     old_agent = agent.read_bytes() if agent.exists() else None
     link = cli_location()
     old_link = link.readlink() if link.is_symlink() else None
+    workspace = Path.home() / "Library/Application Support/Oizys"
+    service_log = workspace / "logs/service.log"
     obsolete_agents = []
     if agent.parent.exists():
         for candidate in agent.parent.glob("*.plist"):
@@ -133,22 +229,34 @@ def install(bundle, applications=Path("/Applications"), login=True):
                 path.rename(backup); moved.append((path, backup))
             staged.rename(destination); placed = True
             agent.parent.mkdir(parents=True, exist_ok=True)
+            service_log.parent.mkdir(parents=True, exist_ok=True)
+            service_log.write_text("")
             value = {
                 "Label": LABEL,
-                # Run the driver, not the app wrapper. The wrapper treats a failed Screen
-                # Recording preflight as a hard stop and retries every five seconds forever
-                # without asking or logging, and under launchd that preflight fails even when
-                # the permission is granted, because an ad-hoc signed bundle has no TCC identity
-                # that survives a rebuild. The driver asks for the permission itself, says so on
-                # stdout, and carries the same supervisor that restarts on faults and reconnects.
-                "ProgramArguments": [str(destination / "Contents/MacOS/OizysDriver"),
-                                     "serve", "--takeover"],
+                # Run the app, which spawns the driver as its child.
+                #
+                # This ran the driver directly for a while, to dodge the app's Screen Recording
+                # preflight. That trade was worse than the problem: Screen Recording is granted
+                # to a code signature, the driver is a separate executable with a separate one,
+                # and nothing the user can click grants the driver -- so the agent started,
+                # refused, exited, and was respawned every ten seconds for ever. A child process
+                # inherits the responsible process's access, so with the app in front there is
+                # one thing to grant and one place to grant it (About > Grant). It also means
+                # the menu-bar item is always up, instead of depending on somebody launching
+                # the app by hand after every install.
+                "ProgramArguments": [str(destination / "Contents/MacOS/Oizys"), "--background"],
                 "WorkingDirectory": str(Path.home() / "Library/Application Support/Oizys"),
                 "RunAtLoad": True, "KeepAlive": True,
                 "LimitLoadToSessionType": "Aqua", "ProcessType": "Interactive",
                 "ThrottleInterval": 10, "ExitTimeOut": 8,
                 "AssociatedBundleIdentifiers": [info["CFBundleIdentifier"]],
-                "StandardOutPath": "/dev/null", "StandardErrorPath": "/dev/null",
+                # stdout is chatty and says nothing useful once running; stderr is where a
+                # refusal to start goes. Throwing it away is what turned a missing permission
+                # into a job that respawns every ten seconds and never explains itself.
+                # ponytail: no rotation. The file only grows while the driver is failing to
+                # start, and each install truncates it; add rotation if that stops being true.
+                "StandardOutPath": "/dev/null",
+                "StandardErrorPath": str(service_log),
             }
             staging_agent = agent.with_suffix(".plist.tmp")
             staging_agent.write_bytes(plistlib.dumps(value)); staging_agent.chmod(0o644); staging_agent.replace(agent)
@@ -181,7 +289,28 @@ def install(bundle, applications=Path("/Applications"), login=True):
     if str(link.parent) not in os.environ.get("PATH", "").split(os.pathsep):
         print(f"Add {link.parent} to PATH, or invoke the CLI by its full path.")
     print(f"Login startup: {'enabled' if login else 'disabled'}; {agent}")
-    print(f"Removed {len(installed)} previous installation(s). Private settings and permissions were preserved.")
+    print(f"Service log: {service_log}")
+    # The agent brings the app up, and with it the menu-bar item; bootstrap has already run by
+    # the time this prints. Nothing to launch by hand.
+    print(f"Removed {len(installed)} previous installation(s). Your settings were kept.")
+
+    # Only once the new bundle is in place and the old ones are gone: a rollback restores an
+    # app whose approval should still be its own.
+    if keep_permissions:
+        granted = screen_recording_granted(destination)
+        print("Screen Recording: left as it was "
+              f"({'granted' if granted else 'NOT granted'} for this build).")
+    else:
+        cleared = reset_permissions(identifiers)
+        print("Screen Recording: cleared for " + (", ".join(cleared) if cleared else "nothing")
+              + " so this build asks for its own.")
+        granted = request_permission(destination) if prompt else False
+        if granted:
+            print("Screen Recording: granted. The driver starts on its own.")
+        else:
+            print("Screen Recording: still needed. Enable Oizys under System Settings > Privacy "
+                  "& Security > Screen & System Audio Recording; the login agent picks it up "
+                  "within a few seconds. Until then it retries quietly and logs to the file above.")
     return destination
 
 
@@ -190,5 +319,10 @@ if __name__ == "__main__":
     parser.add_argument("bundle", type=Path)
     parser.add_argument("--applications", type=Path, default=Path("/Applications"))
     parser.add_argument("--no-login", action="store_true")
+    parser.add_argument("--keep-permissions", action="store_true",
+                        help="do not clear Oizys's own Screen Recording approval")
+    parser.add_argument("--no-prompt", action="store_true",
+                        help="never open the permission dialog; report what is missing instead")
     args = parser.parse_args()
-    install(args.bundle.resolve(), args.applications.resolve(), not args.no_login)
+    install(args.bundle.resolve(), args.applications.resolve(), not args.no_login,
+            keep_permissions=args.keep_permissions, prompt=not args.no_prompt)

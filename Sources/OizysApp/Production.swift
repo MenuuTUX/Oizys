@@ -19,25 +19,23 @@ private final class ProductionController: NSObject, NSApplicationDelegate {
     private var replied = false
     private var quitDeadline: Timer?
     private var permissionPrompted = false
+    private var reportedBlocked = false
     private var retry: Timer?
     private var observers: [NSObjectProtocol] = []
     private var signals: [DispatchSourceSignal] = []
     private var failures = 0
     private var began = Date()
     private var workspace: URL!
+    private let menu = OizysMenuBar()
 
-    private func matchingDock() -> CFDictionary {
-        ["IOProviderClass": "IOUSBHostDevice", "idVendor": 0x17e9, "idProduct": 0x6000] as CFDictionary
+    /// One line to the agent's stderr, which the login job points at the service log.
+    private func note(_ message: String) {
+        FileHandle.standardError.write(Data((message + "\n").utf8))
     }
 
-    private func dockPresent() -> Bool {
-        var iterator: io_iterator_t = 0
-        guard IOServiceGetMatchingServices(kIOMainPortDefault, matchingDock(), &iterator) == KERN_SUCCESS else { return false }
-        defer { IOObjectRelease(iterator) }
-        var count = 0
-        while case let service = IOIteratorNext(iterator), service != 0 { count += 1; IOObjectRelease(service) }
-        return count == 1
-    }
+    private func matchingDock() -> CFDictionary { OizysLifecycle.dockMatching() }
+
+    private func dockPresent() -> Bool { OizysLifecycle.dockCount() == 1 }
 
     private var eligible: Bool {
         guard !quitting, !sleeping, !displaysAsleep, sessionActive, !OizysLifecycle.developmentActive, dockPresent(),
@@ -47,8 +45,15 @@ private final class ProductionController: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Another copy of *this executable*, not another process out of this bundle. The
+        // driver is bundled here too and is attributed to the same identifier, so the wider
+        // test made the app quit on sight whenever the login agent had already started the
+        // service -- which is every login.
         if let id = Bundle.main.bundleIdentifier,
-           NSRunningApplication.runningApplications(withBundleIdentifier: id).contains(where: { $0.processIdentifier != getpid() }) {
+           let me = Bundle.main.executableURL?.resolvingSymlinksInPath(),
+           NSRunningApplication.runningApplications(withBundleIdentifier: id).contains(where: {
+               $0.processIdentifier != getpid() && $0.executableURL?.resolvingSymlinksInPath() == me
+           }) {
             NSApp.terminate(nil); return
         }
         // Allow installation to request this identity's permission before moving the dock.
@@ -91,39 +96,54 @@ private final class ProductionController: NSObject, NSApplicationDelegate {
             let source = DispatchSource.makeSignalSource(signal: number, queue: .main)
             source.setEventHandler { NSApp.terminate(nil) }; source.resume(); signals.append(source)
         }
-        if !CommandLine.arguments.contains("--background") { requestPermissionIfNeeded() }
+        menu.install(quit: { NSApp.terminate(nil) })
+        // The agent's stderr is the service log. One line at startup so a desk that stays dark
+        // can be explained from the log alone, without attaching anything to a running app.
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
+        // --background is how the login agent starts this, and the only thing that tells the
+        // two apart in the log: a line from a hand-launched copy means somebody was there.
+        let started = CommandLine.arguments.contains("--background") ? "at login" : "by hand"
+        note("Oizys \(version) started \(started): screen recording "
+             + (CGPreflightScreenCaptureAccess() ? "granted" : "NOT granted")
+             + ", dock \(OizysLifecycle.dockCount()) attached")
         reconcile()
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        requestPermissionIfNeeded(); reconcile(); return false
+        reconcile(); menu.openWindow(); return false
     }
 
+    /*
+     * Asking is something the user starts, never something that happens to them.
+     *
+     * This used to fire on launch, on reopen, and again from reconcile every time the dock was
+     * present without the permission. CGRequestScreenCaptureAccess puts a system dialog on
+     * screen that nothing in this app can dismiss or suppress, and an ad-hoc signed build
+     * loses its approval on every rebuild -- so the two together meant the same dialog over
+     * and over with no way to make it stop. The state now lives in About, next to a button,
+     * and the driver simply says on stderr that it is waiting.
+     */
     private func requestPermissionIfNeeded() {
         guard !CGPreflightScreenCaptureAccess(), !permissionPrompted else { return }
         permissionPrompted = true
         _ = CGRequestScreenCaptureAccess()
-        let alert = NSAlert()
-        alert.messageText = "Allow Oizys to access your displays"
-        alert.informativeText = "Enable Oizys in System Settings → Privacy & Security → Screen & System Audio Recording. This one-time macOS permission is required. Login startup stays quiet if access is missing."
-        alert.addButton(withTitle: "Open Settings"); alert.addButton(withTitle: "Later")
-        if alert.runModal() == .alertFirstButtonReturn {
-            NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")!)
-        }
     }
 
     private func reconcile() {
         retry?.invalidate(); retry = nil
+        menu.refreshNow()
         guard eligible else { failures = 0; stopWorker(); return }
         guard CGPreflightScreenCaptureAccess() else {
             stopWorker()
-            // Ask once, even at login. Staying quiet here means a dock that is plugged in and
-            // authenticated never lights a panel and says nothing about why: the retry below
-            // spins forever, the worker is never spawned, and `service status` reports the
-            // permission as granted because it preflights the CLI, which is a different binary
-            // with its own grant. A single prompt the first time a dock is actually present is
-            // worth more than a silent loop.
-            requestPermissionIfNeeded()
+            // Waiting, not prompting. The menu bar shows why -- About carries the state and the
+            // button -- so a dock that is plugged in without the permission explains itself in
+            // the interface instead of behind a dialog that comes back every five seconds.
+            menu.refreshNow()
+            if !reportedBlocked {
+                reportedBlocked = true
+                note("dock attached but Screen Recording is not granted to this app; waiting. "
+                     + "Grant it in Oizys > About, or System Settings > Privacy & Security.")
+            }
             retry = Timer.scheduledTimer(withTimeInterval: 5, repeats: false) { [weak self] _ in self?.reconcile() }
             return
         }
@@ -174,6 +194,10 @@ private final class ProductionController: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        // A gamma ramp outlives the process that set it. Leaving one behind is a dim screen
+        // the user cannot explain and cannot find a setting for.
+        DisplayTint.clearAll()
+        menu.shutdown()
         for observer in observers { NSWorkspace.shared.notificationCenter.removeObserver(observer) }
         if attached != 0 { IOObjectRelease(attached) }; if detached != 0 { IOObjectRelease(detached) }
         if let port { IONotificationPortDestroy(port) }

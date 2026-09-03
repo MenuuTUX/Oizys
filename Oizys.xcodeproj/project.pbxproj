@@ -12,16 +12,19 @@
 		326FE7DE0BCBCED53738EE4F /* OizysLifecycle.swift in OizysCoreDylib */ = {isa = PBXBuildFile; fileRef = 2D523F3D48DA3B99FC5AE500 /* OizysLifecycle.swift */; };
 		012A7339043C5873D643D87D /* VirtualDisplay.swift in OizysCoreDylib */ = {isa = PBXBuildFile; fileRef = 28A8EB7B7AA353DF636743BA /* VirtualDisplay.swift */; };
 		E499DB1DF7B0EFF40D266039 /* bench.c in OizysCoreDylib */ = {isa = PBXBuildFile; fileRef = 458C2E28700DA1184E0BDAC2 /* bench.c */; };
+		F85CB590465621FF87FB24A9 /* calibrate.c in OizysCoreDylib */ = {isa = PBXBuildFile; fileRef = 76D213032FA49899684A5838 /* calibrate.c */; };
 		133F099A39DAFA610B7D4403 /* capture_frame.c in OizysCoreDylib */ = {isa = PBXBuildFile; fileRef = ED0EEB4EBCACE0D053E738AD /* capture_frame.c */; };
 		87F457E443E6B0CC4850CC10 /* config.c in OizysCoreDylib */ = {isa = PBXBuildFile; fileRef = D84D26C78DEF97C8F1123C16 /* config.c */; };
 		51F6F4A75C46BB6CA18E3C27 /* crypto.c in OizysCoreDylib */ = {isa = PBXBuildFile; fileRef = 3B32423357F906EBA67305CD /* crypto.c */; };
 		E70341836FB6BDD07A77D8D5 /* ddc_native.c in OizysCoreDylib */ = {isa = PBXBuildFile; fileRef = 6E923A000FA6991C4973A5DF /* ddc_native.c */; };
+		FF0A92AA0C96B319C3DDC5AF /* ddc_tunnel.c in OizysCoreDylib */ = {isa = PBXBuildFile; fileRef = 22F36929F5334BB385D06954 /* ddc_tunnel.c */; };
 		D76C083E4C265B0B756BCCE2 /* display.c in OizysCoreDylib */ = {isa = PBXBuildFile; fileRef = BBCD0F1FE7BBD144E1376A42 /* display.c */; };
 		CDD70DA9F1CC36F32D8B59A6 /* dl3.c in OizysCoreDylib */ = {isa = PBXBuildFile; fileRef = A0E0F016740BCCB3D349E1E8 /* dl3.c */; };
 		FBA84444E83625C62A7A9E1C /* driver.c in OizysCoreDylib */ = {isa = PBXBuildFile; fileRef = F57E32910C395FEEBF5C17D9 /* driver.c */; };
 		BD741D2A8F4FB0C4060E3FA4 /* encode.c in OizysCoreDylib */ = {isa = PBXBuildFile; fileRef = DE4B0A2652A590797A2DA7F8 /* encode.c */; };
 		E79E12B677A2AA80159EFFE7 /* log.c in OizysCoreDylib */ = {isa = PBXBuildFile; fileRef = 96E4E0F8AC502FFB55F7CEAD /* log.c */; };
 		38748F5A0662F66BA5D87D1F /* profile.c in OizysCoreDylib */ = {isa = PBXBuildFile; fileRef = 029C381021032EA9E5AD0D79 /* profile.c */; };
+		28FED147B1C5F645B809C271 /* usb_ports.c in OizysCoreDylib */ = {isa = PBXBuildFile; fileRef = 8BC3C091F14EAD81D49C5C83 /* usb_ports.c */; };
 		1F3756ED92FBD5F06A9CBBBB /* usb_probe.c in OizysCoreDylib */ = {isa = PBXBuildFile; fileRef = 3B6B6273958EF4109954EB42 /* usb_probe.c */; };
 		EE87A051CC694B8DA023194D /* usb_session.c in OizysCoreDylib */ = {isa = PBXBuildFile; fileRef = 9C753C6EA135B5B29A5D07CA /* usb_session.c */; };
 		ED379B2D5F07C2EE264B2415 /* wht.c in OizysCoreDylib */ = {isa = PBXBuildFile; fileRef = 2E77A962705E2AD2553840D9 /* wht.c */; };
@@ -46,16 +49,19 @@
 		D7003A3070DFFAB95CE14744 /* OizysLifecycle.swift in oizys */ = {isa = PBXBuildFile; fileRef = 2D523F3D48DA3B99FC5AE500 /* OizysLifecycle.swift */; };
 		100A6C539A6B479B793574F4 /* VirtualDisplay.swift in oizys */ = {isa = PBXBuildFile; fileRef = 28A8EB7B7AA353DF636743BA /* VirtualDisplay.swift */; };
 		9AABA441294486640DED0716 /* bench.c in oizys */ = {isa = PBXBuildFile; fileRef = 458C2E28700DA1184E0BDAC2 /* bench.c */; };
+		97EFD803DB74CE6C083EB8F1 /* calibrate.c in oizys */ = {isa = PBXBuildFile; fileRef = 76D213032FA49899684A5838 /* calibrate.c */; };
 		107F347DC796AECDF0882681 /* capture_frame.c in oizys */ = {isa = PBXBuildFile; fileRef = ED0EEB4EBCACE0D053E738AD /* capture_frame.c */; };
 		AEA1EEAB76E0A3AEE0C45A56 /* config.c in oizys */ = {isa = PBXBuildFile; fileRef = D84D26C78DEF97C8F1123C16 /* config.c */; };
 		2752BDB59A24B1E5867C9B4D /* crypto.c in oizys */ = {isa = PBXBuildFile; fileRef = 3B32423357F906EBA67305CD /* crypto.c */; };
 		1C431784C109DC7578247593 /* ddc_native.c in oizys */ = {isa = PBXBuildFile; fileRef = 6E923A000FA6991C4973A5DF /* ddc_native.c */; };
+		34AF31947EA4F34CA2C57B49 /* ddc_tunnel.c in oizys */ = {isa = PBXBuildFile; fileRef = 22F36929F5334BB385D06954 /* ddc_tunnel.c */; };
 		F23DDB6DC87994557EBD37FA /* display.c in oizys */ = {isa = PBXBuildFile; fileRef = BBCD0F1FE7BBD144E1376A42 /* display.c */; };
 		F680AD6EFD17ADB3CB9A4E34 /* dl3.c in oizys */ = {isa = PBXBuildFile; fileRef = A0E0F016740BCCB3D349E1E8 /* dl3.c */; };
 		91A29460027136E1EC1BD620 /* driver.c in oizys */ = {isa = PBXBuildFile; fileRef = F57E32910C395FEEBF5C17D9 /* driver.c */; };
 		363DB6102698D157C8ABBEC2 /* encode.c in oizys */ = {isa = PBXBuildFile; fileRef = DE4B0A2652A590797A2DA7F8 /* encode.c */; };
 		6F4FE6D5F17E142F3F954560 /* log.c in oizys */ = {isa = PBXBuildFile; fileRef = 96E4E0F8AC502FFB55F7CEAD /* log.c */; };
 		675EDAE83ED651614FB35789 /* profile.c in oizys */ = {isa = PBXBuildFile; fileRef = 029C381021032EA9E5AD0D79 /* profile.c */; };
+		CB4E37813294A7B6763DD801 /* usb_ports.c in oizys */ = {isa = PBXBuildFile; fileRef = 8BC3C091F14EAD81D49C5C83 /* usb_ports.c */; };
 		36A8DC267A822883AD29B707 /* usb_probe.c in oizys */ = {isa = PBXBuildFile; fileRef = 3B6B6273958EF4109954EB42 /* usb_probe.c */; };
 		4900BA53993B89BF9C33B617 /* usb_session.c in oizys */ = {isa = PBXBuildFile; fileRef = 9C753C6EA135B5B29A5D07CA /* usb_session.c */; };
 		040CB5F9CEB5666B7AB39AF4 /* wht.c in oizys */ = {isa = PBXBuildFile; fileRef = 2E77A962705E2AD2553840D9 /* wht.c */; };
@@ -71,11 +77,22 @@
 		5FF9241A4929305E790423D6 /* ScreenCaptureKit in oizys */ = {isa = PBXBuildFile; fileRef = 508FCEC1FFB54BE8DE65E6C0 /* ScreenCaptureKit.framework */; };
 		64E196210333828D5E4066B1 /* ImageIO in oizys */ = {isa = PBXBuildFile; fileRef = A97F0B1BA1D23D3882C9D6D0 /* ImageIO.framework */; };
 		B1E39D8FCD1ADE7689753739 /* UniformTypeIdentifiers in oizys */ = {isa = PBXBuildFile; fileRef = C0CDFB53944F250CE0F1A8F2 /* UniformTypeIdentifiers.framework */; };
+		778EEE15689C145B7993095E /* CalibrationSession.swift in OizysApp */ = {isa = PBXBuildFile; fileRef = 07DBB810EEFC61D94CF314D0 /* CalibrationSession.swift */; };
+		53985E38034B1E3AF94AB5A1 /* ConnectOverlay.swift in OizysApp */ = {isa = PBXBuildFile; fileRef = 03AEBBA72556FA24475EB745 /* ConnectOverlay.swift */; };
 		B7560249CA6BB9A813AA7CE5 /* DebugPermissions.swift in OizysApp */ = {isa = PBXBuildFile; fileRef = 3DEE5D5E5D207CD24CEA8780 /* DebugPermissions.swift */; };
 		A34FC258810ACE6E9F7D99D6 /* DevDiagnostics.swift in OizysApp */ = {isa = PBXBuildFile; fileRef = FEA78EF48E937C1FA9802574 /* DevDiagnostics.swift */; };
 		F3E6D66195D05E2FB51CCEFE /* DiagnosticReport.swift in OizysApp */ = {isa = PBXBuildFile; fileRef = 128BD5F987CB6D3B259C5A90 /* DiagnosticReport.swift */; };
+		311637B699AEEA51F349C79E /* DisplayTint.swift in OizysApp */ = {isa = PBXBuildFile; fileRef = 66F195DD8E90763F185B8A9D /* DisplayTint.swift */; };
 		2953351EF9776F1F663E868B /* Main.swift in OizysApp */ = {isa = PBXBuildFile; fileRef = 945D4B4A37A269A4CE6589DF /* Main.swift */; };
+		BE70213247D952BF8D65A388 /* OizysDesign.swift in OizysApp */ = {isa = PBXBuildFile; fileRef = 595DDE31A7673F25568E07F0 /* OizysDesign.swift */; };
+		6B21F2105F09C61F6529A5B5 /* OizysLogo.swift in OizysApp */ = {isa = PBXBuildFile; fileRef = 59BC76CE3FC1774ED73C8E0E /* OizysLogo.swift */; };
+		796D345FC0A0ACA55E03467F /* OizysMenuBar.swift in OizysApp */ = {isa = PBXBuildFile; fileRef = 6BC7A0A6AAF7BA376A5B28E8 /* OizysMenuBar.swift */; };
+		05827B448B279AE6A46E4681 /* OizysModel.swift in OizysApp */ = {isa = PBXBuildFile; fileRef = 88BC5FAC8D088ED8140A8567 /* OizysModel.swift */; };
+		52FBAE1DF62D65A333E3D26E /* OizysPanels.swift in OizysApp */ = {isa = PBXBuildFile; fileRef = 2CFCA70AF745BDABADCDE520 /* OizysPanels.swift */; };
+		3FB08419025AB1A5EB663D72 /* PreviewRender.swift in OizysApp */ = {isa = PBXBuildFile; fileRef = 3F58244BB6324130CC9DBB72 /* PreviewRender.swift */; };
 		B70C2A170864AE54B691923A /* Production.swift in OizysApp */ = {isa = PBXBuildFile; fileRef = 3F745877C8CFAB87E33E20F1 /* Production.swift */; };
+		29C59FCEE0B12EB1583A92AD /* SidecarAuto.swift in OizysApp */ = {isa = PBXBuildFile; fileRef = 8EC153AA62B2FA139A394BA3 /* SidecarAuto.swift */; };
+		E1B7D235E25EC39A40615D6B /* SidecarBridge.swift in OizysApp */ = {isa = PBXBuildFile; fileRef = AF08A155E22170D423D26A9B /* SidecarBridge.swift */; };
 		EC708FDCCDBE549E12B05B04 /* OizysLifecycle.swift in OizysApp */ = {isa = PBXBuildFile; fileRef = 2D523F3D48DA3B99FC5AE500 /* OizysLifecycle.swift */; };
 		F8B2A95CA051A849364B80C3 /* AppKit in OizysApp */ = {isa = PBXBuildFile; fileRef = 6960390CFB747E68ECAA34F4 /* AppKit.framework */; };
 		96F0F846479C78013B259767 /* Foundation in OizysApp */ = {isa = PBXBuildFile; fileRef = D6B62CF1F3C9BD64275EFF04 /* Foundation.framework */; };
@@ -114,16 +131,19 @@
 		2D523F3D48DA3B99FC5AE500 /* OizysLifecycle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OizysLifecycle.swift; path = Sources/Support/OizysLifecycle.swift; sourceTree = SOURCE_ROOT; };
 		28A8EB7B7AA353DF636743BA /* VirtualDisplay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = VirtualDisplay.swift; path = Sources/OizysPlatform/VirtualDisplay.swift; sourceTree = SOURCE_ROOT; };
 		458C2E28700DA1184E0BDAC2 /* bench.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = bench.c; path = Sources/OizysCore/bench.c; sourceTree = SOURCE_ROOT; };
+		76D213032FA49899684A5838 /* calibrate.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = calibrate.c; path = Sources/OizysCore/calibrate.c; sourceTree = SOURCE_ROOT; };
 		ED0EEB4EBCACE0D053E738AD /* capture_frame.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = capture_frame.c; path = Sources/OizysCore/capture_frame.c; sourceTree = SOURCE_ROOT; };
 		D84D26C78DEF97C8F1123C16 /* config.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = config.c; path = Sources/OizysCore/config.c; sourceTree = SOURCE_ROOT; };
 		3B32423357F906EBA67305CD /* crypto.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = crypto.c; path = Sources/OizysCore/crypto.c; sourceTree = SOURCE_ROOT; };
 		6E923A000FA6991C4973A5DF /* ddc_native.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = ddc_native.c; path = Sources/OizysCore/ddc_native.c; sourceTree = SOURCE_ROOT; };
+		22F36929F5334BB385D06954 /* ddc_tunnel.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = ddc_tunnel.c; path = Sources/OizysCore/ddc_tunnel.c; sourceTree = SOURCE_ROOT; };
 		BBCD0F1FE7BBD144E1376A42 /* display.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = display.c; path = Sources/OizysCore/display.c; sourceTree = SOURCE_ROOT; };
 		A0E0F016740BCCB3D349E1E8 /* dl3.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = dl3.c; path = Sources/OizysCore/dl3.c; sourceTree = SOURCE_ROOT; };
 		F57E32910C395FEEBF5C17D9 /* driver.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = driver.c; path = Sources/OizysCore/driver.c; sourceTree = SOURCE_ROOT; };
 		DE4B0A2652A590797A2DA7F8 /* encode.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = encode.c; path = Sources/OizysCore/encode.c; sourceTree = SOURCE_ROOT; };
 		96E4E0F8AC502FFB55F7CEAD /* log.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = log.c; path = Sources/OizysCore/log.c; sourceTree = SOURCE_ROOT; };
 		029C381021032EA9E5AD0D79 /* profile.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = profile.c; path = Sources/OizysCore/profile.c; sourceTree = SOURCE_ROOT; };
+		8BC3C091F14EAD81D49C5C83 /* usb_ports.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = usb_ports.c; path = Sources/OizysCore/usb_ports.c; sourceTree = SOURCE_ROOT; };
 		3B6B6273958EF4109954EB42 /* usb_probe.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = usb_probe.c; path = Sources/OizysCore/usb_probe.c; sourceTree = SOURCE_ROOT; };
 		9C753C6EA135B5B29A5D07CA /* usb_session.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = usb_session.c; path = Sources/OizysCore/usb_session.c; sourceTree = SOURCE_ROOT; };
 		2E77A962705E2AD2553840D9 /* wht.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = wht.c; path = Sources/OizysCore/wht.c; sourceTree = SOURCE_ROOT; };
@@ -134,29 +154,45 @@
 		7DA8B3994C1E29ADBCDEED29 /* logo.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = logo.h; path = Sources/oizys/logo.h; sourceTree = SOURCE_ROOT; };
 		4EABC461870478C12B55B408 /* oizys.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = oizys.h; path = Sources/OizysCore/include/oizys.h; sourceTree = SOURCE_ROOT; };
 		8342AA8919989AC72F94AF85 /* oizys_build.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = oizys_build.h; path = Sources/OizysCore/include/oizys_build.h; sourceTree = SOURCE_ROOT; };
+		A8061633FEC51BCE74A346DE /* oizys_calibrate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = oizys_calibrate.h; path = Sources/OizysCore/include/oizys_calibrate.h; sourceTree = SOURCE_ROOT; };
 		A7462DBC420BD9989E18DBBE /* oizys_capture.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = oizys_capture.h; path = Sources/OizysCore/include/oizys_capture.h; sourceTree = SOURCE_ROOT; };
 		A9493B2960D156BFEF2A6130 /* oizys_capture_frame.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = oizys_capture_frame.h; path = Sources/OizysCore/include/oizys_capture_frame.h; sourceTree = SOURCE_ROOT; };
 		BAB11EB198EF479E9D90FDED /* oizys_config.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = oizys_config.h; path = Sources/OizysCore/include/oizys_config.h; sourceTree = SOURCE_ROOT; };
 		2FD582AA360BA119CF9FD877 /* oizys_ddc.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = oizys_ddc.h; path = Sources/OizysCore/include/oizys_ddc.h; sourceTree = SOURCE_ROOT; };
+		EDB0E67D644BF845671281FB /* oizys_ddc_tunnel.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = oizys_ddc_tunnel.h; path = Sources/OizysCore/include/oizys_ddc_tunnel.h; sourceTree = SOURCE_ROOT; };
 		A2D30429742EC733B060EF94 /* oizys_display.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = oizys_display.h; path = Sources/OizysCore/include/oizys_display.h; sourceTree = SOURCE_ROOT; };
 		A5CF28589715AB82973C2DE8 /* oizys_dl3.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = oizys_dl3.h; path = Sources/OizysCore/include/oizys_dl3.h; sourceTree = SOURCE_ROOT; };
 		BDB6258FC55086FD38077AF6 /* oizys_encode.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = oizys_encode.h; path = Sources/OizysCore/include/oizys_encode.h; sourceTree = SOURCE_ROOT; };
 		874F70ACEEE81C7D3FED7E5A /* oizys_platform.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = oizys_platform.h; path = Sources/OizysCore/include/oizys_platform.h; sourceTree = SOURCE_ROOT; };
+		C192731C2B7671C470B3A8F8 /* oizys_ports.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = oizys_ports.h; path = Sources/OizysCore/include/oizys_ports.h; sourceTree = SOURCE_ROOT; };
 		468FB9C93F3C92781367C06B /* oizys_profile.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = oizys_profile.h; path = Sources/OizysCore/include/oizys_profile.h; sourceTree = SOURCE_ROOT; };
 		5E15EE1D433B9BC1117187B5 /* oizys_usb.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = oizys_usb.h; path = Sources/OizysCore/include/oizys_usb.h; sourceTree = SOURCE_ROOT; };
 		2B86D95D18914F714F25C86A /* supervisor.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = supervisor.h; path = Sources/oizys/supervisor.h; sourceTree = SOURCE_ROOT; };
 		2B535736F94B18EFDBD64C46 /* terminal.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = terminal.h; path = Sources/oizys/terminal.h; sourceTree = SOURCE_ROOT; };
+		07DBB810EEFC61D94CF314D0 /* CalibrationSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = CalibrationSession.swift; path = Sources/OizysApp/CalibrationSession.swift; sourceTree = SOURCE_ROOT; };
+		03AEBBA72556FA24475EB745 /* ConnectOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ConnectOverlay.swift; path = Sources/OizysApp/ConnectOverlay.swift; sourceTree = SOURCE_ROOT; };
 		3DEE5D5E5D207CD24CEA8780 /* DebugPermissions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DebugPermissions.swift; path = Sources/OizysApp/DebugPermissions.swift; sourceTree = SOURCE_ROOT; };
 		FEA78EF48E937C1FA9802574 /* DevDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DevDiagnostics.swift; path = Sources/OizysApp/DevDiagnostics.swift; sourceTree = SOURCE_ROOT; };
 		128BD5F987CB6D3B259C5A90 /* DiagnosticReport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DiagnosticReport.swift; path = Sources/OizysApp/DiagnosticReport.swift; sourceTree = SOURCE_ROOT; };
+		66F195DD8E90763F185B8A9D /* DisplayTint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DisplayTint.swift; path = Sources/OizysApp/DisplayTint.swift; sourceTree = SOURCE_ROOT; };
 		945D4B4A37A269A4CE6589DF /* Main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Main.swift; path = Sources/OizysApp/Main.swift; sourceTree = SOURCE_ROOT; };
+		595DDE31A7673F25568E07F0 /* OizysDesign.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OizysDesign.swift; path = Sources/OizysApp/OizysDesign.swift; sourceTree = SOURCE_ROOT; };
+		59BC76CE3FC1774ED73C8E0E /* OizysLogo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OizysLogo.swift; path = Sources/OizysApp/OizysLogo.swift; sourceTree = SOURCE_ROOT; };
+		6BC7A0A6AAF7BA376A5B28E8 /* OizysMenuBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OizysMenuBar.swift; path = Sources/OizysApp/OizysMenuBar.swift; sourceTree = SOURCE_ROOT; };
+		88BC5FAC8D088ED8140A8567 /* OizysModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OizysModel.swift; path = Sources/OizysApp/OizysModel.swift; sourceTree = SOURCE_ROOT; };
+		2CFCA70AF745BDABADCDE520 /* OizysPanels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OizysPanels.swift; path = Sources/OizysApp/OizysPanels.swift; sourceTree = SOURCE_ROOT; };
+		3F58244BB6324130CC9DBB72 /* PreviewRender.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PreviewRender.swift; path = Sources/OizysApp/PreviewRender.swift; sourceTree = SOURCE_ROOT; };
 		3F745877C8CFAB87E33E20F1 /* Production.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Production.swift; path = Sources/OizysApp/Production.swift; sourceTree = SOURCE_ROOT; };
+		8EC153AA62B2FA139A394BA3 /* SidecarAuto.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SidecarAuto.swift; path = Sources/OizysApp/SidecarAuto.swift; sourceTree = SOURCE_ROOT; };
+		AF08A155E22170D423D26A9B /* SidecarBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SidecarBridge.swift; path = Sources/OizysApp/SidecarBridge.swift; sourceTree = SOURCE_ROOT; };
 		A9B7EB1B7BE89C6D48072F43 /* SuiteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SuiteTests.swift; path = Tests/Xcode/SuiteTests.swift; sourceTree = SOURCE_ROOT; };
 		B5DDBF3F89114336EC0E08B7 = {isa = PBXFileReference; lastKnownFileType = text; name = "Architecture.md"; path = "Documentation/Architecture.md"; sourceTree = SOURCE_ROOT; };
+		75F38BE91D13A4750A72774F = {isa = PBXFileReference; lastKnownFileType = text; name = "Calibration.md"; path = "Documentation/Calibration.md"; sourceTree = SOURCE_ROOT; };
 		5E663D17CC9BCFB31C121022 = {isa = PBXFileReference; lastKnownFileType = text; name = "Dock-Trace.md"; path = "Documentation/Dock-Trace.md"; sourceTree = SOURCE_ROOT; };
 		BE64DCC9992D21937DD471DF = {isa = PBXFileReference; lastKnownFileType = text; name = "Monitor-Startup-Handoff-2026-08-31.md"; path = "Documentation/Monitor-Startup-Handoff-2026-08-31.md"; sourceTree = SOURCE_ROOT; };
 		8CDA9285FD41E3077587483A = {isa = PBXFileReference; lastKnownFileType = text; name = "OriginalBrief.md"; path = "Documentation/OriginalBrief.md"; sourceTree = SOURCE_ROOT; };
 		CF05053E159299B83ACD7B00 = {isa = PBXFileReference; lastKnownFileType = text; name = "Performance-2026-08-30.md"; path = "Documentation/Performance-2026-08-30.md"; sourceTree = SOURCE_ROOT; };
+		C3F2E6B328AE26E1B7CBE310 = {isa = PBXFileReference; lastKnownFileType = text; name = "Ports.md"; path = "Documentation/Ports.md"; sourceTree = SOURCE_ROOT; };
 		B348D2F3794A333F06CCCDA3 = {isa = PBXFileReference; lastKnownFileType = text; name = "Protocol.md"; path = "Documentation/Protocol.md"; sourceTree = SOURCE_ROOT; };
 		EA87C733CE8C41B98948CC91 = {isa = PBXFileReference; lastKnownFileType = text; name = "Routing.md"; path = "Documentation/Routing.md"; sourceTree = SOURCE_ROOT; };
 		F276D2CABF3D0FCCCC182759 = {isa = PBXFileReference; lastKnownFileType = text; name = "Testing.md"; path = "Documentation/Testing.md"; sourceTree = SOURCE_ROOT; };
@@ -185,6 +221,7 @@
 		8E18B1FC222940D8CD949F98 = {isa = PBXFileReference; lastKnownFileType = text; name = "test_diagnostic_report.py"; path = "Tests/test_diagnostic_report.py"; sourceTree = SOURCE_ROOT; };
 		6162FAEDF49874AFB8D1709C = {isa = PBXFileReference; lastKnownFileType = text; name = "test_fixture.py"; path = "Tests/test_fixture.py"; sourceTree = SOURCE_ROOT; };
 		ECA0DC486912A78EDFB710A3 = {isa = PBXFileReference; lastKnownFileType = text; name = "test_fixture_runtime.py"; path = "Tests/test_fixture_runtime.py"; sourceTree = SOURCE_ROOT; };
+		C13C969669C0AB53B91C5A42 = {isa = PBXFileReference; lastKnownFileType = text; name = "test_head_gain.py"; path = "Tests/test_head_gain.py"; sourceTree = SOURCE_ROOT; };
 		76914F8BD3D0C35EBCDCD136 = {isa = PBXFileReference; lastKnownFileType = text; name = "test_profiler.py"; path = "Tests/test_profiler.py"; sourceTree = SOURCE_ROOT; };
 		0C38FDBD5F5D4D68A1ECE7AD = {isa = PBXFileReference; lastKnownFileType = text; name = "test_protocol.py"; path = "Tests/test_protocol.py"; sourceTree = SOURCE_ROOT; };
 		26E17847289BED0F04C5A525 = {isa = PBXFileReference; lastKnownFileType = text; name = "test_supervisor.py"; path = "Tests/test_supervisor.py"; sourceTree = SOURCE_ROOT; };
@@ -198,7 +235,6 @@
 		A104FD1EB10AB41318C9BA4D = {isa = PBXFileReference; lastKnownFileType = text; name = "debug_session.py"; path = "Tools/debug_session.py"; sourceTree = SOURCE_ROOT; };
 		F95F0604183B1CEFD4ECBC64 = {isa = PBXFileReference; lastKnownFileType = text; name = "dev_runner.py"; path = "Tools/dev_runner.py"; sourceTree = SOURCE_ROOT; };
 		8DBE07C50FDD24734CD54D12 = {isa = PBXFileReference; lastKnownFileType = text; name = "fixture.py"; path = "Tools/fixture.py"; sourceTree = SOURCE_ROOT; };
-		EAA4E0C658C19CC6326E57A4 = {isa = PBXFileReference; lastKnownFileType = text; name = "fixture_browser.py"; path = "Tools/fixture_browser.py"; sourceTree = SOURCE_ROOT; };
 		699E20D3B627876512B48885 = {isa = PBXFileReference; lastKnownFileType = text; name = "fixture_runtime.py"; path = "Tools/fixture_runtime.py"; sourceTree = SOURCE_ROOT; };
 		5D93F226019C404676645007 = {isa = PBXFileReference; lastKnownFileType = text; name = "install_app.py"; path = "Tools/install_app.py"; sourceTree = SOURCE_ROOT; };
 		BF18B858D9284BC35A3C955A = {isa = PBXFileReference; lastKnownFileType = text; name = "make_dmg.py"; path = "Tools/make_dmg.py"; sourceTree = SOURCE_ROOT; };
@@ -208,14 +244,15 @@
 		A03C030E26E308B104040A94 = {isa = PBXFileReference; lastKnownFileType = text; name = "package_resources.py"; path = "Tools/package_resources.py"; sourceTree = SOURCE_ROOT; };
 		3E955C9A53EEE6EB1D64F82E = {isa = PBXFileReference; lastKnownFileType = text; name = "profile.py"; path = "Tools/profile.py"; sourceTree = SOURCE_ROOT; };
 		F032671C5658B4B70F60B44E = {isa = PBXFileReference; lastKnownFileType = text; name = "report.py"; path = "Tools/report.py"; sourceTree = SOURCE_ROOT; };
-		1064A5399B4A5D6422558D7E = {isa = PBXFileReference; lastKnownFileType = text; name = "setup_debug.py"; path = "Tools/setup_debug.py"; sourceTree = SOURCE_ROOT; };
+		BF472C8548D02E3FE7627959 = {isa = PBXFileReference; lastKnownFileType = text; name = "setup.py"; path = "Tools/setup.py"; sourceTree = SOURCE_ROOT; };
 		BC7120CA10A1BDE777791428 = {isa = PBXFileReference; lastKnownFileType = text; name = "test.py"; path = "Tools/test.py"; sourceTree = SOURCE_ROOT; };
 		BBC30E87AFE96CF51FBB0E23 = {isa = PBXFileReference; lastKnownFileType = text; name = "dev.sh"; path = "dev.sh"; sourceTree = SOURCE_ROOT; };
 		8DB8F481D5E69BA66D9161D7 = {isa = PBXFileReference; lastKnownFileType = text; name = "README.md"; path = "README.md"; sourceTree = SOURCE_ROOT; };
 		FD7C19202B203B5206C2A807 = {isa = PBXFileReference; lastKnownFileType = text; name = "CONTRIBUTING.md"; path = "CONTRIBUTING.md"; sourceTree = SOURCE_ROOT; };
 		FCB09B967218B2B57D628943 = {isa = PBXFileReference; lastKnownFileType = text; name = "CHANGELOG.md"; path = "CHANGELOG.md"; sourceTree = SOURCE_ROOT; };
 		8A6B08D2E621841BD6E5AB06 = {isa = PBXFileReference; lastKnownFileType = text; name = "VERSION"; path = "VERSION"; sourceTree = SOURCE_ROOT; };
-		A33F85C5F7DA87D45034B127 = {isa = PBXFileReference; lastKnownFileType = image.png; name = "Oizys.png"; path = "Oizys.png"; sourceTree = SOURCE_ROOT; };
+		6CC9705E82CD1CC204E9166E = {isa = PBXFileReference; lastKnownFileType = image.png; name = "Logo.png"; path = "Assets/Logo.png"; sourceTree = SOURCE_ROOT; };
+		2A625406045FF373A2FF0574 = {isa = PBXFileReference; lastKnownFileType = image.png; name = "tiny_Logo.png"; path = "Assets/tiny_Logo.png"; sourceTree = SOURCE_ROOT; };
 		3C33486C2F209E6AF59FECFB = {isa = PBXFileReference; lastKnownFileType = text; name = "Info.plist"; path = "Sources/OizysApp/Info.plist"; sourceTree = SOURCE_ROOT; };
 		AE50061E3AD89B2597210370 = {isa = PBXFileReference; lastKnownFileType = text; name = "Debug.entitlements"; path = "Configs/Debug.entitlements"; sourceTree = SOURCE_ROOT; };
 		D8BF94C905C13E87D9C1CC29 /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Debug.xcconfig; path = Configs/Debug.xcconfig; sourceTree = SOURCE_ROOT; };
@@ -356,16 +393,19 @@
 				2D523F3D48DA3B99FC5AE500 /* OizysLifecycle.swift */,
 				28A8EB7B7AA353DF636743BA /* VirtualDisplay.swift */,
 				458C2E28700DA1184E0BDAC2 /* bench.c */,
+				76D213032FA49899684A5838 /* calibrate.c */,
 				ED0EEB4EBCACE0D053E738AD /* capture_frame.c */,
 				D84D26C78DEF97C8F1123C16 /* config.c */,
 				3B32423357F906EBA67305CD /* crypto.c */,
 				6E923A000FA6991C4973A5DF /* ddc_native.c */,
+				22F36929F5334BB385D06954 /* ddc_tunnel.c */,
 				BBCD0F1FE7BBD144E1376A42 /* display.c */,
 				A0E0F016740BCCB3D349E1E8 /* dl3.c */,
 				F57E32910C395FEEBF5C17D9 /* driver.c */,
 				DE4B0A2652A590797A2DA7F8 /* encode.c */,
 				96E4E0F8AC502FFB55F7CEAD /* log.c */,
 				029C381021032EA9E5AD0D79 /* profile.c */,
+				8BC3C091F14EAD81D49C5C83 /* usb_ports.c */,
 				3B6B6273958EF4109954EB42 /* usb_probe.c */,
 				9C753C6EA135B5B29A5D07CA /* usb_session.c */,
 				2E77A962705E2AD2553840D9 /* wht.c */,
@@ -379,14 +419,17 @@
 				7DA8B3994C1E29ADBCDEED29 /* logo.h */,
 				4EABC461870478C12B55B408 /* oizys.h */,
 				8342AA8919989AC72F94AF85 /* oizys_build.h */,
+				A8061633FEC51BCE74A346DE /* oizys_calibrate.h */,
 				A7462DBC420BD9989E18DBBE /* oizys_capture.h */,
 				A9493B2960D156BFEF2A6130 /* oizys_capture_frame.h */,
 				BAB11EB198EF479E9D90FDED /* oizys_config.h */,
 				2FD582AA360BA119CF9FD877 /* oizys_ddc.h */,
+				EDB0E67D644BF845671281FB /* oizys_ddc_tunnel.h */,
 				A2D30429742EC733B060EF94 /* oizys_display.h */,
 				A5CF28589715AB82973C2DE8 /* oizys_dl3.h */,
 				BDB6258FC55086FD38077AF6 /* oizys_encode.h */,
 				874F70ACEEE81C7D3FED7E5A /* oizys_platform.h */,
+				C192731C2B7671C470B3A8F8 /* oizys_ports.h */,
 				468FB9C93F3C92781367C06B /* oizys_profile.h */,
 				5E15EE1D433B9BC1117187B5 /* oizys_usb.h */,
 				2B86D95D18914F714F25C86A /* supervisor.h */,
@@ -409,11 +452,22 @@
 		4ED5B5C271D5C4638B51E954 /* OizysApp */ = {
 			isa = PBXGroup;
 			children = (
+				07DBB810EEFC61D94CF314D0 /* CalibrationSession.swift */,
+				03AEBBA72556FA24475EB745 /* ConnectOverlay.swift */,
 				3DEE5D5E5D207CD24CEA8780 /* DebugPermissions.swift */,
 				FEA78EF48E937C1FA9802574 /* DevDiagnostics.swift */,
 				128BD5F987CB6D3B259C5A90 /* DiagnosticReport.swift */,
+				66F195DD8E90763F185B8A9D /* DisplayTint.swift */,
 				945D4B4A37A269A4CE6589DF /* Main.swift */,
+				595DDE31A7673F25568E07F0 /* OizysDesign.swift */,
+				59BC76CE3FC1774ED73C8E0E /* OizysLogo.swift */,
+				6BC7A0A6AAF7BA376A5B28E8 /* OizysMenuBar.swift */,
+				88BC5FAC8D088ED8140A8567 /* OizysModel.swift */,
+				2CFCA70AF745BDABADCDE520 /* OizysPanels.swift */,
+				3F58244BB6324130CC9DBB72 /* PreviewRender.swift */,
 				3F745877C8CFAB87E33E20F1 /* Production.swift */,
+				8EC153AA62B2FA139A394BA3 /* SidecarAuto.swift */,
+				AF08A155E22170D423D26A9B /* SidecarBridge.swift */,
 			);
 			name = OizysApp;
 			sourceTree = "<group>";
@@ -430,10 +484,12 @@
 			isa = PBXGroup;
 			children = (
 				B5DDBF3F89114336EC0E08B7 /* Architecture.md */,
+				75F38BE91D13A4750A72774F /* Calibration.md */,
 				5E663D17CC9BCFB31C121022 /* Dock-Trace.md */,
 				BE64DCC9992D21937DD471DF /* Monitor-Startup-Handoff-2026-08-31.md */,
 				8CDA9285FD41E3077587483A /* OriginalBrief.md */,
 				CF05053E159299B83ACD7B00 /* Performance-2026-08-30.md */,
+				C3F2E6B328AE26E1B7CBE310 /* Ports.md */,
 				B348D2F3794A333F06CCCDA3 /* Protocol.md */,
 				EA87C733CE8C41B98948CC91 /* Routing.md */,
 				F276D2CABF3D0FCCCC182759 /* Testing.md */,
@@ -462,6 +518,7 @@
 				8E18B1FC222940D8CD949F98 /* test_diagnostic_report.py */,
 				6162FAEDF49874AFB8D1709C /* test_fixture.py */,
 				ECA0DC486912A78EDFB710A3 /* test_fixture_runtime.py */,
+				C13C969669C0AB53B91C5A42 /* test_head_gain.py */,
 				76914F8BD3D0C35EBCDCD136 /* test_profiler.py */,
 				0C38FDBD5F5D4D68A1ECE7AD /* test_protocol.py */,
 				26E17847289BED0F04C5A525 /* test_supervisor.py */,
@@ -475,7 +532,6 @@
 				A104FD1EB10AB41318C9BA4D /* debug_session.py */,
 				F95F0604183B1CEFD4ECBC64 /* dev_runner.py */,
 				8DBE07C50FDD24734CD54D12 /* fixture.py */,
-				EAA4E0C658C19CC6326E57A4 /* fixture_browser.py */,
 				699E20D3B627876512B48885 /* fixture_runtime.py */,
 				5D93F226019C404676645007 /* install_app.py */,
 				BF18B858D9284BC35A3C955A /* make_dmg.py */,
@@ -485,14 +541,15 @@
 				A03C030E26E308B104040A94 /* package_resources.py */,
 				3E955C9A53EEE6EB1D64F82E /* profile.py */,
 				F032671C5658B4B70F60B44E /* report.py */,
-				1064A5399B4A5D6422558D7E /* setup_debug.py */,
+				BF472C8548D02E3FE7627959 /* setup.py */,
 				BC7120CA10A1BDE777791428 /* test.py */,
 				BBC30E87AFE96CF51FBB0E23 /* dev.sh */,
 				8DB8F481D5E69BA66D9161D7 /* README.md */,
 				FD7C19202B203B5206C2A807 /* CONTRIBUTING.md */,
 				FCB09B967218B2B57D628943 /* CHANGELOG.md */,
 				8A6B08D2E621841BD6E5AB06 /* VERSION */,
-				A33F85C5F7DA87D45034B127 /* Oizys.png */,
+				6CC9705E82CD1CC204E9166E /* Logo.png */,
+				2A625406045FF373A2FF0574 /* tiny_Logo.png */,
 				3C33486C2F209E6AF59FECFB /* Info.plist */,
 				AE50061E3AD89B2597210370 /* Debug.entitlements */,
 			);
@@ -661,16 +718,19 @@
 				326FE7DE0BCBCED53738EE4F /* OizysLifecycle.swift */,
 				012A7339043C5873D643D87D /* VirtualDisplay.swift */,
 				E499DB1DF7B0EFF40D266039 /* bench.c */,
+				F85CB590465621FF87FB24A9 /* calibrate.c */,
 				133F099A39DAFA610B7D4403 /* capture_frame.c */,
 				87F457E443E6B0CC4850CC10 /* config.c */,
 				51F6F4A75C46BB6CA18E3C27 /* crypto.c */,
 				E70341836FB6BDD07A77D8D5 /* ddc_native.c */,
+				FF0A92AA0C96B319C3DDC5AF /* ddc_tunnel.c */,
 				D76C083E4C265B0B756BCCE2 /* display.c */,
 				CDD70DA9F1CC36F32D8B59A6 /* dl3.c */,
 				FBA84444E83625C62A7A9E1C /* driver.c */,
 				BD741D2A8F4FB0C4060E3FA4 /* encode.c */,
 				E79E12B677A2AA80159EFFE7 /* log.c */,
 				38748F5A0662F66BA5D87D1F /* profile.c */,
+				28FED147B1C5F645B809C271 /* usb_ports.c */,
 				1F3756ED92FBD5F06A9CBBBB /* usb_probe.c */,
 				EE87A051CC694B8DA023194D /* usb_session.c */,
 				ED379B2D5F07C2EE264B2415 /* wht.c */,
@@ -690,16 +750,19 @@
 				D7003A3070DFFAB95CE14744 /* OizysLifecycle.swift */,
 				100A6C539A6B479B793574F4 /* VirtualDisplay.swift */,
 				9AABA441294486640DED0716 /* bench.c */,
+				97EFD803DB74CE6C083EB8F1 /* calibrate.c */,
 				107F347DC796AECDF0882681 /* capture_frame.c */,
 				AEA1EEAB76E0A3AEE0C45A56 /* config.c */,
 				2752BDB59A24B1E5867C9B4D /* crypto.c */,
 				1C431784C109DC7578247593 /* ddc_native.c */,
+				34AF31947EA4F34CA2C57B49 /* ddc_tunnel.c */,
 				F23DDB6DC87994557EBD37FA /* display.c */,
 				F680AD6EFD17ADB3CB9A4E34 /* dl3.c */,
 				91A29460027136E1EC1BD620 /* driver.c */,
 				363DB6102698D157C8ABBEC2 /* encode.c */,
 				6F4FE6D5F17E142F3F954560 /* log.c */,
 				675EDAE83ED651614FB35789 /* profile.c */,
+				CB4E37813294A7B6763DD801 /* usb_ports.c */,
 				36A8DC267A822883AD29B707 /* usb_probe.c */,
 				4900BA53993B89BF9C33B617 /* usb_session.c */,
 				040CB5F9CEB5666B7AB39AF4 /* wht.c */,
@@ -710,11 +773,22 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				778EEE15689C145B7993095E /* CalibrationSession.swift */,
+				53985E38034B1E3AF94AB5A1 /* ConnectOverlay.swift */,
 				B7560249CA6BB9A813AA7CE5 /* DebugPermissions.swift */,
 				A34FC258810ACE6E9F7D99D6 /* DevDiagnostics.swift */,
 				F3E6D66195D05E2FB51CCEFE /* DiagnosticReport.swift */,
+				311637B699AEEA51F349C79E /* DisplayTint.swift */,
 				2953351EF9776F1F663E868B /* Main.swift */,
+				BE70213247D952BF8D65A388 /* OizysDesign.swift */,
+				6B21F2105F09C61F6529A5B5 /* OizysLogo.swift */,
+				796D345FC0A0ACA55E03467F /* OizysMenuBar.swift */,
+				05827B448B279AE6A46E4681 /* OizysModel.swift */,
+				52FBAE1DF62D65A333E3D26E /* OizysPanels.swift */,
+				3FB08419025AB1A5EB663D72 /* PreviewRender.swift */,
 				B70C2A170864AE54B691923A /* Production.swift */,
+				29C59FCEE0B12EB1583A92AD /* SidecarAuto.swift */,
+				E1B7D235E25EC39A40615D6B /* SidecarBridge.swift */,
 				EC708FDCCDBE549E12B05B04 /* OizysLifecycle.swift */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

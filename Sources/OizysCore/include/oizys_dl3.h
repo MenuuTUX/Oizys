@@ -133,6 +133,17 @@ int oizys_driver_present_bgra_mosaic(OizysDriver *driver, uint8_t head, const ui
  * ScreenCaptureKit goes silent on a static desktop, so nothing else would carry the
  * repeats a changed strip still owes. Sends nothing when the ledger is clear. */
 int oizys_driver_refresh_head(OizysDriver *driver, uint8_t head);
+
+/* Non-zero while this head is blanked by head.<side>.standby_min. The display still exists
+ * and the layout is untouched; only its pixels are black. */
+int oizys_driver_head_is_blanked(const OizysDriver *driver, uint8_t head);
+
+/* Seconds since anything on this head last changed, 0 before the first frame. */
+int oizys_driver_head_idle_seconds(const OizysDriver *driver, uint8_t head);
+
+/* The capture rate this session should be asking for now: capture.fps normally, and
+ * power.idle_fps once every active head has been still for power.idle_after_s. */
+int oizys_driver_capture_fps_target(const OizysDriver *driver);
 /* Run the control session's own clocks: a 13 ms status poll and a 3 s heartbeat. These
  * are independent of whether any pixels moved. Call it often; it rate-limits itself. */
 int oizys_driver_service_control(OizysDriver *driver);
@@ -148,6 +159,25 @@ size_t oizys_video_solid_strip(uint8_t *out, size_t cap, uint16_t x, uint16_t y,
  * [16 blocks][Cr,Cb,Y][64 row-major samples]. */
 size_t oizys_video_colour_strip_planes(uint8_t *out, size_t cap, uint16_t x, uint16_t y,
                                        const int32_t *planes);
+/* Uniform output gain applied while encoding, 256 = unity, clamped to 0..256. Set it per
+ * head before that head's strips are encoded. This dims the signal Oizys sends; it is not
+ * the monitor's backlight, which a DisplayLink output cannot reach. */
+void oizys_video_set_gain(int gain_q8);
+
+/* Contrast about mid-grey applied while encoding, 256 = unity, clamped to 128..384. Unlike
+ * gain this runs either side of unity, because a contrast control that can only reduce is
+ * half a control; above unity it clips highlights, as raising contrast on a monitor does.
+ * Set it per head before that head's strips are encoded. */
+void oizys_video_set_contrast(int contrast_q8);
+int oizys_video_contrast(void);
+
+/* Per-channel correction as three 256-entry tables, in R, G, B order, applied to pixels
+ * before the colour transform. NULL removes it. The caller owns the storage and must keep it
+ * alive and unchanged while frames are being encoded. */
+void oizys_video_set_channel_lut(const uint8_t (*tables)[256]);
+int oizys_video_has_channel_lut(void);
+int oizys_video_gain(void);
+
 size_t oizys_video_colour_strip_bgra(uint8_t *out, size_t cap, uint16_t x, uint16_t y,
                                      const uint8_t *bgra, size_t stride, uint32_t width,
                                      uint32_t height);

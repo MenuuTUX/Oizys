@@ -1,8 +1,11 @@
 #include <CoreGraphics/CoreGraphics.h>
 #include <dispatch/dispatch.h>
 #include "oizys_display.h"
+#include "oizys_config.h"
 #include "oizys_ddc.h"
+#include "oizys_usb.h"   /* oizys_log */
 #include <stdlib.h>
+#include <time.h>
 
 /*
  * Apple's own virtual panels: Sidecar iPads and AirPlay receivers both report the vendor
@@ -59,27 +62,64 @@ static void detach_mirror_set(CGDisplayConfigRef config, uint32_t head) {
 }
 
 /*
- * Every display's origin, taken before anything is created and put back afterwards.
+ * Every display's origin and mode, taken before anything is created and put back afterwards.
+ *
  * Creating a virtual display makes macOS re-lay-out the whole desktop, and the heads are
  * not the only thing it moves — a Sidecar iPad gets shoved along the row too. Restoring
  * the lot is what keeps the arrangement the user built.
+ *
+ * The mode matters for the same reason and is the more damaging half. macOS stores a
+ * resolution per *set* of attached displays, and a set it has not seen before gets a
+ * conservative default rather than the one the user picked for a smaller set. Adding two
+ * Oizys heads makes a new set every time the rest of the desk changes, so a laptop panel
+ * the owner runs at its "More Space" scaled mode comes back a step smaller. Nothing here
+ * used to notice: the origins were put back, the layout was then committed permanently,
+ * and the write cemented the smaller mode as what that set means. One attach, and the main
+ * display is smaller until somebody sets it by hand again.
  */
 #define OIZYS_SNAPSHOT_CAP 16
 static struct {
     uint32_t id;
     int32_t x, y;
+    CGDisplayModeRef mode; /* retained; NULL when the display would not report one */
 } g_snapshot[OIZYS_SNAPSHOT_CAP];
 static uint32_t g_snapshot_count;
+
+/* A mode copied now is a different object from the same mode copied a second ago, so the
+   comparison is on what a mode actually is: its point size, its backing pixels — the two
+   differ on a scaled Retina mode, and that is exactly the pair that shifts here — and its
+   refresh rate. */
+static int modes_differ(CGDisplayModeRef a, CGDisplayModeRef b) {
+    if (!a || !b) {
+        return a != b;
+    }
+    return CGDisplayModeGetWidth(a) != CGDisplayModeGetWidth(b) ||
+           CGDisplayModeGetHeight(a) != CGDisplayModeGetHeight(b) ||
+           CGDisplayModeGetPixelWidth(a) != CGDisplayModeGetPixelWidth(b) ||
+           CGDisplayModeGetPixelHeight(a) != CGDisplayModeGetPixelHeight(b) ||
+           CGDisplayModeGetRefreshRate(a) != CGDisplayModeGetRefreshRate(b);
+}
+
+static void forget_snapshot(void) {
+    for (uint32_t i = 0; i < g_snapshot_count; i++) {
+        if (g_snapshot[i].mode) {
+            CGDisplayModeRelease(g_snapshot[i].mode);
+            g_snapshot[i].mode = NULL;
+        }
+    }
+    g_snapshot_count = 0;
+}
 
 void oizys_displays_snapshot(void) {
     uint32_t ids[OIZYS_SNAPSHOT_CAP];
     uint32_t count = online_displays(ids, OIZYS_SNAPSHOT_CAP);
-    g_snapshot_count = 0;
+    forget_snapshot();
     for (uint32_t i = 0; i < count; i++) {
         CGRect bounds = CGDisplayBounds(ids[i]);
         g_snapshot[g_snapshot_count].id = ids[i];
         g_snapshot[g_snapshot_count].x = (int32_t)bounds.origin.x;
         g_snapshot[g_snapshot_count].y = (int32_t)bounds.origin.y;
+        g_snapshot[g_snapshot_count].mode = CGDisplayCopyDisplayMode(ids[i]);
         g_snapshot_count++;
     }
 }
@@ -88,13 +128,14 @@ int oizys_displays_restore(void) {
     if (g_snapshot_count == 0) {
         return 0;
     }
+    int keep_modes = oizys_config_keep_modes();
     uint32_t ids[OIZYS_SNAPSHOT_CAP];
     uint32_t count = online_displays(ids, OIZYS_SNAPSHOT_CAP);
     CGDisplayConfigRef config;
     if (CGBeginDisplayConfiguration(&config) != kCGErrorSuccess) {
         return -1;
     }
-    int moved = 0;
+    int changed = 0;
     for (uint32_t i = 0; i < g_snapshot_count; i++) {
         for (uint32_t j = 0; j < count; j++) {
             if (ids[j] != g_snapshot[i].id) {
@@ -104,12 +145,27 @@ int oizys_displays_restore(void) {
             if ((int32_t)now.origin.x != g_snapshot[i].x ||
                 (int32_t)now.origin.y != g_snapshot[i].y) {
                 CGConfigureDisplayOrigin(config, ids[j], g_snapshot[i].x, g_snapshot[i].y);
-                moved = 1;
+                changed = 1;
+            }
+            if (keep_modes && g_snapshot[i].mode) {
+                CGDisplayModeRef current = CGDisplayCopyDisplayMode(ids[j]);
+                if (modes_differ(current, g_snapshot[i].mode)) {
+                    oizys_log("display %u came back at %zux%zu; putting %zux%zu back",
+                              ids[j], current ? CGDisplayModeGetWidth(current) : (size_t)0,
+                              current ? CGDisplayModeGetHeight(current) : (size_t)0,
+                              CGDisplayModeGetWidth(g_snapshot[i].mode),
+                              CGDisplayModeGetHeight(g_snapshot[i].mode));
+                    CGConfigureDisplayWithDisplayMode(config, ids[j], g_snapshot[i].mode, NULL);
+                    changed = 1;
+                }
+                if (current) {
+                    CGDisplayModeRelease(current);
+                }
             }
             break;
         }
     }
-    if (!moved) {
+    if (!changed) {
         CGCancelDisplayConfiguration(config);
         return 0;
     }
@@ -265,6 +321,28 @@ struct WatchState {
 };
 static struct WatchState g_watch;
 
+static double monotonic_seconds(void) {
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    return (double)now.tv_sec + (double)now.tv_nsec / 1e9;
+}
+
+/*
+ * A resolution changing has two entirely different causes and the same callback, so telling
+ * them apart is the whole job here.
+ *
+ * A display arriving or leaving makes macOS pick the stored resolution for the new set of
+ * screens, which is where the shrunken laptop panel comes from. That is fallout, and it is
+ * put back. Somebody choosing a resolution in System Settings is not fallout, and putting
+ * that back would be a menu-bar app fighting the user's own hands.
+ *
+ * The separator is time: fallout lands in the same breath as the attach. Beyond this many
+ * seconds past a topology change, a mode that has moved is taken as intentional and becomes
+ * the new snapshot.
+ */
+#define OIZYS_TOPOLOGY_SETTLE_S 5.0
+static double g_topology_at;
+
 static void reconfigured(CGDirectDisplayID display, CGDisplayChangeSummaryFlags flags,
                          void *userInfo) {
     (void)display;
@@ -273,6 +351,10 @@ static void reconfigured(CGDirectDisplayID display, CGDisplayChangeSummaryFlags 
        change" phase deadlocks against the transaction already in flight. */
     if (flags & kCGDisplayBeginConfigurationFlag) {
         return;
+    }
+    if (flags & (kCGDisplayAddFlag | kCGDisplayRemoveFlag | kCGDisplayEnabledFlag |
+                 kCGDisplayDisabledFlag)) {
+        g_topology_at = monotonic_seconds();
     }
     if (g_watch.count <= 0) {
         return;
@@ -283,6 +365,11 @@ static void reconfigured(CGDirectDisplayID display, CGDisplayChangeSummaryFlags 
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 400 * NSEC_PER_MSEC),
                    dispatch_get_main_queue(), ^{
                      struct WatchState settled = watch;
+                     if (monotonic_seconds() - g_topology_at < OIZYS_TOPOLOGY_SETTLE_S) {
+                         oizys_displays_restore();
+                     } else {
+                         oizys_displays_snapshot();
+                     }
                      oizys_displays_arrange(settled.ids, settled.count, settled.width,
                                             settled.height);
                    });
@@ -298,6 +385,10 @@ void oizys_displays_watch(const uint32_t *ids, int count, uint32_t width, uint32
     g_watch.count = count;
     g_watch.width = width;
     g_watch.height = height;
+    /* Arming happens moments after the heads were created, which is itself the topology
+       change everything below is about. Without this the first callback to arrive would be
+       read as somebody choosing a resolution and the shrunken mode adopted as intended. */
+    g_topology_at = monotonic_seconds();
     static int registered;
     if (!registered) {
         registered = CGDisplayRegisterReconfigurationCallback(reconfigured, NULL) == kCGErrorSuccess;

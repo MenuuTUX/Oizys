@@ -26,7 +26,7 @@ def private_request(request):
     action = request["action"]
     if action == "prepare":
         print("Installing the isolated tools. This can take a few minutes.", flush=True)
-        result = fixture.run_child([sys.executable, str(ROOT / "Tools/setup_debug.py")],
+        result = fixture.run_child([sys.executable, str(ROOT / "Tools/setup.py")],
                                    capture_output=True, timeout=1700, cwd=ROOT)
         if result.returncode:
             raise fixture.FixtureError("Tool setup failed. Check your internet connection and retry Prepare required tools.")
@@ -94,7 +94,7 @@ def main():
         args = request.get("arguments", [])
         if not isinstance(args, list) or not all(isinstance(a, str) for a in args):
             raise ValueError("Invalid arguments")
-        if name not in ("test.py", "profile.py", "measure_processes.py", "report.py", "setup_debug.py"):
+        if name not in ("test.py", "profile.py", "measure_processes.py", "report.py", "setup.py"):
             raise ValueError("Unknown tool")
         (ROOT / "build").mkdir(exist_ok=True)
         # run_child owns and cancels the entire compiler/downloader/test tree.

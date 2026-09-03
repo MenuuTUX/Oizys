@@ -5,7 +5,6 @@ import CoreGraphics
 // capture, encoding, USB and recovery; no pixel buffers cross this process boundary.
 #if !OIZYS_PRODUCTION
 final class OizysApp: NSObject, NSApplicationDelegate {
-    private var item: NSStatusItem!
     private var window: NSWindow!
     private let statusLabel = NSTextField(labelWithString: "Ready")
     private let detailLabel = NSTextField(wrappingLabelWithString:
@@ -44,6 +43,10 @@ final class OizysApp: NSObject, NSApplicationDelegate {
     private var explicitQuit = false
     private var signals: [DispatchSourceSignal] = []
     private let info = Bundle.main.infoDictionary ?? [:]
+    // The shipping menu bar, installed here too so it can be exercised before release. It
+    // is the only status item a diagnostic build puts up: the debug session's own controls
+    // hang off its right-click menu, so what is in the menu bar is what ships.
+    private let productMenu = OizysMenuBar()
     private var fallback: Bool { info["OizysFallback"] as? Bool ?? (info["OizysFallback"] as? NSString)?.boolValue ?? false }
 
 
@@ -86,6 +89,7 @@ final class OizysApp: NSObject, NSApplicationDelegate {
         }
         makeEditMenu()
         makeMenu()
+        productMenu.install(quit: { NSApp.terminate(nil) })
         makeWindow()
         showWindow()
         if CommandLine.arguments.contains("--benchmark") { start() }
@@ -105,13 +109,9 @@ final class OizysApp: NSObject, NSApplicationDelegate {
         NSApp.mainMenu = bar
     }
 
+    /// The debug session's controls. They are handed to the product menu bar as a submenu
+    /// rather than given a status item of their own.
     private func makeMenu() {
-        item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        let icon = NSImage(named: NSImage.applicationIconName)?.copy() as? NSImage
-        icon?.size = NSSize(width: 18, height: 18)
-        item.button?.image = icon
-        item.button?.setAccessibilityLabel("Oizys")
-        item.button?.toolTip = "Oizys — USB displays"
         let menu = NSMenu()
         statusMenu = NSMenuItem(title: "Oizys · Ready", action: nil, keyEquivalent: "")
         menu.addItem(statusMenu)
@@ -120,14 +120,12 @@ final class OizysApp: NSObject, NSApplicationDelegate {
         stopMenu = add(menu, "Stop debug and restore production", #selector(stop), "")
         stopMenu.isEnabled = false
         menu.addItem(.separator())
-        _ = add(menu, "Open Oizys…", #selector(showWindow), ",")
+        _ = add(menu, "Debug Window…", #selector(showWindow), "")
         _ = add(menu, "Open Diagnostics…", #selector(openLogs), "")
         _ = add(menu, "Developer Dashboard…", #selector(openDeveloper), "d")
         _ = add(menu, "Screen Recording Settings…", #selector(openPrivacy), "")
-        menu.addItem(.separator())
-        _ = add(menu, "Quit Oizys", #selector(quit), "q")
         menu.autoenablesItems = false
-        item.menu = menu
+        productMenu.extraMenu = menu
     }
 
     private func add(_ menu: NSMenu, _ title: String, _ selector: Selector,
@@ -383,6 +381,7 @@ final class OizysApp: NSObject, NSApplicationDelegate {
 
     private func didStop(_ process: Process) {
         guard worker === process else { return }
+        defer { productMenu.refreshNow() }
         stopTimer?.invalidate()
         benchmarkTimer?.invalidate()
         worker = nil
@@ -492,6 +491,7 @@ final class OizysApp: NSObject, NSApplicationDelegate {
     @objc private func quit() { explicitQuit = true; NSApp.terminate(nil) }
 
     func applicationWillTerminate(_ notification: Notification) {
+        productMenu.shutdown()
         releaseSession()
         // Keep installed production as the main app, unless another debug session owns the dock.
         if !OizysLifecycle.developmentActive,
@@ -546,6 +546,45 @@ struct OizysApplication {
         #if OIZYS_PRODUCTION
         runProduction()
         #else
+        if CommandLine.arguments.contains("--calibrate-serve") {
+            // Bring the capture server up, print where it is, and hold it there. Verifies the
+            // certificate, the listener and the page without a phone in the room.
+            let application = NSApplication.shared
+            application.setActivationPolicy(.prohibited)
+            let session = MainActor.assumeIsolated { () -> CalibrationSession in
+                let session = CalibrationSession()
+                session.startServerOnly()
+                return session
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                MainActor.assumeIsolated {
+                    print(session.address.isEmpty ? "no address" : session.address)
+                    fflush(stdout)
+                }
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 20) { exit(0) }
+            application.run()
+        }
+        if CommandLine.arguments.contains("--show-overlay") {
+            // Draw the connect ripple on the main display once and leave. The overlay is the
+            // one piece of this app that only exists on real glass, so it needs a way to be
+            // looked at that does not involve unplugging a monitor.
+            let application = NSApplication.shared
+            application.setActivationPolicy(.prohibited)
+            MainActor.assumeIsolated {
+                ConnectOverlay.enabled = true
+                ConnectOverlay.preview(model: OizysModel())
+            }
+            // Outlive the animation, then go. Nothing is installed and nothing is left behind.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.4) { exit(0) }
+            application.run()
+        }
+        if let index = CommandLine.arguments.firstIndex(of: "--render-preview"),
+           index + 1 < CommandLine.arguments.count {
+            // Rendering needs AppKit initialised but must never show a window or a menu.
+            NSApplication.shared.setActivationPolicy(.prohibited)
+            exit(MainActor.assumeIsolated { PreviewRender.run(into: CommandLine.arguments[index + 1]) })
+        }
         let application = NSApplication.shared
         let delegate = OizysApp()
         application.setActivationPolicy(.accessory)

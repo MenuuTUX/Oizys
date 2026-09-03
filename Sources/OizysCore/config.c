@@ -5,6 +5,8 @@
 #include "oizys_build.h"
 #include <math.h>
 #include <pwd.h>
+#include <sys/stat.h>
+#include <time.h>
 #include <unistd.h>
 
 #include <assert.h>
@@ -24,14 +26,15 @@ typedef enum {
     FIELD_BOOL,
     FIELD_HEADS,   /* "left", "right", "left,right" */
     FIELD_HEADREF, /* "none", "left", "right" */
-    FIELD_STRING,
+    FIELD_STRING,  /* one of a fixed set of words */
+    FIELD_TEXT,    /* free-form; a device name is whatever the owner called it */
 } FieldType;
 
 typedef struct {
     const char *key;
     FieldType type;
     size_t offset;
-    size_t capacity; /* FIELD_STRING only */
+    size_t capacity; /* FIELD_STRING and FIELD_TEXT only */
     const char *fallback;
     double low;
     double high;
@@ -41,6 +44,9 @@ typedef struct {
     {key, type, offsetof(OizysConfig, member), 0, fallback, low, high}
 #define FS(key, member, fallback) \
     {key, FIELD_STRING, offsetof(OizysConfig, member), sizeof(((OizysConfig *)0)->member), \
+     fallback, 0, 0}
+#define FT(key, member, fallback) \
+    {key, FIELD_TEXT, offsetof(OizysConfig, member), sizeof(((OizysConfig *)0)->member), \
      fallback, 0, 0}
 
 static const Field FIELDS[] = {
@@ -52,6 +58,38 @@ static const Field FIELDS[] = {
     F("capture.fps", FIELD_INT, capture_fps, "60", 1, 240),
     F("capture.queue_depth", FIELD_INT, capture_queue_depth, "3", 1, 8),
     F("capture.dump_frames", FIELD_BOOL, capture_dump_frames, "false", 0, 1),
+    /*
+     * Per-head power behaviour. Two opposite problems, one per key, because a pair of
+     * monitors does not necessarily have the same one.
+     *
+     * keepalive_s: a panel drops to standby on its own once its input stops changing, and an
+     * idle desktop puts zero bytes on the video endpoint by design. Repainting the cached
+     * strips every N seconds costs no capture and no encode, and stops that happening.
+     *
+     * standby_min: the opposite. Blank the head after this long still, so a monitor that
+     * would otherwise stay lit on an unused desk goes dark. Blanking is instant to undo,
+     * unlike deactivating the head, because the display itself never goes away.
+     */
+    F("head.left.keepalive_s", FIELD_INT, head_keepalive_s[0], "0", 0, 600),
+    F("head.right.keepalive_s", FIELD_INT, head_keepalive_s[1], "0", 0, 600),
+    F("head.left.standby_min", FIELD_INT, head_standby_min[0], "0", 0, 240),
+    F("head.right.standby_min", FIELD_INT, head_standby_min[1], "0", 0, 240),
+    /* Capture, encode and USB all scale with frame rate, so the cheapest thing an idle
+     * desktop can do is ask for fewer frames. Nothing is lost: a still desktop has nothing
+     * to send either way, and the first change restores the full rate. */
+    F("power.saving", FIELD_BOOL, power_saving, "true", 0, 1),
+    F("power.idle_fps", FIELD_INT, power_idle_fps, "10", 1, 240),
+    F("power.idle_after_s", FIELD_INT, power_idle_after_s, "20", 1, 600),
+    /* Dims the signal Oizys encodes for a head. A DisplayLink output has no I2C path to the
+     * monitor, so its backlight is not reachable; this is the only brightness control that
+     * works on a dock-driven panel. It can only darken -- above unity would clip. */
+    F("head.left.brightness", FIELD_INT, head_brightness[0], "100", 10, 100),
+    F("head.right.brightness", FIELD_INT, head_brightness[1], "100", 10, 100),
+    /* Contrast is the other half of the same encoder pass, and the range is not the same
+     * shape: brightness scales from black so unity is its ceiling, while contrast pivots on
+     * mid-grey and has to go both ways to mean anything. Above 100 clips highlights. */
+    F("head.left.contrast", FIELD_INT, head_contrast[0], "100", 50, 150),
+    F("head.right.contrast", FIELD_INT, head_contrast[1], "100", 50, 150),
     /* Load-bearing. Polling the dock harder than this reads back as a false disconnect. */
     F("control.poll_ms", FIELD_INT, control_poll_ms, "13", 8, 50),
     F("control.heartbeat_s", FIELD_INT, control_heartbeat_s, "3", 1, 10),
@@ -64,6 +102,36 @@ static const Field FIELDS[] = {
     /* The dock rotates over this many buffers; 2 and 3 are the only values it has shown. */
     F("dock.buffers", FIELD_INT, dock_buffers, "2", 2, 3),
     F("displaylink.auto_stop", FIELD_BOOL, displaylink_auto_stop, "true", 0, 1),
+    /*
+     * Creating a virtual display makes the window server re-lay-out every screen, and it
+     * does not only move them: for a combination of screens it has seen before it restores
+     * that combination's stored resolution, and "built-in + Sidecar + two Oizys heads" is a
+     * combination almost nobody has deliberately configured. The built-in panel comes back
+     * a scaled step smaller, and because the layout that follows is committed permanently,
+     * the smaller size is then what that combination means from then on. Putting every
+     * display's mode back alongside its origin is what stops one attach shrinking a desktop
+     * for good. Off leaves whatever macOS chose.
+     */
+    F("display.keep_modes", FIELD_BOOL, display_keep_modes, "true", 0, 1),
+    /*
+     * Sidecar. Off by default: attaching a display is not something to start doing to
+     * someone who only installed a dock driver. On, the iPad is connected when it turns up
+     * and the Mac looks like a desk -- see sidecar.require_desk, which is the difference
+     * between a docked Mac and one on a sofa. A disconnect made by hand is respected.
+     */
+    F("sidecar.auto_connect", FIELD_BOOL, sidecar_auto_connect, "false", 0, 1),
+    F("sidecar.require_desk", FIELD_BOOL, sidecar_require_desk, "true", 0, 1),
+    FT("sidecar.device", sidecar_device, ""),
+    /*
+     * An iPad's backlight is not reachable from this Mac: macOS reports the Sidecar display
+     * as not brightness-changeable, and Oizys never sees those pixels either -- Apple
+     * composites and sends them. What is reachable is the display's transfer table, which
+     * every display has, so these two are a gamma ramp rather than a backlight or an encoder
+     * gain. Same arithmetic as the heads: brightness scales from black, contrast pivots on
+     * mid-grey and runs either side of unity.
+     */
+    F("sidecar.brightness", FIELD_INT, sidecar_brightness, "100", 10, 100),
+    F("sidecar.contrast", FIELD_INT, sidecar_contrast, "100", 50, 150),
     FS("log.level", log_level, "info"),
 };
 
@@ -216,6 +284,9 @@ static int apply(OizysConfig *config, const Field *field, const char *text) {
         *(int *)member(config, field->offset) = value;
         return 0;
     }
+    case FIELD_TEXT:
+        snprintf((char *)member(config, field->offset), field->capacity, "%s", text);
+        return 0;
     case FIELD_STRING: {
         for (int i = 0; LOG_LEVELS[i]; i++) {
             if (strcasecmp(text, LOG_LEVELS[i]) == 0) {
@@ -255,6 +326,7 @@ static void render(const OizysConfig *config, const Field *field, char *out, siz
         return;
     }
     case FIELD_STRING:
+    case FIELD_TEXT:
         snprintf(out, capacity, "%s", (const char *)member_const(config, field->offset));
         return;
     }
@@ -324,6 +396,70 @@ const OizysConfig *oizys_config(void) {
 
 void oizys_config_reload(void) {
     g_loaded = 0;
+}
+
+/*
+ * A running driver reads its settings from the cache, so a change made anywhere else -- the
+ * menu bar, `oizys config set`, an editor -- would otherwise wait for a restart. That is the
+ * wrong shape for a brightness slider. One stat per second is cheap enough to sit on the
+ * control path, and mtime is the only thing that has to be compared: any write to the file
+ * moves it, and the read that follows is the same read startup does.
+ */
+int oizys_config_refresh_if_changed(void) {
+    static time_t last_seen;
+    static time_t last_checked;
+    time_t now = time(NULL);
+    if (now == last_checked) {
+        return 0;
+    }
+    last_checked = now;
+    struct stat info;
+    time_t stamp = stat(oizys_config_path(), &info) == 0 ? info.st_mtime : 0;
+    if (stamp == last_seen) {
+        return 0;
+    }
+    last_seen = stamp;
+    /* The first observation is the state the cache was already built from. */
+    static int primed;
+    if (!primed) {
+        primed = 1;
+        return 0;
+    }
+    oizys_config_reload();
+    return 1;
+}
+
+int oizys_config_head_keepalive_s(int head) {
+    if (head < 0 || head > 1) {
+        return 0;
+    }
+    return oizys_config()->head_keepalive_s[head];
+}
+
+int oizys_config_head_standby_s(int head) {
+    if (head < 0 || head > 1) {
+        return 0;
+    }
+    return oizys_config()->head_standby_min[head] * 60;
+}
+
+int oizys_config_head_gain_q8(int head) {
+    if (head < 0 || head > 1) {
+        return 256;
+    }
+    int percent = oizys_config()->head_brightness[head];
+    return percent * 256 / 100;
+}
+
+int oizys_config_keep_modes(void) {
+    return oizys_config()->display_keep_modes;
+}
+
+int oizys_config_head_contrast_q8(int head) {
+    if (head < 0 || head > 1) {
+        return 256;
+    }
+    return oizys_config()->head_contrast[head] * 256 / 100;
 }
 
 int oizys_config_head_active(int head) {
@@ -424,6 +560,39 @@ int oizys_config_selftest(void) {
     CHECK(apply(&config, find_field("dock.buffers"), "1") == 0 && config.dock_buffers == 2);
     CHECK(apply(&config, find_field("dock.buffers"), "9") == 0 && config.dock_buffers == 3);
 
+    /* Keepalive and standby are per head and independent: a pair of monitors does not
+     * necessarily have the same problem, which is the whole reason these are not one key. */
+    CHECK(config.head_keepalive_s[0] == 0 && config.head_standby_min[0] == 0);
+    CHECK(apply(&config, find_field("head.left.keepalive_s"), "30") == 0);
+    CHECK(config.head_keepalive_s[0] == 30 && config.head_keepalive_s[1] == 0);
+    CHECK(apply(&config, find_field("head.right.standby_min"), "4") == 0);
+    CHECK(config.head_standby_min[1] == 4 && config.head_standby_min[0] == 0);
+    CHECK(apply(&config, find_field("head.left.standby_min"), "9999") == 0);
+    CHECK(config.head_standby_min[0] == 240);
+
+    /* Power saving is on by default, and the idle rate is below any sane capture rate. */
+    CHECK(config.power_saving == 1);
+    CHECK(config.power_idle_fps == 10 && config.power_idle_after_s == 20);
+
+    /* Brightness is a percentage that becomes a Q8 gain, and it can only ever darken. */
+    CHECK(config.head_brightness[0] == 100 && config.head_brightness[1] == 100);
+    CHECK(apply(&config, find_field("head.left.brightness"), "50") == 0);
+    CHECK(config.head_brightness[0] == 50 && config.head_brightness[1] == 100);
+    CHECK(apply(&config, find_field("head.left.brightness"), "400") == 0);
+    CHECK(config.head_brightness[0] == 100);
+    CHECK(apply(&config, find_field("head.right.brightness"), "0") == 0);
+    CHECK(config.head_brightness[1] == 10);
+
+    /* Contrast is unity by default and clamps either side of it, because it pivots on
+     * mid-grey rather than scaling from black. */
+    CHECK(config.head_contrast[0] == 100 && config.head_contrast[1] == 100);
+    CHECK(apply(&config, find_field("head.left.contrast"), "140") == 0);
+    CHECK(config.head_contrast[0] == 140 && config.head_contrast[1] == 100);
+    CHECK(apply(&config, find_field("head.left.contrast"), "900") == 0);
+    CHECK(config.head_contrast[0] == 150);
+    CHECK(apply(&config, find_field("head.right.contrast"), "1") == 0);
+    CHECK(config.head_contrast[1] == 50);
+
     /* Garbage is refused, and the field keeps what it had. */
     CHECK(apply(&config, find_field("head.width"), "wide") == -2);
     CHECK(apply(&config, find_field("capture.dump_frames"), "maybe") == -2);
@@ -449,6 +618,27 @@ int oizys_config_selftest(void) {
         render(&round, &FIELDS[i], text, sizeof(text));
         CHECK(apply(&round, &FIELDS[i], text) == 0);
     }
+
+    /* Keeping other displays' resolutions is on: the shrunken-desktop bug it prevents is
+     * silent, permanent and not obviously caused by us. Sidecar stays off until asked. */
+    CHECK(config.display_keep_modes == 1);
+    CHECK(config.sidecar_auto_connect == 0 && config.sidecar_require_desk == 1);
+    CHECK(config.sidecar_device[0] == '\0');
+    CHECK(config.sidecar_brightness == 100 && config.sidecar_contrast == 100);
+    CHECK(apply(&config, find_field("sidecar.brightness"), "1") == 0);
+    CHECK(config.sidecar_brightness == 10);
+    CHECK(apply(&config, find_field("sidecar.contrast"), "999") == 0);
+    CHECK(config.sidecar_contrast == 150);
+
+    /* A device name is whatever its owner typed, spaces and apostrophes included, and it
+     * round-trips unchanged. Longer than the field truncates rather than failing: a name
+     * that matches on its first 63 characters is still the right iPad. */
+    CHECK(apply(&config, find_field("sidecar.device"), "shib's iPad Pro") == 0);
+    CHECK(strcmp(config.sidecar_device, "shib's iPad Pro") == 0);
+    render(&config, find_field("sidecar.device"), text, sizeof(text));
+    CHECK(strcmp(text, "shib's iPad Pro") == 0);
+    CHECK(apply(&config, find_field("sidecar.device"), "") == 0);
+    CHECK(config.sidecar_device[0] == '\0');
 
     CHECK(find_field("no.such.key") == NULL);
     return g_failures;

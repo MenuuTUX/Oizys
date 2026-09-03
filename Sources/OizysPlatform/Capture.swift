@@ -76,7 +76,23 @@ private final class Capture {
     var lastReport = ProcessInfo.processInfo.systemUptime
     #endif
     var timer: DispatchSourceTimer?
+    /// Streams and their live configuration, so power saving can lower the frame rate the
+    /// window server is asked for instead of throwing away frames after it has made them.
+    var configurations: [SCStreamConfiguration] = []
+    var appliedFPS: Int32 = 0
     init(_ count: Int) { self.count = count }
+    /// Ask the window server for a different rate, and only when it actually changed. The
+    /// call is asynchronous and cheap, but issuing it a hundred times a second would not be.
+    func applyFrameRate(_ fps: Int32) {
+        guard fps > 0, fps != appliedFPS else { return }
+        appliedFPS = fps
+        for (index, stream) in streams.enumerated() where index < configurations.count {
+            let configuration = configurations[index]
+            configuration.minimumFrameInterval = CMTime(value: 1, timescale: fps)
+            stream.updateConfiguration(configuration) { _ in }
+        }
+    }
+
     func stop() {
         timer?.cancel(); timer = nil
         for output in outputs.values { oizys_output_disable(output.output) }
@@ -130,6 +146,7 @@ func captureStart(_ ids: UnsafePointer<UInt32>?, _ count: Int32, _ driver: Opaqu
     }
     let capture = Capture(Int(count))
     let config = oizys_config()!.pointee
+    capture.appliedFPS = config.capture_fps
     for head in 0..<Int(count) where ids[head] != 0 {
         guard let display = content.displays.first(where: { $0.displayID == ids[head] }),
               display.width == 1920, display.height == 1080 else {
@@ -147,6 +164,7 @@ func captureStart(_ ids: UnsafePointer<UInt32>?, _ count: Int32, _ driver: Opaqu
         let stream = SCStream(filter: SCContentFilter(display: display, excludingWindows: []),
                               configuration: configuration, delegate: delegate)
         capture.outputs[head] = delegate; capture.streams.append(stream)
+        capture.configurations.append(configuration)
         #if !OIZYS_PRODUCTION
         capture.displayIDs[head] = ids[head]
         #endif
@@ -177,6 +195,7 @@ func captureClock(_ raw: UnsafeMutableRawPointer?, _ driver: OpaquePointer?, _ h
                   oizys_output_needs_refresh(output.output) != 0 else { continue }
             if oizys_driver_refresh_head(driver, UInt8(head)) < 0 { oizys_output_fail(output.output, "cached desktop refresh failed") }
         }
+        capture.applyFrameRate(oizys_driver_capture_fps_target(driver))
     }
     capture.timer = timer; timer.resume()
 }

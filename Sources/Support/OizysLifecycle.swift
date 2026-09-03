@@ -1,5 +1,6 @@
 import AppKit
 import Darwin
+import IOKit
 
 // Shared by the CLI and GUI; only this user's Oizys applications are controlled.
 enum OizysLifecycle {
@@ -7,6 +8,37 @@ enum OizysLifecycle {
     static var domain: String { "gui/\(getuid())" }
     static var job: String { "\(domain)/\(label)" }
     static var agent: String { NSHomeDirectory() + "/Library/LaunchAgents/\(label).plist" }
+    /*
+     * What counts as the dock, in one place.
+     *
+     * There were two of these, and they disagreed: the app matched on idVendor alone and the
+     * driver on vendor and product. Vendor alone matches nothing -- IOKit returns an empty
+     * iterator for it -- so the menu bar reported "No dock connected" while the driver was
+     * happily encoding to two panels off that very dock. Anything that needs to know whether
+     * the dock is here asks this.
+     */
+    static let dockVendor = 0x17e9
+    static let dockProduct = 0x6000
+
+    static func dockMatching() -> CFDictionary {
+        ["IOProviderClass": "IOUSBHostDevice",
+         "idVendor": dockVendor, "idProduct": dockProduct] as CFDictionary
+    }
+
+    /// How many docks are attached. Callers that need exactly one say so themselves.
+    static func dockCount() -> Int {
+        var iterator: io_iterator_t = 0
+        guard IOServiceGetMatchingServices(kIOMainPortDefault, dockMatching(), &iterator) == KERN_SUCCESS
+        else { return 0 }
+        defer { IOObjectRelease(iterator) }
+        var count = 0
+        while case let service = IOIteratorNext(iterator), service != 0 {
+            count += 1
+            IOObjectRelease(service)
+        }
+        return count
+    }
+
     static var lease: URL {
         URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Library/Application Support/Oizys/development-session.json")
     }
@@ -46,7 +78,28 @@ enum OizysLifecycle {
     static var applications: [NSRunningApplication] {
         NSWorkspace.shared.runningApplications.filter {
             $0.processIdentifier != getpid() && ($0.bundleIdentifier?.hasPrefix("org.oizys.") ?? false)
+                && isAppInstance($0)
         }
+    }
+
+    /*
+     * True for a running copy of the app itself, false for the driver.
+     *
+     * OizysDriver lives inside the app bundle, so macOS attributes it to the app's bundle
+     * identifier and it turns up in runningApplications like any GUI process. Matching on the
+     * identifier alone therefore counts the service as a second copy of the app -- which made
+     * the menu-bar item vanish, because the app terminates itself when it thinks another copy
+     * is up, and the login agent starts the driver first. Compare the executable instead.
+     *
+     * Unknown counts as an app: a process that will not say what it is running should still be
+     * stopped before an install replaces the bundle underneath it.
+     */
+    static func isAppInstance(_ app: NSRunningApplication) -> Bool {
+        guard let executable = app.executableURL?.lastPathComponent,
+              let bundle = app.bundleURL,
+              let main = Bundle(url: bundle)?.infoDictionary?["CFBundleExecutable"] as? String
+        else { return true }
+        return executable == main
     }
 
     static func resume() -> Int32 {
@@ -135,7 +188,12 @@ enum OizysLifecycle {
             guard run("/bin/launchctl", ["disable", job], quiet: false) == 0 else { return 1 }
             return stop()
         case "permissions":
-            // TCC is owned by macOS. Never reset it or try to grant it with a script.
+            // TCC is owned by macOS, and a running service never touches it: opening the pane
+            // is the whole of what this does. The single exception in the project is
+            // Tools/install_app.py, which clears Oizys's own approval during an install the
+            // user asked for, because an ad-hoc rebuild leaves an approval that shows as
+            // ticked and fails every preflight. Nothing here, and nothing at runtime, resets
+            // anything -- and neither ever grants.
             return run("/usr/bin/open", ["x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture"], quiet: false)
         default:
             fputs("oizys service status|start|stop|restart|login-enable|login-disable|permissions\n", stderr)

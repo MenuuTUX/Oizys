@@ -62,13 +62,49 @@ def test_install_replaces_only_owned_apps_and_registers_cli(tmp_path, installati
     value = plistlib.loads(agent.read_bytes())
     assert value["AssociatedBundleIdentifiers"] == ["org.oizys.Oizys.production"]
     arguments = value["ProgramArguments"]
-    # The agent runs the driver's own supervisor, not the app wrapper: under launchd the
-    # wrapper stalls on a Screen Recording preflight that an ad-hoc signed bundle cannot pass.
-    assert arguments[0] == str(destination / "Contents/MacOS/OizysDriver")
-    assert arguments[1:] == ["serve", "--takeover"]
+    # The agent runs the app, which spawns the driver as a child. Screen Recording is granted
+    # to a signature, so running the driver directly needs a grant nothing can offer the user:
+    # a child inherits the app's access, leaving one thing to grant and one button to grant it.
+    assert arguments[0] == str(destination / "Contents/MacOS/Oizys")
+    assert arguments[1:] == ["--background"]
     action = "bootstrap" if login else "disable"
     assert any(command[:2] == ["/bin/launchctl", action] for command in calls)
     assert not list(applications.glob(".oizys-install-*"))
+
+
+def test_install_clears_only_oizys_screen_recording_approvals(tmp_path, installation):
+    # An ad-hoc rebuild keeps the old approval, which then shows as ticked and fails every
+    # preflight. Clearing it is the difference between one prompt and a login agent that
+    # respawns for ever. It must never reach an identifier Oizys does not own.
+    home, _, calls = installation
+    applications = tmp_path / "Applications"
+    bundle(applications / "Old.app", identifier="org.oizys.Oizys.production-fallback")
+    bundle(applications / "Other.app", identifier="com.example.other")
+    install_app.install(bundle(tmp_path / "source.app"), applications)
+    resets = [command for command in calls if command[:1] == ["/usr/bin/tccutil"]]
+    assert [command[3] for command in resets] == ["org.oizys.Oizys.production",
+                                                  "org.oizys.Oizys.production-fallback"]
+    assert all(command[2] == "ScreenCapture" for command in resets)
+    assert not any("com.example.other" in command for command in resets)
+
+
+def test_install_can_keep_permissions_and_then_never_calls_tccutil(tmp_path, installation):
+    home, _, calls = installation
+    applications = tmp_path / "Applications"
+    install_app.install(bundle(tmp_path / "source.app"), applications, keep_permissions=True)
+    assert not any(command[:1] == ["/usr/bin/tccutil"] for command in calls)
+
+
+def test_install_gives_the_login_agent_somewhere_to_report_a_refusal(tmp_path, installation):
+    # stderr going to /dev/null is what hid a missing permission behind a silent respawn.
+    home, _, _ = installation
+    applications = tmp_path / "Applications"
+    install_app.install(bundle(tmp_path / "source.app"), applications)
+    agent = home / "Library/LaunchAgents" / (install_app.LABEL + ".plist")
+    value = plistlib.loads(agent.read_bytes())
+    log = Path(value["StandardErrorPath"])
+    assert log != Path("/dev/null") and log.exists()
+    assert log.is_relative_to(home / "Library/Application Support/Oizys")
 
 
 def test_install_rolls_back_app_agent_and_cli_on_startup_failure(tmp_path, installation, monkeypatch):

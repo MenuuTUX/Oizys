@@ -97,6 +97,7 @@ static void print_usage(void) {
          "oizys monitors             list all online monitors without creating displays\n"
          "oizys monitor <id> modes | mode <index> | position <x> <y> | mirror <id|off>\n"
          "oizys service status|start|stop|restart|login-enable|login-disable|permissions\n"
+         "oizys ports                every USB port's negotiated speed and power budget\n"
          "oizys ddc <action> [args] --display <id>   select a particular monitor\n");
     if (!OIZYS_DIAGNOSTICS) {
         puts("oizys build-info | probe | routes\n"
@@ -109,6 +110,8 @@ static void print_usage(void) {
     puts("oizys — open-source DisplayLink Ridge driver (C)\n\n"
          "  oizys probe              identify the USB hub (read-only)\n"
          "  oizys routes             report configured heads and native I2C paths (read-only)\n"
+         "  oizys ports              USB tree: negotiated vs declared link speed (read-only)\n"
+         "  oizys calibrate show | run <file> | clear | selftest   display colour correction\n"
          "  oizys displays           two 1920x1080 virtual heads until Ctrl-C\n"
          "  oizys diagnose --takeover  authenticate both heads and read physical EDIDs\n"
          "  oizys patterns --takeover [--seconds N]  unique physical test patterns\n"
@@ -141,6 +144,52 @@ static void cmd_probe(void) {
         oizys_hub_print(&hubs[i]);
     }
     free(hubs);
+}
+
+static int cmd_calibrate(int argc, char **argv) {
+    const char *action = argc > 0 ? argv[0] : "show";
+    if (strcmp(action, "selftest") == 0) {
+        int failures = oizys_calibration_selftest();
+        if (failures) {
+            fprintf(stderr, "calibration self-test: %d check(s) failed\n", failures);
+            return 1;
+        }
+        puts("calibration self-test passed");
+        return 0;
+    }
+    if (strcmp(action, "show") == 0) {
+        printf("%s\n\n", oizys_calibration_path());
+        for (int head = 0; head < 2; head++) {
+            OizysCalibration stored;
+            printf("Head %d (%s):\n", head, head == 0 ? "left" : "right");
+            if (oizys_calibration_load(head, &stored) == 0) {
+                oizys_calibration_print(&stored, stdout);
+            } else {
+                puts("  no calibration; driven uncorrected");
+            }
+        }
+        return 0;
+    }
+    if (strcmp(action, "run") == 0 && argc > 1) {
+        return oizys_calibration_run(argv[1], stdout) == 0 ? 0 : 1;
+    }
+    if (strcmp(action, "clear") == 0) {
+        int failed = oizys_calibration_store(0, NULL) != 0 || oizys_calibration_store(1, NULL) != 0;
+        puts(failed ? "Could not clear the calibration." : "Calibration cleared; both heads run uncorrected.");
+        return failed;
+    }
+    fputs("oizys calibrate show | run <readings.json> | clear | selftest\n", stderr);
+    return 2;
+}
+
+static void cmd_ports(void) {
+    OizysPort *ports = calloc(OIZYS_MAX_PORTS, sizeof(*ports));
+    if (!ports) {
+        return;
+    }
+    int n = oizys_ports_scan(ports, OIZYS_MAX_PORTS);
+    oizys_ports_print(ports, n, stdout);
+    free(ports);
 }
 
 static OizysVirtualDisplay *make_head(const char *name, uint32_t serial) {
@@ -975,7 +1024,8 @@ static int cmd_config(int argc, char **argv) {
         return 1;
     }
     if (strcmp(action, "selftest") == 0) {
-        int failures = oizys_config_selftest();
+        int failures = oizys_config_selftest() + oizys_ports_selftest()
+                       + oizys_calibration_selftest() + oizys_ddc_tunnel_selftest();
         if (failures) {
             fprintf(stderr, "config self-test: %d check(s) failed\n", failures);
             return 0;
@@ -1051,7 +1101,16 @@ static int cmd_serve(int takeover, int profile, int stats) {
     if (!CGPreflightScreenCaptureAccess()) {
         fputs("Screen Recording permission is required before takeover; leaving DisplayLink untouched\n",
               stderr);
-        CGRequestScreenCaptureAccess();
+        /*
+         * Ask only when a person typed this. Under launchd there is nobody to answer and the
+         * job is respawned every few seconds, so requesting here put the system's permission
+         * dialog on screen over and over with no way to make it stop -- the one thing worse
+         * than not asking. The service says why on stderr, which the login agent now keeps;
+         * the app and the installer own the asking, and both have somebody in front of them.
+         */
+        if (isatty(STDERR_FILENO)) {
+            CGRequestScreenCaptureAccess();
+        }
         return 0;
     }
     char path[PATH_MAX], resolved[PATH_MAX];
@@ -1184,6 +1243,13 @@ int main(int argc, char **argv) {
     }
     if (strcmp(command, "ddc") == 0) {
         return cmd_ddc(rest_argc, rest) ? 0 : 1;
+    }
+    if (strcmp(command, "calibrate") == 0) {
+        return cmd_calibrate(rest_argc, rest);
+    }
+    if (strcmp(command, "ports") == 0) {
+        cmd_ports();
+        return 0;
     }
     if (strcmp(command, "probe") == 0) {
         cmd_probe();

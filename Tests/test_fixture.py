@@ -285,8 +285,7 @@ def test_resolver_deduplicates_source_ids_and_keeps_only_safe_headers(monkeypatc
 
 
 def test_browser_metadata_uses_only_requested_clip_and_allowed_streams(monkeypatch):
-    monkeypatch.syspath_prepend(str(ROOT / "Tools"))
-    from fixture_browser import media_from_documents
+    from fixture import media_from_documents
 
     documents = [{"nested": [
         {"code": "recommendation", "video_versions": [{"url": "https://scontent.cdninstagram.com/unrelated"}]},
@@ -304,8 +303,7 @@ def test_browser_metadata_uses_only_requested_clip_and_allowed_streams(monkeypat
 
 
 def test_browser_metadata_accepts_missing_dimensions_and_rejects_unbound_video(monkeypatch):
-    monkeypatch.syspath_prepend(str(ROOT / "Tools"))
-    from fixture_browser import media_from_documents
+    from fixture import media_from_documents
 
     url = "https://scontent.cdninstagram.com/video"
     assert media_from_documents([{"video_versions": [{"url": url}]}], "requested", "test") is None
@@ -325,17 +323,65 @@ def test_public_browser_source_does_not_return_to_downloader(monkeypatch):
     assert calls == [(SOURCE, 6, True)]
 
 
-@pytest.mark.parametrize("status", [1, 3])
-def test_browser_failure_redacts_source_and_distinguishes_access(monkeypatch, status):
+def obscura_reply(payload, status=0):
+    """What `obscura scrape --format json` writes on stdout, with the page's own JSON in eval."""
+    body = json.dumps({"results": [{"url": SOURCE, "eval": json.dumps(payload)}]})
+    return lambda *a, **kw: subprocess.CompletedProcess(a[0], status, body, SOURCE + PHRASE)
+
+
+def test_browser_transport_failure_is_redacted(monkeypatch):
+    # A non-zero exit is the browser not completing: connection, missing binary, timeout.
+    # Its stderr can carry the source URL, so none of it may reach the message.
     monkeypatch.setattr(fixture, "run_child", lambda *a, **kw: subprocess.CompletedProcess(
-        a[0], status, SOURCE, SOURCE + PHRASE))
+        a[0], 1, SOURCE, SOURCE + PHRASE))
     with pytest.raises(fixture.FixtureError) as error:
         fixture.headless_reels(SOURCE, 6, resolve=True)
     assert SOURCE not in str(error.value) and PHRASE not in str(error.value)
-    if status == 3:
-        assert "login" in str(error.value) and "permissions do not need changing" in str(error.value)
-    else:
-        assert "connection" in str(error.value)
+    assert "connection" in str(error.value)
+
+
+@pytest.mark.parametrize("landing", ["/accounts/login/", "/challenge/", "/checkpoint/x"])
+def test_browser_login_wall_is_named_as_access_not_failure(monkeypatch, landing):
+    # obscura exits 0 whatever the page turned out to be, so a login wall has to be read off
+    # the page it actually landed on. Getting this wrong would report a private profile as a
+    # broken connection and send the user to fix their network.
+    monkeypatch.setattr(fixture, "run_child", obscura_reply(
+        {"host": "www.instagram.com", "path": landing, "agent": "t", "links": []}))
+    with pytest.raises(fixture.FixtureError) as error:
+        fixture.headless_reels(SOURCE, 6, resolve=True)
+    assert SOURCE not in str(error.value) and PHRASE not in str(error.value)
+    assert "login" in str(error.value) and "permissions do not need changing" in str(error.value)
+
+
+def test_browser_redirected_off_the_host_is_treated_as_no_access(monkeypatch):
+    monkeypatch.setattr(fixture, "run_child", obscura_reply(
+        {"host": "elsewhere.invalid", "path": "/", "agent": "t", "links": []}))
+    with pytest.raises(fixture.FixtureError) as error:
+        fixture.headless_reels(SOURCE, 6, resolve=True)
+    assert "login" in str(error.value)
+
+
+def test_browser_unreadable_output_does_not_leak_it(monkeypatch):
+    monkeypatch.setattr(fixture, "run_child", lambda *a, **kw: subprocess.CompletedProcess(
+        a[0], 0, "not json " + SOURCE, SOURCE + PHRASE))
+    with pytest.raises(fixture.FixtureError) as error:
+        fixture.headless_reels(SOURCE, 6, resolve=True)
+    assert SOURCE not in str(error.value) and PHRASE not in str(error.value)
+
+
+def test_browser_returns_only_canonical_reel_links(monkeypatch):
+    links = ["https://www.instagram.com/reel/AAA/", "https://www.instagram.com/reel/BBB/"]
+    monkeypatch.setattr(fixture, "run_child", obscura_reply(
+        {"host": "www.instagram.com", "path": "/someone/reels/", "agent": "t", "links": links}))
+    assert fixture.headless_reels(SOURCE, 6) == links
+
+
+def test_browser_refuses_a_source_exposing_fewer_than_two_clips(monkeypatch):
+    monkeypatch.setattr(fixture, "run_child", obscura_reply(
+        {"host": "www.instagram.com", "path": "/someone/reels/", "agent": "t",
+         "links": ["https://www.instagram.com/reel/AAA/"]}))
+    with pytest.raises(fixture.FixtureError):
+        fixture.headless_reels(SOURCE, 6)
 
 
 def test_downloader_access_error_is_actionable_without_raw_stderr(monkeypatch, capsys):

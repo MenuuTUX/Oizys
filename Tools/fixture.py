@@ -206,25 +206,119 @@ def replace_settings(binary, path, source, passphrase):
     return backup
 
 
-def headless_reels(source, count, *, resolve=False):
-    # Only the dedicated Firefox runtime is used. Its temporary profile and cache
-    # live under this directory, which the parent removes even on interruption.
+# Obscura is the only browser this uses: one short-lived headless process per call, no
+# profile, no personal browser, no vendor runtime to install. The page script below runs
+# inside it and returns JSON; nothing else crosses back.
+DISCOVER_JS = """(async () => {
+  const found = [];
+  const scrape = () => {
+    for (const a of document.querySelectorAll('a[href]')) {
+      let url; try { url = new URL(a.href); } catch { continue; }
+      if (url.protocol !== 'https:') continue;
+      if (!['www.instagram.com', 'instagram.com'].includes(url.hostname)) continue;
+      const m = /^\\/(?:[A-Za-z0-9_.]+\\/)?reel\\/([A-Za-z0-9_-]+)\\/?$/.exec(url.pathname);
+      const link = m && 'https://www.instagram.com/reel/' + m[1] + '/';
+      if (link && !found.includes(link)) found.push(link);
+    }
+  };
+  let stale = 0;
+  for (let i = 0; i < 48 && found.length < COUNT && stale < 8; i++) {
+    const before = found.length;
+    scrape();
+    stale = before === found.length ? stale + 1 : 0;
+    window.scrollTo(0, document.body.scrollHeight);
+    await new Promise(r => setTimeout(r, 1000));
+  }
+  scrape();
+  return JSON.stringify({path: location.pathname, host: location.hostname,
+                         agent: navigator.userAgent, links: found.slice(0, COUNT)});
+})()"""
+
+RESOLVE_JS = """(() => {
+  const documents = [];
+  for (const s of document.querySelectorAll('script[type="application/json"]')) {
+    try { documents.push(JSON.parse(s.textContent)); } catch {}
+  }
+  return JSON.stringify({path: location.pathname, host: location.hostname,
+                         agent: navigator.userAgent, documents});
+})()"""
+
+
+def obscura(url, script, timeout):
+    """One headless page. Raises FixtureError; never forwards the browser's own text."""
     workspace = CURRENT.get()
     with tempfile.TemporaryDirectory(prefix="oizys-fixture-browser-",
                                      dir=workspace.directory if workspace else None) as temporary:
-        environment = dict(os.environ, TMPDIR=temporary,
-                           PLAYWRIGHT_BROWSERS_PATH=str(ROOT / "build/browsers"))
-        result = run_child([sys.executable, str(ROOT / "Tools/fixture_browser.py")],
-                           input=json.dumps(dict(source=source, count=count, resolve=resolve)), text=True,
-                           capture_output=True, timeout=150 + count * 50 if resolve else 150, env=environment)
-    if result.returncode == 3:
+        result = run_child(["obscura", "--stealth", "scrape", url, "--eval", script,
+                            "--format", "json", "--quiet", "--timeout", str(int(timeout))],
+                           text=True, capture_output=True, timeout=timeout + 30,
+                           env=dict(os.environ, TMPDIR=temporary, OBSCURA_STORAGE_DIR=temporary))
+    if result.returncode:
+        raise FixtureError("The isolated browser could not complete the request. Check your connection, "
+                           "or install obscura with Prepare required tools. "
+                           "Personal browsers were not accessed; saved settings were not changed.")
+    try:
+        page = json.loads(result.stdout)["results"][0]
+        payload = json.loads(page["eval"])
+    except (ValueError, KeyError, IndexError, TypeError):
+        raise FixtureError("The isolated browser returned nothing readable for that source.") from None
+    # The page may have redirected to a login or checkpoint wall. Treat that as no access
+    # rather than parsing whatever the wall happened to contain.
+    if (payload.get("host") not in ("www.instagram.com", "instagram.com")
+            or payload.get("path", "").startswith(("/accounts/", "/challenge/", "/checkpoint/"))):
         raise FixtureError("The source did not expose enough playable public clips to the isolated browser. "
                            "It may require login or be limiting access. Try later or use another public source. "
                            "Your passphrase and display permissions do not need changing.")
-    if result.returncode:
-        raise FixtureError("The isolated browser could not complete the request. Check your connection or Prepare required tools. "
-                           "Personal browsers were not accessed; saved settings were not changed.")
-    return json.loads(result.stdout)
+    return payload
+
+
+def media_from_documents(documents, shortcode, user_agent):
+    """Use only metadata attached to this clip, never recommendations or page text."""
+    pending = list(documents)
+    while pending:
+        node = pending.pop()
+        if isinstance(node, list):
+            pending.extend(node)
+        elif isinstance(node, dict):
+            if node.get("code", node.get("shortcode")) == shortcode:
+                versions = node.get("video_versions", [])
+                if not isinstance(versions, list):
+                    continue
+                versions = [v for v in versions if isinstance(v, dict)
+                            and isinstance(v.get("url"), str) and allowed_media_url(v["url"])]
+                def area(version):
+                    w, h = version.get("width", 0), version.get("height", 0)
+                    return w * h if isinstance(w, (int, float)) and isinstance(h, (int, float)) else 0
+                versions.sort(key=area, reverse=True)
+                if versions:
+                    return dict(id="reel:" + shortcode, url=versions[0]["url"],
+                                fallback=versions[-1]["url"] if len(versions) > 1 else None,
+                                headers={"User-Agent": user_agent})
+            pending.extend(node.values())
+    return None
+
+
+def headless_reels(source, count, *, resolve=False):
+    page = obscura(source, DISCOVER_JS.replace("COUNT", str(count)), 150)
+    links = [link for link in page.get("links", []) if isinstance(link, str)][:count]
+    if len(links) < 2:
+        raise FixtureError("The source did not expose enough playable public clips to the isolated browser. "
+                           "It may require login or be limiting access. Try later or use another public source. "
+                           "Your passphrase and display permissions do not need changing.")
+    if not resolve:
+        return links
+    clips = []
+    for index, link in enumerate(links):
+        detail = obscura(link, RESOLVE_JS, 50)
+        clip = media_from_documents(detail.get("documents", []), link.strip("/").rsplit("/", 1)[-1],
+                                    detail.get("agent", ""))
+        if clip:
+            clips.append(clip)
+        # Only fixed progress messages. This carries private data no further than the parent.
+        print(f"Checked clip {index + 1}/{len(links)}", file=sys.stderr, flush=True)
+    if len(clips) < 2:
+        raise FixtureError("Fewer than two clips exposed a playable public stream.")
+    return clips
 
 
 def prepare_clips(source, count, min_fps=0):
@@ -244,14 +338,8 @@ def resolver_executable():
 def check_dependencies(source):
     if not resolver_executable():
         raise FixtureError("Required tools are missing. Click Prepare required tools, then retry.")
-    if urlparse(source).hostname == "www.instagram.com":
-        try:
-            import importlib.util
-            available = importlib.util.find_spec("playwright") is not None
-        except (ImportError, ValueError):
-            available = False
-        if not available or not list((ROOT / "build/browsers").glob("firefox-*/firefox/Nightly.app")):
-            raise FixtureError("The private Firefox runtime is missing. Click Prepare required tools, then retry.")
+    if urlparse(source).hostname == "www.instagram.com" and not shutil.which("obscura"):
+        raise FixtureError("The isolated browser is missing. Click Prepare required tools, then retry.")
 
 
 def discover_clips(source, count):

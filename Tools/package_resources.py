@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 def app_icon(destination):
-    """Build the standard macOS sizes from the repository's original artwork."""
+    """Build the standard macOS sizes from the app's mark."""
     with tempfile.TemporaryDirectory(prefix="oizys-icon-") as temporary:
         iconset = Path(temporary) / "Oizys.iconset"
         iconset.mkdir()
@@ -21,7 +21,7 @@ def app_icon(destination):
             for scale in (1, 2):
                 name = f"icon_{size}x{size}{'@2x' if scale == 2 else ''}.png"
                 subprocess.run(["sips", "-z", str(size * scale), str(size * scale),
-                                str(ROOT / "Oizys.png"), "--out", str(iconset / name)],
+                                str(ROOT / "Assets/Logo.png"), "--out", str(iconset / name)],
                                check=True, stdout=subprocess.DEVNULL)
         subprocess.run(["iconutil", "-c", "icns", str(iconset), "-o", str(destination)], check=True)
 
@@ -33,6 +33,20 @@ def package(bundle, driver, debug, identity="-", allow_debugger=False):
     binaries.mkdir(parents=True, exist_ok=True)
     resources.mkdir(parents=True, exist_ok=True)
     app_icon(resources / "Oizys.icns")
+    # Both pictures ship. The menu-bar item derives its template from full-resolution
+    # artwork rather than from the icns: the stipple has to be thresholded at 18 points, and
+    # a source that sips has already resampled down to 16px has none left to threshold.
+    # Bundled under the same names they have in Assets/, so a resource lookup and a
+    # glance at the repository agree about which picture is which.
+    artwork = {"Logo.png", "tiny_Logo.png"}
+    shutil.copy2(ROOT / "Assets/Logo.png", resources / "Logo.png")
+    shutil.copy2(ROOT / "Assets/tiny_Logo.png", resources / "tiny_Logo.png")
+    # Resources is reused between builds, so a picture that has been renamed or dropped stays
+    # in the bundle and ships forever. Packaging owns every PNG in here; anything else is left
+    # over from a previous name for one of these two.
+    for stale in resources.glob("*.png"):
+        if stale.name not in artwork:
+            stale.unlink()
     shutil.copy2(driver, binaries / "OizysDriver")
     info = json.loads(subprocess.check_output([str(driver), "build-info"]))
     if info["diagnostics"] != debug:
@@ -41,7 +55,7 @@ def package(bundle, driver, debug, identity="-", allow_debugger=False):
     if debug:
         digest = hashlib.sha256()
         with zipfile.ZipFile(resources / "Developer.zip", "w", zipfile.ZIP_DEFLATED) as output:
-            paths = [ROOT / name for name in ("VERSION", "dev.sh", "Oizys.png", "README.md",
+            paths = [ROOT / name for name in ("VERSION", "dev.sh", "Assets/Logo.png", "Assets/tiny_Logo.png", "README.md",
                                               "CONTRIBUTING.md", "CHANGELOG.md")]
             for directory in ("Sources", "Tools", "Tests", "Configs", "Oizys.xcodeproj"):
                 paths += sorted((ROOT / directory).rglob("*"))

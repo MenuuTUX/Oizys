@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="Oizys.png" alt="Oizys, a face formed from white dots on black" width="240">
+  <img src="Assets/Logo.png" alt="Oizys, a face formed from white dots on black" width="240">
 </p>
 
 <h1 align="center">Oizys</h1>
@@ -28,6 +28,8 @@ took it there are in [Protocol.md](Documentation/Protocol.md); how they were fou
   <a href="Documentation/Protocol.md">Protocol</a> ·
   <a href="Documentation/Dock-Trace.md">Dock trace</a> ·
   <a href="Documentation/Routing.md">Routing</a> ·
+  <a href="Documentation/Ports.md">Ports</a> ·
+  <a href="Documentation/Calibration.md">Calibration</a> ·
   <a href="Documentation/Testing.md">Testing</a> ·
   <a href="Documentation/Performance-2026-08-30.md">Performance</a> ·
   <a href="Documentation/Xcode.md">Xcode</a> ·
@@ -76,6 +78,18 @@ treat a release as something to build from source rather than hand to someone el
 
 ## Building and installing
 
+From a fresh clone, one command prepares everything a build needs:
+
+```bash
+./dev.sh setup                        # developer tools, Python environment, Xcode project
+```
+
+It checks for Xcode and says exactly what to run if it is missing, creates `.venv` and
+installs the test dependencies, installs the optional fixture tools through Homebrew when
+Homebrew is present, and generates `Oizys.xcodeproj`. It is safe to re-run: every step is
+skipped once satisfied. `./dev.sh setup --check` reports what is missing and installs
+nothing.
+
 Run `./dev.sh` for the interactive developer menu, or use its scriptable commands:
 
 ```bash
@@ -92,10 +106,42 @@ Installation replaces other Oizys apps in `/Applications` and `~/Applications` w
 directory on PATH when available. Debug is never installed. Its executable is
 `dist/Oizys-debug-<version>-<variant>`; the version comes from `VERSION`.
 
+### Screen Recording after an install
+
+macOS keys Screen Recording to a code-signing identity, and an ad-hoc build gets a new one
+every rebuild. The old approval outlives the bundle it belonged to, so System Settings shows
+Oizys already ticked while every preflight fails — and the login agent starts, refuses, exits,
+and is respawned ten seconds later, forever.
+
+So installing clears Oizys's own approval and asks for a fresh one: the app's dialog first,
+then the Screen Recording pane, and it waits at a terminal until the box is ticked. Only
+`org.oizys.*` identifiers are touched, nothing is ever granted by script, and the running
+service still never goes near TCC.
+
+```bash
+python3 Tools/install_app.py <bundle> --keep-permissions   # leave the approval alone
+python3 Tools/install_app.py <bundle> --no-prompt          # report what is missing, ask nothing
+```
+
+The login agent's stderr goes to `~/Library/Application Support/Oizys/logs/service.log`,
+truncated on each install. If the desk stays dark, that file says why in one line.
+
 The developer menu also covers cleaning, dependency setup, tests, coverage, three
 sanitizers, encoder and GUI profiling, static analysis, Xcode archives, status and privacy
 settings. Builds do not run tests. See [Xcode workflows](Documentation/Xcode.md) for IDE
 details.
+
+### Looking at the interface without hardware
+
+```bash
+./dev.sh ui          # render every menu panel to PNG and open them
+./dev.sh overlay     # draw the display-connect ripple once, on the main display
+```
+
+`ui` renders the popover, each window section, the status-item glyph on both menu-bar grounds,
+and three frames of the connect animation, from a fixed model. It needs no dock, no driver and
+no screen, so it runs in a review or in CI. Several layout faults in this app were found that
+way and none of them would have shown up in a build log.
 
 ### Debug beside production
 
@@ -154,12 +200,152 @@ the signing requirement stable across edits.
 
 ### Icons and packages
 
-`Oizys.png` is the repository logo and the source for every app icon. Xcode packaging
-uses macOS `sips` and `iconutil` to build the required icon sizes. Replace that PNG and
-rebuild to update Finder, application dialogs, and the debug menu-bar icon.
+The artwork lives in `Assets/`, one file per job. `Assets/Logo.png` is the repository logo,
+every app icon size and the panel header; `Assets/tiny_Logo.png` is the menu-bar item and the
+terminal art, and nothing else is cut from it. Both are bundled under the same names they have
+in the repository. Xcode packaging uses macOS `sips` and `iconutil` to build the icon sizes,
+and the full-resolution PNG is copied into the bundle as well.
+
+The menu-bar item cannot be the picture scaled down. A menu-bar icon is a template: macOS
+discards the colour and tints whatever is opaque, so a stipple portrait on an opaque black
+ground arrives as a solid block. `Logo.template` rebuilds alpha from luminance instead, so the
+bright grain becomes opaque and the ground becomes transparent, and the artwork survives at
+18 points in a light or dark menu bar.
+
+Replace the PNG and rebuild to update all of it; run `.venv/bin/python Tools/ascii_logo.py`
+to regenerate the terminal art in `Sources/oizys/logo.h`.
 
 Production ZIP and PKG packaging remain available through
 `Tools/build_app.py --format both`; use `dev.sh install` to register per-user startup.
+
+## The menu bar
+
+Every variant installs a menu-bar item — one item, including in a diagnostic build, where the
+debug session's controls hang off the same item's right-click menu. Clicking it opens a panel
+with the driver's state, the displays it can see, and switches for starting at login and for
+the connect animation. The panel is placed against the screen the item is drawn on and closes
+as soon as anything else takes focus. Right-clicking gives a plain menu instead, for when a
+panel is the wrong shape for the job.
+
+**Open Oizys…** opens the full window, which is organised as:
+
+| Section | What is there |
+| --- | --- |
+| Displays | every display, with brightness and mirroring |
+| Power & standby | per-monitor keep-awake and blank-when-idle, the macOS timer, and idle frame rate |
+| Sidecar | the iPad's state and arrangement, connect and disconnect, and the power reality |
+| Colour | match the monitors to each other using an iPhone, over a QR code |
+| USB ports | `oizys ports` in the window, with any downgraded link called out |
+| All settings | every driver setting, editable, showing which differ from their defaults |
+| How it works | a live diagram of the path a pixel takes, drawn from what is attached now |
+
+When a display comes online, Oizys draws a short ripple on that display and nothing else: a
+non-activating, click-through overlay that closes itself after under two seconds. It never
+takes focus and never appears twice for one event. The switch for it is in the panel, next to
+a Preview button for trying it without unplugging anything.
+
+### Brightness on a dock-driven monitor
+
+DDC/CI reaches a monitor over its own I2C channel, which exists only on a real display pipe.
+A head driven over the dock has no such pipe, so its monitor cannot be asked to dim itself and
+`oizys ddc list` says so. Implementing DDC/CI as a tunnel through the dock's control session
+is possible, because the dock already speaks I2C to read EDID.
+
+The protocol half of that tunnel is built and tested: `Sources/OizysCore/ddc_tunnel.c` frames
+MCCS messages, computes and validates the checksums, parses replies, rejects an answer about
+the wrong feature, and retries the way the standard requires. What it does not have is the
+dock's opcode for "perform this I2C transaction" — the EDID command carries a DDC selector
+and no address field, so the generic transaction is a different message and its id is not
+published anywhere this project may look. `oizys_ddc_tunnel_install` takes that transport as
+a function pointer, and until one is installed `oizys_ddc_tunnel_available()` is zero and the
+menu says DDC is unreachable on a dock head rather than offering a button that does nothing.
+
+What works instead is upstream of the problem. Oizys encodes every pixel those panels
+receive, so brightness for a head is a gain applied during encoding:
+
+```bash
+oizys config set head.left.brightness 70
+```
+
+The menu bar has the same control as a halftone slider. It dims the picture, not the
+backlight, and it only darkens: driving above unity clips highlights rather than matching
+them. A change repaints the head, because the cached strips were encoded at the old gain.
+
+Settings are re-read by a running driver within a second, so this and most other keys take
+effect without a restart.
+
+### When a monitor keeps going to standby
+
+Two different clocks put a panel to sleep, and they fail differently. macOS has one
+display-sleep timer covering every screen, so if both monitors sleep together at the same
+interval, that is the one to change — Power & standby links to it.
+
+A monitor also sleeps on its own when its input stops changing, and every model has its own
+patience. Panels sleeping at *different* times — one after four minutes, one straight away —
+is this, not macOS. An idle desktop puts zero bytes on the video endpoint by design, so a
+panel can decide nothing is arriving.
+
+Both controls are per head, because the problem is:
+
+```bash
+oizys config set head.left.keepalive_s 30    # repaint every 30s so this panel never sleeps
+oizys config set head.right.standby_min 4    # let this one go black after 4 minutes still
+```
+
+`keepalive_s` repaints the cached image, which costs no capture and no encoding because the
+strips are already encoded. `standby_min` blanks the head instead of tearing it down: a
+deactivated head stops being a display and moves every window on it, while black pixels leave
+the display in place, so the next frame wakes it and the layout never moved.
+
+### Power saving
+
+`power.saving` lowers the capture rate to `power.idle_fps` once every active head has been
+still for `power.idle_after_s`. Capture, encoding and USB all scale with frame rate and a
+still desktop has nothing to send at any rate, so this costs nothing and the first change
+restores full speed. On by default.
+
+### When the main display gets smaller
+
+macOS stores a resolution against each *set* of attached screens, not against each screen.
+Plugging the dock in makes a set it has not seen before, so it falls back to a smaller scaled
+mode for the built-in panel; the layout Oizys writes afterwards is permanent, which is what
+turns a one-off into a resolution that stays wrong. A 14" or 15" laptop typically drops one
+scaling step, and the desktop really is smaller — not just the diagram in System Settings.
+
+Oizys records every screen's origin *and* mode before it creates a head, and puts both back.
+That is `display.keep_modes`, on by default:
+
+```bash
+oizys config set display.keep_modes false   # let macOS pick, and keep what it picks
+```
+
+A resolution you set yourself is not undone. The heads arriving and a person choosing a
+resolution look identical to the window server, so the two are told apart by when they
+happen: a mode that moves within five seconds of a screen appearing or leaving is treated as
+fallout and reverted, and one that moves at any other time is adopted as the new intent.
+
+### Sidecar
+
+An iPad can be attached from Oizys directly — the Sidecar panel lists what is reachable — and
+Oizys can attach it on its own when it turns up:
+
+```bash
+oizys config set sidecar.auto_connect true
+oizys config set sidecar.device "shib's iPad Pro"   # empty means whichever is offered first
+oizys config set sidecar.require_desk false         # connect anywhere, not only at a desk
+```
+
+Nothing polls. SidecarCore pushes into the menu-bar app when the reachable set changes, and
+the run loop stays parked until it does. `sidecar.require_desk` is the difference between a
+docked Mac and one on a sofa: on AC with another screen attached, the iPad earns a place as a
+second display, and otherwise it is somebody's iPad. Disconnecting by hand is respected —
+Oizys leaves it alone for five minutes rather than taking the display straight back — and
+five failed attempts stand it down for half an hour.
+
+macOS ships no public interface for connecting Sidecar, so this drives a private Apple
+framework and can stop working after any update. When it does, the panel says so instead of
+offering a button that does nothing; everything else about an attached iPad goes through the
+ordinary display APIs and is unaffected.
 
 ## Terminal controls
 
@@ -177,7 +363,7 @@ is still there as `oizys tui --menu`.
 | `r` | refresh |
 | `q` | quit |
 
-The ASCII art is generated from `Oizys.png` by `Tools/ascii_logo.py`, which writes
+The ASCII art is generated from `Assets/tiny_Logo.png` by `Tools/ascii_logo.py`, which writes
 `Sources/oizys/logo.h`. Point it at another image to change it.
 
 Every variant includes the same CLI. With production installed, run `oizys` or `oizys tui`.
@@ -191,6 +377,10 @@ oizys monitor 1 mode 3                 # select a listed mode index
 oizys monitor 1 position 1920 0        # session arrangement, in desktop points
 oizys monitor 1 mirror off
 oizys ddc get 0x10 --display 1         # brightness on a supported native DDC connection
+oizys ports                            # every USB device's negotiated vs declared link speed
+oizys calibrate show                   # stored colour correction, per head
+oizys calibrate run <readings.json>    # fit and store a captured session
+oizys calibrate clear                  # back to uncorrected
 oizys config list
 oizys config set capture.fps 60
 oizys service restart                  # apply changed driver settings

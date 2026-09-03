@@ -106,6 +106,10 @@ _SIGNATURES = {
     "oizys_video_colour_strip_bgra": (ctypes.c_size_t, [
         _u8p, ctypes.c_size_t, ctypes.c_uint16, ctypes.c_uint16, _u8p,
         ctypes.c_size_t, ctypes.c_uint32, ctypes.c_uint32]),
+    "oizys_video_set_gain": (None, [ctypes.c_int]),
+    "oizys_video_set_channel_lut": (None, [ctypes.c_void_p]),
+    "oizys_video_has_channel_lut": (ctypes.c_int, []),
+    "oizys_video_gain": (ctypes.c_int, []),
     "oizys_video_colour_strip_planes": (ctypes.c_size_t, [
         _u8p, ctypes.c_size_t, ctypes.c_uint16, ctypes.c_uint16, _i32p]),
     "oizys_quantize_reference": (ctypes.c_int32, [

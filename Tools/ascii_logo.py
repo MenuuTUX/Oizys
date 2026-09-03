@@ -20,7 +20,7 @@ from PIL import Image, ImageOps
 ROOT = Path(__file__).resolve().parent.parent
 RAMP = " .:-=+*#%@"
 SIZES = {"OIZYS_LOGO_LARGE": (44, 24), "OIZYS_LOGO_SMALL": (24, 13)}
-DEFAULT = "Oizys.png"
+DEFAULT = "Assets/tiny_Logo.png"
 
 
 def prepare(path):

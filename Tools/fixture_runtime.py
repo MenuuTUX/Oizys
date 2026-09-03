@@ -68,7 +68,7 @@ def cleanup_abandoned(base):
     if legacy:
         commands = subprocess.check_output(["ps", "-U", str(os.getuid()), "-o", "command="], text=True)
         for path in legacy:
-            if "fixture_browser.py" in commands or str(path) in commands:
+            if "obscura" in commands or str(path) in commands:
                 continue
             try:
                 if owned_directory(path):

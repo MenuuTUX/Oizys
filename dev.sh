@@ -73,6 +73,7 @@ doctor() {
   xcode-select -p
   xcodebuild -version
   "$PYTHON" --version
+  "$PYTHON" Tools/setup.py --check || true
   echo "Variant: $VARIANT ($(configuration)); version: $VERSION"
   echo "Signing: $SIGNING (a dash means local ad-hoc signing, without notarization)"
   echo 'macOS controls Screen Recording approval; no script can grant it silently.'
@@ -107,7 +108,22 @@ execute() {
     status) cli service status ;;
     stop) cli service stop ;;
     clean) clean ;;
-    setup) "$PYTHON" Tools/setup_debug.py ;;
+    setup) "$PYTHON" Tools/setup.py ;;
+    ui)
+      # Render every panel to PNG and open them. No dock, no driver, no screen needed:
+      # the alternative to this is plugging in hardware to find out a label is truncated.
+      VARIANT=debug-verbose
+      generate
+      xcodebuild -project Oizys.xcodeproj -scheme "$(scheme)" -configuration "$(configuration)" build >/dev/null
+      OUT="${1:-build/ui}"
+      "build/$(configuration)/Oizys-debug.app/Contents/MacOS/Oizys-debug" --render-preview "$ROOT/$OUT"
+      open "$ROOT/$OUT" ;;
+    overlay)
+      # Draw the display-connect ripple once on the main display, then exit.
+      VARIANT=debug-verbose
+      generate
+      xcodebuild -project Oizys.xcodeproj -scheme "$(scheme)" -configuration "$(configuration)" build >/dev/null
+      "build/$(configuration)/Oizys-debug.app/Contents/MacOS/Oizys-debug" --show-overlay ;;
     debug)
       VARIANT="${1:-debug-minimal}"
       case "$VARIANT" in debug-minimal|debug-verbose|debug-fallback) ;; *) echo 'Choose a debug variant.' >&2; return 2 ;; esac
@@ -127,6 +143,8 @@ execute() {
     help|--help|-h)
       echo './dev.sh [build|install|run|clean|archive|analyze] [variant]'
       echo './dev.sh [tui|status|stop|setup|test|coverage|sanitize|profile|xcode|permissions|doctor] [arguments]'
+      echo './dev.sh ui [dir]        # render every menu panel to PNG and open them; no hardware needed'
+      echo './dev.sh overlay         # draw the display-connect ripple once on the main display'
       echo './dev.sh debug [debug-minimal|debug-verbose|debug-fallback]  # replace the previous debug session and run'
       echo './dev.sh build-debug-all  # prepare all portable debug variants without replacing production'
       echo 'Variants: production, production-fallback, debug-minimal, debug-verbose, debug-fallback'
@@ -150,10 +168,11 @@ while true; do
   [[ "${TERM:-dumb}" == dumb ]] || printf '\033[2J\033[H'
   echo "Oizys developer tools · $VERSION · $VARIANT"
   echo '1 Variant     2 Build         3 Run           4 Install production'
-  echo '5 Clean       6 Setup tests   7 Run tests     8 Coverage'
+  echo '5 Clean       6 Setup         7 Run tests     8 Coverage'
   echo '9 ASan        u UBSan         t TSan          p Encoder profile'
   echo 'g GUI profile x Open Xcode    a Analyze       z Xcode archive'
   echo 'm Monitor TUI s Status        d Doctor        r Recording permission'
+  echo 'i Render UI   o Show overlay'
   echo 'q Quit'
   read -r -p '> ' answer || break
   case "$answer" in
@@ -162,6 +181,7 @@ while true; do
     6) command=setup ;; 7) command=test ;; 8) command=coverage ;; 9|u|t) command=sanitize ;;
     p|g) command=profile ;; x) command=xcode ;; a) command=analyze ;; z) command=archive ;;
     m) command=tui ;; s) command=status ;; d) command=doctor ;; r) command=permissions ;;
+    i) command=ui ;; o) command=overlay ;;
     *) continue ;;
   esac
   extra=()

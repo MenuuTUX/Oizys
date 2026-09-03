@@ -169,7 +169,7 @@ final class DevDiagnostics: NSObject, ObservableObject, NSWindowDelegate {
     }
 
     func prepareDependencies() {
-        repository("Prepare developer tools", request: ["tool": "setup_debug.py"], duration: 1800)
+        repository("Prepare developer tools", request: ["tool": "setup.py"], duration: 1800)
     }
 
     func preparePrivateDependencies() {

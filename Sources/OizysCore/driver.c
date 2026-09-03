@@ -1,3 +1,4 @@
+#include "oizys_calibrate.h"
 #include "oizys_config.h"
 #include "oizys_dl3.h"
 #include "oizys_encode.h"
@@ -40,6 +41,16 @@ struct OizysDriver {
     uint32_t frame_seq[OIZYS_DL3_MAX_HEADS];
     uint64_t next_keepalive;
     uint64_t next_heartbeat;
+    uint64_t last_video_ns[OIZYS_DL3_MAX_HEADS];
+    uint64_t last_change_ns[OIZYS_DL3_MAX_HEADS];
+    int gain_q8[OIZYS_DL3_MAX_HEADS];
+    int contrast_q8[OIZYS_DL3_MAX_HEADS];
+    uint8_t blanked[OIZYS_DL3_MAX_HEADS];
+    /* The encoder holds a pointer to these while a head's strips are converted, so
+     * they live as long as the driver rather than as long as the call that built them. */
+    uint8_t cal_table[OIZYS_DL3_MAX_HEADS][OIZYS_CAL_CHANNELS][256];
+    uint8_t cal_active[OIZYS_DL3_MAX_HEADS];
+    uint64_t cal_checked_ns;
     uint8_t active[OIZYS_DL3_MAX_HEADS];
     OizysDriverVerification verification;
     OizysDamageMap damage[OIZYS_DL3_MAX_HEADS];
@@ -769,6 +780,10 @@ OizysDriver *oizys_driver_engage(OizysSession *session, uint16_t product_id) {
         driver->head[i].ddc_selector = profile->ddc_selector[i];
         driver->head[i].video_endpoint = profile->video_endpoint[i];
         oizys_damage_init(&driver->damage[i], 1920, 1080);
+        driver->gain_q8[i] = 256;
+        driver->contrast_q8[i] = 256;
+        driver->blanked[i] = 0;
+        driver->last_change_ns[i] = 0;
     }
     if (run_shared_ake(driver) < 0 || configure_control(driver) < 0) {
         oizys_log("driver engagement failed");
@@ -1742,6 +1757,7 @@ static int refresh_strip_bodies(OizysDriver *driver, uint8_t head, const uint8_t
 static int submit_strip_frame(OizysDriver *driver, uint8_t head, const OizysStrip *strips,
                               int count, int presentations) {
     OIZYS_PROFILE_BEGIN(submit, OIZYS_ZONE_SUBMIT);
+    driver->last_video_ns[head] = monotonic_ns();
     ByteBuffer stream;
     if (buffer_init(&stream, 512 * 1024) < 0) {
         OIZYS_PROFILE_END(submit, OIZYS_ZONE_SUBMIT);
@@ -1771,13 +1787,94 @@ static int submit_strip_frame(OizysDriver *driver, uint8_t head, const OizysStri
  * owes nothing puts zero bytes on the wire, which is what DisplayLink Manager does: the
  * dock holds the last image in its own buffers.
  */
+/*
+ * A head's stored colour correction, rebuilt into the encoder's lookup form.
+ *
+ * Reloaded at most once a second, on the same clock as the settings, so a calibration saved
+ * from the menu reaches the panel without a restart. Building three 256-entry tables costs
+ * nothing next to a frame and happens only when the file actually changed.
+ */
+static void reload_corrections(OizysDriver *driver) {
+    uint64_t now = monotonic_ns();
+    if (driver->cal_checked_ns && now - driver->cal_checked_ns < 1000000000ull) {
+        return;
+    }
+    driver->cal_checked_ns = now;
+    for (int head = 0; head < OIZYS_DL3_MAX_HEADS; head++) {
+        OizysCalibration correction;
+        if (oizys_calibration_load(head, &correction) == 0) {
+            oizys_calibration_table(&correction, driver->cal_table[head]);
+            driver->cal_active[head] = 1;
+        } else {
+            driver->cal_active[head] = 0;
+        }
+    }
+}
+
+/* Install this head's tables, or clear them, before any of its strips are converted. */
+static void install_head_lut(OizysDriver *driver, uint8_t head) {
+    reload_corrections(driver);
+    oizys_video_set_channel_lut(driver->cal_active[head] ? driver->cal_table[head] : NULL);
+}
+
+static void apply_head_correction(OizysDriver *driver, uint8_t head) {
+    oizys_video_set_gain(oizys_config_head_gain_q8(head));
+    oizys_video_set_contrast(oizys_config_head_contrast_q8(head));
+    install_head_lut(driver, head);
+}
+
 int oizys_driver_refresh_head(OizysDriver *driver, uint8_t head) {
     if (!driver || head >= driver->profile->head_count || !driver->active[head]) {
         return -1;
     }
     /* Nothing is cached to repay from until the first full frame has landed. */
-    if (driver->damage[head].keyframe_owed) {
+    if (driver->damage[head].keyframe_owed && !driver->blanked[head]) {
         return 0;
+    }
+    uint64_t now = monotonic_ns();
+
+    /*
+     * head.<side>.standby_min -- blank a head that nothing has changed on for long enough.
+     *
+     * Blanking, rather than tearing the head down. A deactivated head stops being a display,
+     * which moves every window on it and cannot be undone by the desktop changing again;
+     * black pixels leave the display in place, so the next frame wakes it with a repaint and
+     * the user's layout never moved. The panel's own backlight is what this saves, by giving
+     * its DPMS an unchanging black input to time out against.
+     */
+    int standby_s = oizys_config_head_standby_s(head);
+    if (standby_s > 0 && driver->last_change_ns[head] &&
+        now - driver->last_change_ns[head] >= (uint64_t)standby_s * 1000000000ull) {
+        if (!driver->blanked[head]) {
+            oizys_log("head %u blanked after %d s still", head, standby_s);
+            if (oizys_driver_present_solid(driver, head, 0, 0, 0) < 0) {
+                return -1;
+            }
+            driver->blanked[head] = 1;
+            driver->last_video_ns[head] = now;
+        }
+        return 0;
+    }
+    if (driver->blanked[head]) {
+        /* Came back: the cache still holds the last real desktop, so repaint from it. */
+        oizys_log("head %u woke from blank", head);
+        driver->blanked[head] = 0;
+        driver->damage[head].keyframe_owed = 1;
+    }
+    if (driver->damage[head].keyframe_owed && !driver->strip_body[head][0]) {
+        return 0;
+    }
+
+    /*
+     * head.<side>.keepalive_s -- the opposite problem. A panel drops to standby on its own
+     * once its input stops changing, and an idle desktop puts zero bytes on the video
+     * endpoint by design. Repainting the cached strips costs no capture and no encode.
+     */
+    apply_head_correction(driver, head);
+    int keepalive_s = oizys_config_head_keepalive_s(head);
+    if (keepalive_s > 0 && driver->last_video_ns[head] &&
+        now - driver->last_video_ns[head] >= (uint64_t)keepalive_s * 1000000000ull) {
+        driver->damage[head].keyframe_owed = 1;
     }
     OizysStrip owed[OIZYS_MAX_STRIPS];
     int count = oizys_damage_owed(&driver->damage[head], owed, OIZYS_MAX_STRIPS);
@@ -1790,11 +1887,51 @@ int oizys_driver_refresh_head(OizysDriver *driver, uint8_t head) {
      * produces transient negatives that the driver then reads as the monitor going
      * away.
      */
-    if (submit_strip_frame(driver, head, owed, count, 1) < 0) {
+    if (submit_strip_frame(driver, head, owed, count,
+                           driver->damage[head].keyframe_owed ? OIZYS_DAMAGE_REPEATS : 1) < 0) {
         return -1;
     }
     oizys_damage_presented(&driver->damage[head]);
     return 0;
+}
+
+int oizys_driver_head_is_blanked(const OizysDriver *driver, uint8_t head) {
+    return driver && head < OIZYS_DL3_MAX_HEADS ? driver->blanked[head] : 0;
+}
+
+int oizys_driver_head_idle_seconds(const OizysDriver *driver, uint8_t head) {
+    if (!driver || head >= OIZYS_DL3_MAX_HEADS || !driver->last_change_ns[head]) {
+        return 0;
+    }
+    return (int)((monotonic_ns() - driver->last_change_ns[head]) / 1000000000ull);
+}
+
+/*
+ * The frame rate capture should be asking for right now.
+ *
+ * Capture, encode and USB all scale with it, and a desktop nobody is touching has nothing to
+ * send at any rate, so the cheapest thing an idle session can do is ask for fewer frames. The
+ * first change on any head restores the full rate, and because ScreenCaptureKit delivers on
+ * change, that costs at most one idle interval of latency.
+ */
+int oizys_driver_capture_fps_target(const OizysDriver *driver) {
+    const OizysConfig *config = oizys_config();
+    if (!driver || !config->power_saving) {
+        return config->capture_fps;
+    }
+    uint64_t now = monotonic_ns();
+    uint64_t threshold = (uint64_t)config->power_idle_after_s * 1000000000ull;
+    for (int head = 0; head < OIZYS_DL3_MAX_HEADS; head++) {
+        if (!driver->active[head]) {
+            continue;
+        }
+        /* A head that has never had a frame is starting up, not idle. */
+        if (!driver->last_change_ns[head] || now - driver->last_change_ns[head] < threshold) {
+            return config->capture_fps;
+        }
+    }
+    int idle = config->power_idle_fps;
+    return idle < config->capture_fps ? idle : config->capture_fps;
 }
 
 static int present_bgra_mosaic(OizysDriver *driver, uint8_t head, const uint8_t *bgra,
@@ -1804,6 +1941,35 @@ static int present_bgra_mosaic(OizysDriver *driver, uint8_t head, const uint8_t 
         width != 1920 || height != 1080 || stride < (size_t)width * 4) {
         return -1;
     }
+    /*
+     * This head's brightness, before anything is encoded. The gain is a property of the
+     * encoder rather than of a strip, so it must be set while this head's strips are the
+     * ones being converted -- heads encode one at a time, which is what makes that safe.
+     *
+     * A change has to repaint: every cached strip body was encoded at the old gain, and
+     * repaying strip debt re-sends those bodies untouched. Without the keyframe the screen
+     * would dim only where something happened to move.
+     */
+    if (driver->blanked[head]) {
+        // A real frame outranks the standby timer; repaint rather than stay dark.
+        driver->blanked[head] = 0;
+        driver->damage[head].keyframe_owed = 1;
+        oizys_log("head %u woke on new content", head);
+    }
+    driver->last_change_ns[head] = monotonic_ns();
+    /* Both are encoder-side, so a change to either makes every cached strip stale: the
+       tiles that did not move still have to be resent at the new setting. */
+    int gain = oizys_config_head_gain_q8(head);
+    int contrast = oizys_config_head_contrast_q8(head);
+    if (driver->gain_q8[head] != gain || driver->contrast_q8[head] != contrast) {
+        driver->gain_q8[head] = gain;
+        driver->contrast_q8[head] = contrast;
+        driver->damage[head].keyframe_owed = 1;
+        oizys_log("head %u gain %d/256, contrast %d/256", head, gain, contrast);
+    }
+    oizys_video_set_gain(gain);
+    oizys_video_set_contrast(contrast);
+    install_head_lut(driver, head);
     /*
      * DisplayLink Manager does not stream whole frames. It hashes the surface a strip at
      * a time, sends the macro tiles whose content moved, and sends nothing at all while
@@ -1866,6 +2032,8 @@ static int service_control(OizysDriver *driver) {
     if (driver->next_keepalive && now < driver->next_keepalive) {
         return 0;
     }
+    /* Settings changed elsewhere take effect here, without a restart. */
+    oizys_config_refresh_if_changed();
     if (send_random_tail(driver, 0x14, 0x0c, NULL) < 0) {
         return -1;
     }
