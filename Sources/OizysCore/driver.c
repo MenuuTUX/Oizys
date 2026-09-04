@@ -45,6 +45,10 @@ struct OizysDriver {
     uint64_t last_change_ns[OIZYS_DL3_MAX_HEADS];
     int gain_q8[OIZYS_DL3_MAX_HEADS];
     int contrast_q8[OIZYS_DL3_MAX_HEADS];
+    /* Every cached strip body was encoded at the settings in force when it was made. When
+       those change, the bodies are stale even though the pixels they came from did not
+       move -- so the hash cache has to be bypassed for one pass. */
+    uint8_t recode[OIZYS_DL3_MAX_HEADS];
     uint8_t blanked[OIZYS_DL3_MAX_HEADS];
     /* The encoder holds a pointer to these while a head's strips are converted, so
      * they live as long as the driver rather than as long as the call that built them. */
@@ -1692,7 +1696,7 @@ static int encode_strip_body(OizysDriver *driver, uint8_t head, const OizysDamag
                              const uint8_t *bgra, size_t stride, uint32_t width, uint32_t height,
                              OizysStrip strip) {
     uint32_t index = strip.row * map->cols + strip.col;
-    if (driver->strip_body[head][index] &&
+    if (!driver->recode[head] && driver->strip_body[head][index] &&
         driver->strip_body_hash[head][index] == map->pending[index]) {
         return 0;
     }
@@ -1802,11 +1806,20 @@ static void reload_corrections(OizysDriver *driver) {
     driver->cal_checked_ns = now;
     for (int head = 0; head < OIZYS_DL3_MAX_HEADS; head++) {
         OizysCalibration correction;
-        if (oizys_calibration_load(head, &correction) == 0) {
-            oizys_calibration_table(&correction, driver->cal_table[head]);
-            driver->cal_active[head] = 1;
-        } else {
-            driver->cal_active[head] = 0;
+        uint8_t table[OIZYS_CAL_CHANNELS][256];
+        uint8_t active = oizys_calibration_load(head, &correction) == 0;
+        if (active) {
+            oizys_calibration_table(&correction, table);
+        }
+        /* Compare before storing: a calibration saved from the menu has to invalidate the
+           cached strip bodies, and a reload that found the same file must not. */
+        if (active != driver->cal_active[head] ||
+            (active && memcmp(table, driver->cal_table[head], sizeof(table)) != 0)) {
+            if (active) {
+                memcpy(driver->cal_table[head], table, sizeof(table));
+            }
+            driver->cal_active[head] = active;
+            driver->recode[head] = 1;
         }
     }
 }
@@ -1817,10 +1830,39 @@ static void install_head_lut(OizysDriver *driver, uint8_t head) {
     oizys_video_set_channel_lut(driver->cal_active[head] ? driver->cal_table[head] : NULL);
 }
 
-static void apply_head_correction(OizysDriver *driver, uint8_t head) {
-    oizys_video_set_gain(oizys_config_head_gain_q8(head));
-    oizys_video_set_contrast(oizys_config_head_contrast_q8(head));
-    install_head_lut(driver, head);
+/*
+ * This head's brightness, contrast and calibration, before anything of its is encoded. All
+ * three are encoder state rather than strip state, so they must be installed while this
+ * head's strips are the ones being converted -- heads encode one at a time, which is what
+ * makes that safe.
+ *
+ * Returns non-zero when any of them moved since the last call. That is the whole reason
+ * this is one function: a change has to repaint *and* re-encode. Every cached strip body
+ * was made at the old setting, and both the frame path and the idle repaint path replay
+ * those bodies untouched, so without this a new brightness reached only the tiles that
+ * happened to move under it -- which is what the patchwork looked like.
+ */
+static int apply_head_correction(OizysDriver *driver, uint8_t head) {
+    int gain = oizys_config_head_gain_q8(head);
+    int contrast = oizys_config_head_contrast_q8(head);
+    if (driver->gain_q8[head] != gain || driver->contrast_q8[head] != contrast) {
+        driver->gain_q8[head] = gain;
+        driver->contrast_q8[head] = contrast;
+        driver->recode[head] = 1;
+        oizys_log("head %u gain %d/256, contrast %d/256", head, gain, contrast);
+    }
+    oizys_video_set_gain(gain);
+    oizys_video_set_contrast(contrast);
+    install_head_lut(driver, head);   /* may raise recode on its own */
+    if (!driver->recode[head]) {
+        return 0;
+    }
+    driver->damage[head].keyframe_owed = 1;
+    return 1;
+}
+
+int oizys_driver_head_needs_recode(const OizysDriver *driver, uint8_t head) {
+    return driver && head < OIZYS_DL3_MAX_HEADS ? driver->recode[head] : 0;
 }
 
 int oizys_driver_refresh_head(OizysDriver *driver, uint8_t head) {
@@ -1870,7 +1912,11 @@ int oizys_driver_refresh_head(OizysDriver *driver, uint8_t head) {
      * once its input stops changing, and an idle desktop puts zero bytes on the video
      * endpoint by design. Repainting the cached strips costs no capture and no encode.
      */
-    apply_head_correction(driver, head);
+    if (apply_head_correction(driver, head)) {
+        /* Nothing in the cache is worth sending at the new settings. oizys_output_repaint
+           re-presents the last captured frame, which is what re-encodes them. */
+        return 0;
+    }
     int keepalive_s = oizys_config_head_keepalive_s(head);
     if (keepalive_s > 0 && driver->last_video_ns[head] &&
         now - driver->last_video_ns[head] >= (uint64_t)keepalive_s * 1000000000ull) {
@@ -1957,19 +2003,7 @@ static int present_bgra_mosaic(OizysDriver *driver, uint8_t head, const uint8_t 
         oizys_log("head %u woke on new content", head);
     }
     driver->last_change_ns[head] = monotonic_ns();
-    /* Both are encoder-side, so a change to either makes every cached strip stale: the
-       tiles that did not move still have to be resent at the new setting. */
-    int gain = oizys_config_head_gain_q8(head);
-    int contrast = oizys_config_head_contrast_q8(head);
-    if (driver->gain_q8[head] != gain || driver->contrast_q8[head] != contrast) {
-        driver->gain_q8[head] = gain;
-        driver->contrast_q8[head] = contrast;
-        driver->damage[head].keyframe_owed = 1;
-        oizys_log("head %u gain %d/256, contrast %d/256", head, gain, contrast);
-    }
-    oizys_video_set_gain(gain);
-    oizys_video_set_contrast(contrast);
-    install_head_lut(driver, head);
+    apply_head_correction(driver, head);
     /*
      * DisplayLink Manager does not stream whole frames. It hashes the surface a strip at
      * a time, sends the macro tiles whose content moved, and sends nothing at all while
@@ -1992,6 +2026,7 @@ static int present_bgra_mosaic(OizysDriver *driver, uint8_t head, const uint8_t 
         submit_strip_frame(driver, head, owed, count, presentations) < 0) {
         return -1;
     }
+    driver->recode[head] = 0;
     oizys_damage_presented(&driver->damage[head]);
     /* A static desktop is silent on the control plane, which makes a healthy idle stream
      * look identical to a dead one in the log. Say so periodically. */

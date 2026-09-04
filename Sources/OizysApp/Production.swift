@@ -45,6 +45,21 @@ private final class ProductionController: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        /*
+         * Asking comes first, before the duplicate-instance guard below.
+         *
+         * The installer runs this executable with --permissions-only to raise the system
+         * dialog, and macOS only lists an app under Screen Recording once the app has asked.
+         * By the time the installer gets there the login agent has already brought the
+         * menu-bar copy up -- so with the guard first, the asking copy saw a running one,
+         * quit on the spot, and the install ended by pointing at a list Oizys was not in.
+         * This pass touches nothing else: it asks, and it exits.
+         */
+        if CommandLine.arguments.contains("--permissions-only") {
+            requestPermissionIfNeeded()
+            NSApp.terminate(nil)
+            return
+        }
         // Another copy of *this executable*, not another process out of this bundle. The
         // driver is bundled here too and is attributed to the same identifier, so the wider
         // test made the app quit on sight whenever the login agent had already started the
@@ -55,12 +70,6 @@ private final class ProductionController: NSObject, NSApplicationDelegate {
                $0.processIdentifier != getpid() && $0.executableURL?.resolvingSymlinksInPath() == me
            }) {
             NSApp.terminate(nil); return
-        }
-        // Allow installation to request this identity's permission before moving the dock.
-        if CommandLine.arguments.contains("--permissions-only") {
-            requestPermissionIfNeeded()
-            NSApp.terminate(nil)
-            return
         }
         workspace = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("Oizys")
         do { try FileManager.default.createDirectory(at: workspace, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700]) }

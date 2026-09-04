@@ -124,17 +124,17 @@ void oizys_displays_snapshot(void) {
     }
 }
 
-int oizys_displays_restore(void) {
+/*
+ * Stage the snapshot into an open transaction. Returns how many changes were staged, so a
+ * caller that stages several plans can commit once and blank the desk once.
+ */
+static int plan_restore(CGDisplayConfigRef config) {
     if (g_snapshot_count == 0) {
         return 0;
     }
     int keep_modes = oizys_config_keep_modes();
     uint32_t ids[OIZYS_SNAPSHOT_CAP];
     uint32_t count = online_displays(ids, OIZYS_SNAPSHOT_CAP);
-    CGDisplayConfigRef config;
-    if (CGBeginDisplayConfiguration(&config) != kCGErrorSuccess) {
-        return -1;
-    }
     int changed = 0;
     for (uint32_t i = 0; i < g_snapshot_count; i++) {
         for (uint32_t j = 0; j < count; j++) {
@@ -165,12 +165,26 @@ int oizys_displays_restore(void) {
             break;
         }
     }
-    if (!changed) {
+    return changed;
+}
+
+/* Commit a transaction, or drop it when nothing was staged. Cancelling is not a failure:
+   it is the case where the desk is already right and must not be blanked to prove it. */
+static int commit(CGDisplayConfigRef config, int staged) {
+    if (staged <= 0) {
         CGCancelDisplayConfiguration(config);
-        return 0;
+        return staged < 0 ? -1 : 0;
     }
     return CGCompleteDisplayConfiguration(config, kCGConfigurePermanently) == kCGErrorSuccess ? 0
                                                                                              : -1;
+}
+
+int oizys_displays_restore(void) {
+    CGDisplayConfigRef config;
+    if (CGBeginDisplayConfiguration(&config) != kCGErrorSuccess) {
+        return -1;
+    }
+    return commit(config, plan_restore(config));
 }
 
 /*
@@ -251,7 +265,18 @@ static int native_external_bounds(const uint32_t *ids, int count, CGRect *out) {
     return 1;
 }
 
-int oizys_displays_arrange(const uint32_t *ids, int count, uint32_t width, uint32_t height) {
+/*
+ * Stage the head layout into an open transaction. Returns 1 when it staged anything, 0 when
+ * the heads are already seated the way they should be, -1 on a bad argument. Nothing here
+ * commits: seating and restoring belong in the same transaction, and the pending seats are
+ * only recorded once the caller's commit succeeds.
+ */
+static int32_t g_pending_x[OIZYS_MAX_LAYOUT_HEADS], g_pending_y[OIZYS_MAX_LAYOUT_HEADS];
+static int g_pending_count;
+
+static int plan_arrange(CGDisplayConfigRef config, const uint32_t *ids, int count,
+                        uint32_t width, uint32_t height) {
+    g_pending_count = 0;
     if (!ids || count <= 0 || count > OIZYS_MAX_LAYOUT_HEADS) {
         return -1;
     }
@@ -265,10 +290,6 @@ int oizys_displays_arrange(const uint32_t *ids, int count, uint32_t width, uint3
     if (heads_are_healthy(ids, count)) {
         remember_seats(ids, count);
         return 0;
-    }
-    CGDisplayConfigRef config;
-    if (CGBeginDisplayConfiguration(&config) != kCGErrorSuccess) {
-        return -1;
     }
     /*
      * A head has to scan out its own desktop. macOS will fold a newly created virtual
@@ -302,16 +323,63 @@ int oizys_displays_arrange(const uint32_t *ids, int count, uint32_t width, uint3
        even one pixel is a seam the cursor catches on. */
     for (int i = 0; i < count; i++) {
         CGConfigureDisplayOrigin(config, ids[i], x + (int32_t)width * i, y);
+        g_pending_x[i] = x + (int32_t)width * i;
+        g_pending_y[i] = y;
     }
-    if (CGCompleteDisplayConfiguration(config, kCGConfigurePermanently) != kCGErrorSuccess) {
+    g_pending_count = count;
+    return 1;
+}
+
+/* Adopt the seats a committed plan actually put the heads in. */
+static void seats_committed(void) {
+    for (int i = 0; i < g_pending_count; i++) {
+        g_seat_x[i] = g_pending_x[i];
+        g_seat_y[i] = g_pending_y[i];
+    }
+    if (g_pending_count > 0) {
+        g_seated = 1;
+    }
+    g_pending_count = 0;
+}
+
+int oizys_displays_arrange(const uint32_t *ids, int count, uint32_t width, uint32_t height) {
+    CGDisplayConfigRef config;
+    if (CGBeginDisplayConfiguration(&config) != kCGErrorSuccess) {
         return -1;
     }
-    for (int i = 0; i < count; i++) {
-        g_seat_x[i] = x + (int32_t)width * i;
-        g_seat_y[i] = y;
+    int staged = plan_arrange(config, ids, count, width, height);
+    int rc = commit(config, staged);
+    if (rc == 0) {
+        seats_committed();
     }
-    g_seated = 1;
-    return 0;
+    return rc;
+}
+
+/*
+ * Both plans, one commit.
+ *
+ * Restoring and seating are two writes to the same thing, and every commit is a mode set:
+ * the whole desk goes black for a beat, every window server client redraws, and the dock's
+ * heads renegotiate. Running them as separate transactions is what made a boot blink several
+ * times in a row. Staged together they are one blank, and a desk that is already correct
+ * stages nothing and does not blink at all.
+ */
+int oizys_displays_settle(const uint32_t *ids, int count, uint32_t width, uint32_t height) {
+    CGDisplayConfigRef config;
+    if (CGBeginDisplayConfiguration(&config) != kCGErrorSuccess) {
+        return -1;
+    }
+    int staged = plan_restore(config);
+    int seating = plan_arrange(config, ids, count, width, height);
+    if (seating < 0) {
+        CGCancelDisplayConfiguration(config);
+        return -1;
+    }
+    int rc = commit(config, staged + seating);
+    if (rc == 0) {
+        seats_committed();
+    }
+    return rc;
 }
 
 struct WatchState {
@@ -343,6 +411,51 @@ static double monotonic_seconds(void) {
 #define OIZYS_TOPOLOGY_SETTLE_S 5.0
 static double g_topology_at;
 
+/*
+ * One settle per burst, not one per callback.
+ *
+ * A single display arriving raises this callback many times -- once for the begin phase and
+ * once for the end phase of every display in the set, and again for each of macOS's own
+ * intermediate steps. Booting with the dock attached raised dozens. Each one used to
+ * schedule its own restore and its own arrange, so the desk was still being reconfigured
+ * when the next batch landed, and every one of those reconfigurations is a screen blank: the
+ * flicker was Oizys answering itself.
+ *
+ * So the callbacks re-arm a single deadline instead of stacking work behind it. The block
+ * that eventually runs checks whether the deadline moved while it was waiting and, if it
+ * did, waits out the remainder rather than acting on a state that is still changing. What
+ * comes out the far side is exactly one settle per burst, and that settle is one
+ * transaction, so a topology change costs one blank however many callbacks announced it.
+ */
+#define OIZYS_SETTLE_DELAY_S 0.4
+static double g_settle_deadline;
+static int g_settle_armed;
+
+static void settle_after(double seconds);
+
+static void settle_now(void) {
+    if (monotonic_seconds() < g_settle_deadline) {
+        settle_after(g_settle_deadline - monotonic_seconds());
+        return;
+    }
+    g_settle_armed = 0;
+    struct WatchState watch = g_watch;
+    if (watch.count <= 0) {
+        return;
+    }
+    /* A mode that moved in the same breath as an attach is fallout and is put back; one that
+       moved long after it is the user's own choice and becomes the new snapshot. */
+    if (monotonic_seconds() - g_topology_at >= OIZYS_TOPOLOGY_SETTLE_S) {
+        oizys_displays_snapshot();
+    }
+    oizys_displays_settle(watch.ids, watch.count, watch.width, watch.height);
+}
+
+static void settle_after(double seconds) {
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(seconds * NSEC_PER_SEC)),
+                   dispatch_get_main_queue(), ^{ settle_now(); });
+}
+
 static void reconfigured(CGDirectDisplayID display, CGDisplayChangeSummaryFlags flags,
                          void *userInfo) {
     (void)display;
@@ -359,20 +472,11 @@ static void reconfigured(CGDirectDisplayID display, CGDisplayChangeSummaryFlags 
     if (g_watch.count <= 0) {
         return;
     }
-    struct WatchState watch = g_watch;
-    /* Sidecar reports through several callbacks as it attaches, and the mirror set is not
-       in place until the last of them. Re-asserting a beat later sees the final state. */
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 400 * NSEC_PER_MSEC),
-                   dispatch_get_main_queue(), ^{
-                     struct WatchState settled = watch;
-                     if (monotonic_seconds() - g_topology_at < OIZYS_TOPOLOGY_SETTLE_S) {
-                         oizys_displays_restore();
-                     } else {
-                         oizys_displays_snapshot();
-                     }
-                     oizys_displays_arrange(settled.ids, settled.count, settled.width,
-                                            settled.height);
-                   });
+    g_settle_deadline = monotonic_seconds() + OIZYS_SETTLE_DELAY_S;
+    if (!g_settle_armed) {
+        g_settle_armed = 1;
+        settle_after(OIZYS_SETTLE_DELAY_S);
+    }
 }
 
 void oizys_displays_watch(const uint32_t *ids, int count, uint32_t width, uint32_t height) {

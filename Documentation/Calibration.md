@@ -72,6 +72,12 @@ correction goes in the encoder as a per-channel 256-entry lookup, applied to the
 before the colour transform — it has to be before, because the transform's planes are linear
 combinations of R, G and B and a per-channel scale does not commute with them.
 
+`head.<side>.brightness` and `head.<side>.contrast` compose into that same table, the
+calibration first and the user's own two knobs on top. They were a scale and a lift on the
+planes once, which is exact only while nothing clips; on the pixels they clip per channel,
+the way a monitor does. A table that changes for either reason invalidates every cached
+strip body for that head, because those bodies were encoded through the old one.
+
 The lookup is vectorised. `vqtbl4q_u8` reaches 64 entries and yields zero above that, so four
 of them cover 256: each is offset by 64, and the wrap-around puts every index outside its own
 quarter above 64 where it reads as zero, leaving exactly one quarter to answer. The tests

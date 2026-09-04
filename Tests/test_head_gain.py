@@ -251,3 +251,76 @@ def test_contrast_leaves_a_grey_grey():
             assert encoded == encode_contrast(flat(level), contrast)
     # A grey ramp stays neutral: encoding is deterministic and channel-symmetric.
     assert encode_contrast(flat(90), 320) != encode_contrast(flat(91), 320)
+
+
+# --- brightness and contrast are applied to the pixels ------------------------------------
+#
+# The pair used to be a scale and a lift on the encoded planes, which is the same transform
+# right up to the point where a channel leaves 0..255 and then is not the same at all: the
+# planes were clamped independently of each other, which is not any RGB triple, and the dock
+# reconstructed blocks of wrong colour out of it. On the pixels the clipping is per channel,
+# the way a monitor clips, and it is exactly reproducible here.
+
+
+def tone(level, gain, contrast):
+    shaped = 128 + (((level - 128) * contrast + 128) >> 8)
+    shaped = min(255, max(0, shaped))
+    return min(255, max(0, (shaped * gain + 128) >> 8))
+
+
+@pytest.mark.parametrize("gain,contrast", [(256, 384), (256, 128), (180, 320), (128, 200)])
+def test_tone_matches_the_same_map_applied_to_the_pixels(gain, contrast):
+    # Saturated corners included, so at least one channel clips at each end.
+    pixels = surface(23)
+    pixels[0, :4] = 255
+    pixels[1, :4] = 0
+    core.lib.oizys_video_set_contrast(contrast)
+    through_encoder = encode(pixels, gain)
+
+    core.lib.oizys_video_set_gain(256)
+    core.lib.oizys_video_set_contrast(256)
+    table = np.array([tone(level, gain, contrast) for level in range(256)], dtype=np.uint8)
+    mapped = pixels.copy()
+    mapped[:, :, :3] = table[pixels[:, :, :3]]
+    assert through_encoder == encode(mapped, 256)
+
+
+def test_raised_contrast_clips_one_channel_and_leaves_the_others():
+    # A pixel whose red is already near the ceiling: raising contrast must clip the red and
+    # move green and blue on their own terms. Clamping planes could not express this, and
+    # produced a colour that was in none of the three channels.
+    pixels = np.zeros((STRIP_H, STRIP_W, 4), dtype=np.uint8)
+    pixels[:, :, 2] = 250      # red
+    pixels[:, :, 1] = 140      # green
+    pixels[:, :, 0] = 30       # blue
+    core.lib.oizys_video_set_contrast(384)
+    through_encoder = encode(pixels, 256)
+
+    core.lib.oizys_video_set_gain(256)
+    core.lib.oizys_video_set_contrast(256)
+    clipped = pixels.copy()
+    clipped[:, :, 2] = 255                       # (250-128)*1.5+128 = 311, clipped
+    clipped[:, :, 1] = tone(140, 256, 384)
+    clipped[:, :, 0] = tone(30, 256, 384)
+    assert through_encoder == encode(clipped, 256)
+
+
+def test_the_tone_composes_with_a_calibration_table():
+    # Both live in the same lookup now. The calibration has to run first: it is what the
+    # panel needs to be neutral, and brightness is what the user then asked for on top.
+    tables = identity_lut()
+    tables[1, :] = (np.arange(256) // 2).astype(np.uint8)      # halve green
+    keep = install_lut(tables)
+    core.lib.oizys_video_set_contrast(320)
+    through_encoder = encode(surface(29), 200)
+
+    core.lib.oizys_video_set_channel_lut(None)
+    core.lib.oizys_video_set_gain(256)
+    core.lib.oizys_video_set_contrast(256)
+    pixels = surface(29)
+    expected = pixels.copy()
+    expected[:, :, 1] = pixels[:, :, 1] // 2
+    table = np.array([tone(level, 200, 320) for level in range(256)], dtype=np.uint8)
+    expected[:, :, :3] = table[expected[:, :, :3]]
+    assert through_encoder == encode(expected, 256)
+    del keep

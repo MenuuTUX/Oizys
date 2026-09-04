@@ -56,6 +56,8 @@ struct MenuPopover: View {
                     }
                 }
 
+                MenuBarSection()
+
                 HStack(spacing: 8) {
                     QuietButton(title: model.running ? "Stop" : "Start") {
                         model.running ? model.stop() : model.start()
@@ -76,6 +78,49 @@ struct MenuPopover: View {
         .frame(width: 330)
         .background(Ink.ground)
         .onAppear { model.refresh() }
+    }
+}
+
+/*
+ * The menu-bar items Oizys is asked about, and which of them it can actually change.
+ *
+ * Two purple items sit beside Oizys's own while it is working: macOS's screen-recording
+ * indicator, because Oizys is capturing the head desktops, and the mirroring indicator, lit by
+ * whatever iPad or AirPlay display is attached. Neither has an off switch anywhere in macOS.
+ *
+ * The switch here is for Control Center's Screen Mirroring module, which is a different item
+ * with a confusingly similar name. It writes the same preference System Settings > Control
+ * Center writes, so either place turns it off and either place turns it back on -- and neither
+ * place touches the indicator that a live session puts there.
+ *
+ * The screen-recording line is a statement, not a switch, and deliberately so: macOS gives no
+ * way to turn that indicator off, which is the point of it. Saying so here, next to what Oizys
+ * actually captures, is the useful version of that.
+ */
+private struct MenuBarSection: View {
+    @State private var mirroringIcon = MenuBarExtras.mirroringIconVisible
+
+    var body: some View {
+        SectionLabel(text: "Menu bar")
+        Row(label: "Screen mirroring module",
+            detail: "Control Center's, not Oizys's. Hiding it leaves the purple item macOS "
+                  + "shows while an iPad is attached; that one has no switch.") {
+            QuietSwitch(isOn: Binding(get: { mirroringIcon },
+                                      set: { mirroringIcon = $0
+                                             MenuBarExtras.setMirroringIconVisible($0) }))
+        }
+        Row(label: "Screen recording",
+            detail: MenuBarExtras.capturing
+                ? "Granted. Oizys captures the two head desktops and encodes them onto the dock."
+                : "Not granted, so the heads stay dark.") {
+            QuietButton(title: "Settings…") { MenuBarExtras.openScreenRecordingSettings() }
+        }
+        Text("Oizys installs one menu-bar item. The two purple ones beside it belong to "
+             + "macOS: one for the capture Oizys is doing, one for the display that is "
+             + "attached. Neither can be turned off, and Oizys would not hide them if it "
+             + "could -- they are what tell you a driver is reading your desktop and where "
+             + "the picture is going. They leave when the capture and the display do.")
+            .font(.system(size: 10)).foregroundStyle(Ink.faint).padding(.top, 6)
     }
 }
 
@@ -177,36 +222,13 @@ struct PanelBody: View {
 
 private struct DisplaysPanel: View {
     @ObservedObject var model: OizysModel
+
     var body: some View {
         SectionLabel(text: "Attached displays", trailing: "\(model.displays.count)")
         ForEach(model.displays) { display in
-            Row(label: display.name,
-                detail: "\(display.geometry) · at \(Int(display.origin.x)),\(Int(display.origin.y))"
-                        + (display.mirrored ? " · mirrored" : "") + (display.main ? " · main" : "")) {
-                Text(display.kind.rawValue).foregroundStyle(Ink.faint)
-            }
-            if let head = display.head {
-                HeadBrightnessRow(model: model, head: head)
-                HeadContrastRow(model: model, head: head)
-            } else if display.kind != .sidecar {
-                BrightnessRow(model: model, display: display)
-            }
-            HStack(spacing: 8) {
-                if !display.main {
-                    QuietButton(title: display.mirrored ? "Unmirror" : "Mirror main") {
-                        model.run(["monitor", String(display.id), "mirror",
-                                   display.mirrored ? "off" : String(CGMainDisplayID())])
-                    }
-                }
-                Spacer()
-            }
-            .padding(.top, 6).padding(.bottom, 14)
+            DisplayCard(model: model, display: display)
         }
-        Text("Brightness on an Oizys head is a gain applied while encoding, because Oizys owns "
-             + "every pixel those panels receive. It dims the picture, not the backlight — a "
-             + "DisplayLink output has no I2C channel, so the monitor's own controls, including "
-             + "its power state, stay on its front-panel menu.")
-            .font(.system(size: 10)).foregroundStyle(Ink.faint).padding(.top, 4)
+        NightShiftRows()
 
         SectionLabel(text: "Arrangement")
         Row(label: "Keep the other screens' resolutions",
@@ -221,6 +243,213 @@ private struct DisplaysPanel: View {
              + "you would rather set that up yourself — Oizys adopts a resolution you choose "
              + "yourself a few seconds after the screens settle, so it will not fight you.")
             .font(.system(size: 10)).foregroundStyle(Ink.faint).padding(.top, 4)
+
+        SectionLabel(text: "What macOS keeps to itself")
+        Text("HDR, Presets, True Tone and the display colour profile have no route out of "
+             + "System Settings, and rotation only has an undocumented one that a display "
+             + "driven over the dock has no framebuffer for. Everything else the Displays "
+             + "pane does is above. Oizys has its own answer to the colour profile: the "
+             + "Colour panel measures a head and stores a per-channel correction for it.")
+            .font(.system(size: 10)).foregroundStyle(Ink.faint)
+        HStack(spacing: 8) {
+            QuietButton(title: "Open Displays settings…") {
+                DisplaySettings.openDisplaysSettings()
+            }
+            Spacer()
+        }
+        .padding(.top, 8)
+    }
+}
+
+/*
+ * One display, and everything that can be done to it from here.
+ *
+ * An Oizys head is the exception in every row. Its resolution is fixed: the dock is trained
+ * for 1920x1080 and ScreenCaptureKit is opened on a surface that size, so offering a
+ * resolution list for one would be offering a way to make the panel go dark. Its brightness
+ * is a gain in the encoder rather than a DDC write, for the same reason its monitor's own
+ * controls stay on its front panel — a DisplayLink output has no I2C channel.
+ */
+private struct DisplayCard: View {
+    @ObservedObject var model: OizysModel
+    let display: OizysDisplay
+
+    private var badges: String {
+        var parts = ["at \(Int(display.origin.x)),\(Int(display.origin.y))"]
+        if display.mirrored { parts.append("mirrored") }
+        if display.main { parts.append("main") }
+        let angle = DisplaySettings.rotation(display.id)
+        if angle != 0 { parts.append("rotated \(angle)°") }
+        return parts.joined(separator: " · ")
+    }
+
+    var body: some View {
+        Row(label: display.name, detail: "\(display.geometry) · \(badges)") {
+            Text(display.kind.rawValue).foregroundStyle(Ink.faint)
+        }
+        if display.kind == .head {
+            Row(label: "Resolution", detail: "Fixed by the dock: the heads are trained for "
+                                             + "1920×1080 and captured at that size.") {
+                Text("1920 × 1080 · 60 Hz")
+            }
+        } else {
+            ModeRows(model: model, display: display)
+        }
+        if let head = display.head {
+            HeadBrightnessRow(model: model, head: head)
+            HeadContrastRow(model: model, head: head)
+        } else if display.kind != .sidecar {
+            BrightnessRow(model: model, display: display)
+        }
+        PlacementRows(model: model, display: display)
+    }
+}
+
+/// Resolution and refresh rate, split the way the Displays pane splits them: one control for
+/// the size, one for the rates that size offers. A display with a single rate shows none.
+private struct ModeRows: View {
+    @ObservedObject var model: OizysModel
+    let display: OizysDisplay
+
+    var body: some View {
+        let modes = DisplaySettings.modes(display.id)
+        let now = DisplaySettings.current(display.id)
+        if modes.isEmpty {
+            Row(label: "Resolution", detail: "This display did not report a mode list.") {
+                Text("—")
+            }
+        } else {
+            // One entry per size; the rate control below picks among that size's rates.
+            let sizes = sizeOptions(modes)
+            VStack(alignment: .leading, spacing: 6) {
+                Text("RESOLUTION").font(Ink.section).tracking(1.1).foregroundStyle(Ink.faint)
+                ChipChoice(options: sizes.map { ($0.label, $0.index) },
+                           selection: Binding(get: { now?.index ?? -1 },
+                                              set: { apply(modes, $0) }))
+            }
+            .padding(.vertical, 8)
+            .overlay(alignment: .bottom) { Rectangle().fill(Ink.hairline).frame(height: 1) }
+
+            if let now, case let rates = DisplaySettings.rates(display.id, like: now),
+               rates.count > 1 {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("REFRESH RATE").font(Ink.section).tracking(1.1).foregroundStyle(Ink.faint)
+                    ChipChoice(options: rates.map { ($0.rate, $0.index) },
+                               selection: Binding(get: { now.index }, set: { apply(modes, $0) }),
+                               minimum: 64)
+                }
+                .padding(.vertical, 8)
+                .overlay(alignment: .bottom) { Rectangle().fill(Ink.hairline).frame(height: 1) }
+            }
+        }
+    }
+
+    /// The highest-refresh entry for each distinct size, so the size chips are one per size.
+    /// Picking a size keeps whatever rate that size offers first; the rate chips move it.
+    private func sizeOptions(_ modes: [DisplaySettings.Mode]) -> [DisplaySettings.Mode] {
+        var seen = Set<String>()
+        return modes.filter { seen.insert("\($0.width)x\($0.height)x\($0.hiDPI)").inserted }
+    }
+
+    private func apply(_ modes: [DisplaySettings.Mode], _ index: Int) {
+        guard let mode = modes.first(where: { $0.index == index }) else { return }
+        DisplaySettings.apply(display.id, mode)
+        model.refresh()
+    }
+}
+
+/// Where this display sits, and what it is showing. Mirroring and "make this the main
+/// display" are the two arrangement choices with consequences; the sides are a shortcut for
+/// the drag that System Settings makes you do.
+private struct PlacementRows: View {
+    @ObservedObject var model: OizysModel
+    let display: OizysDisplay
+
+    private var others: [OizysDisplay] {
+        model.displays.filter { $0.id != display.id }
+    }
+
+    /// The heads, left to right. Moving one of them moves both: the driver seats them as a
+    /// contiguous run and reseats anything else, so a lone head would snap back.
+    private var run: [CGDirectDisplayID] {
+        guard display.head != nil else { return [display.id] }
+        return model.displays.filter { $0.head != nil }
+            .sorted { ($0.head ?? 0) < ($1.head ?? 0) }.map(\.id)
+    }
+
+    var body: some View {
+        if let anchor, !run.contains(anchor.id) {
+            Row(label: "Position",
+                detail: "Relative to \(anchor.name), edges touching"
+                        + (run.count > 1 ? ". Moves both heads: the driver seats them as a pair."
+                                         : ".")) {
+                HStack(spacing: 4) {
+                    ForEach(DisplaySettings.Side.allCases, id: \.self) { side in
+                        QuietButton(title: side.rawValue) {
+                            DisplaySettings.placeRun(run, side, of: anchor.id)
+                            model.refresh()
+                        }
+                    }
+                }
+            }
+        }
+        if display.head != nil {
+            Row(label: "Mirroring",
+                detail: "A head in a mirror set scans out the other display's desktop at the "
+                        + "wrong aspect ratio, so the driver refuses to run with one.") {
+                Text("Not available")
+            }
+        }
+        HStack(spacing: 8) {
+            if !display.main {
+                QuietButton(title: "Make main") {
+                    DisplaySettings.makeMain(display.id)
+                    model.refresh()
+                }
+            }
+            if display.head == nil, !display.main, let anchor, anchor.head == nil {
+                QuietButton(title: display.mirrored ? "Unmirror" : "Mirror \(anchor.name)") {
+                    DisplaySettings.mirror(display.id, of: display.mirrored ? nil : anchor.id)
+                    model.refresh()
+                }
+            }
+            Spacer()
+        }
+        .padding(.top, 6).padding(.bottom, 14)
+    }
+
+    /// The main display, or failing that whatever else is attached. A display cannot be
+    /// placed relative to itself, and the main one is what everybody means by "next to".
+    private var anchor: OizysDisplay? {
+        others.first { $0.main } ?? others.first
+    }
+}
+
+/// Night Shift, which is a Displays setting on this Mac and lives in a private framework.
+/// The rows disappear rather than misbehave on a release that has moved it.
+private struct NightShiftRows: View {
+    @State private var on = NightShift.enabled
+    @State private var strength = NightShift.strength
+
+    var body: some View {
+        if NightShift.available {
+            SectionLabel(text: "Night Shift")
+            Row(label: "Night Shift", detail: "Warms every display, Oizys heads included: it "
+                                              + "is applied by the window server, above the "
+                                              + "pixels Oizys reads.") {
+                QuietSwitch(isOn: Binding(get: { on },
+                                          set: { on = $0; NightShift.setEnabled($0) }))
+            }
+            Row(label: "Warmth") {
+                HStack(spacing: 10) {
+                    HalftoneSlider(value: Binding(get: { Double(strength) },
+                                                  set: { strength = Float($0)
+                                                         NightShift.setStrength(Float($0)) }))
+                        .frame(width: 150)
+                    Text("\(Int(strength * 100))%").frame(width: 38, alignment: .trailing)
+                }
+            }
+        }
     }
 }
 
@@ -229,7 +458,9 @@ private struct HeadBrightnessRow: View {
     let head: Int
     var body: some View {
         let value = model.headBrightness(head)
-        Row(label: "Brightness", detail: "Applied in the encoder; takes effect immediately.") {
+        Row(label: "Brightness",
+            detail: "A gain applied while encoding, because Oizys owns every pixel this "
+                    + "panel receives. It dims the picture, not the backlight.") {
             HStack(spacing: 10) {
                 HalftoneSlider(value: Binding(
                     get: { (value - 10) / 90 },

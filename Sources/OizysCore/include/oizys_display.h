@@ -52,6 +52,10 @@ int oizys_display_unit_is_shared(uint32_t id);
  * macOS re-lay-out the desktop and move displays that have nothing to do with the dock. */
 void oizys_displays_snapshot(void);
 int oizys_displays_restore(void);
+/* Restore and arrange in one display transaction, and therefore one mode set. Two commits
+ * are two screen blanks, and the desk blinks once for each; every caller that wants both
+ * wants them together. */
+int oizys_displays_settle(const uint32_t *ids, int count, uint32_t width, uint32_t height);
 
 #ifdef __cplusplus
 }

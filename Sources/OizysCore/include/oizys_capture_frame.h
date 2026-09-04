@@ -22,6 +22,11 @@ void oizys_output_destroy(OizysCaptureOutput *output); /* after draining produce
 int oizys_output_frames(const OizysCaptureOutput *output);
 const char *oizys_output_failure(const OizysCaptureOutput *output);
 int oizys_output_needs_refresh(OizysCaptureOutput *output); /* worker queue only */
+/* Present the last frame again, as if it had just arrived. ScreenCaptureKit delivers only
+   what changed, so a desktop nobody is touching produces no frames at all -- and a setting
+   that changes how a frame is encoded, rather than what is in it, would otherwise not reach
+   the panel until something moved on it. Worker queue only. */
+void oizys_output_repaint(OizysCaptureOutput *output);
 void oizys_output_report(OizysCaptureOutput *output); /* worker queue only */
 #ifdef __cplusplus
 }

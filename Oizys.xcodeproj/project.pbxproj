@@ -82,8 +82,10 @@
 		B7560249CA6BB9A813AA7CE5 /* DebugPermissions.swift in OizysApp */ = {isa = PBXBuildFile; fileRef = 3DEE5D5E5D207CD24CEA8780 /* DebugPermissions.swift */; };
 		A34FC258810ACE6E9F7D99D6 /* DevDiagnostics.swift in OizysApp */ = {isa = PBXBuildFile; fileRef = FEA78EF48E937C1FA9802574 /* DevDiagnostics.swift */; };
 		F3E6D66195D05E2FB51CCEFE /* DiagnosticReport.swift in OizysApp */ = {isa = PBXBuildFile; fileRef = 128BD5F987CB6D3B259C5A90 /* DiagnosticReport.swift */; };
+		6A7B772922E55E300B895DF9 /* DisplaySettings.swift in OizysApp */ = {isa = PBXBuildFile; fileRef = F8B440078D7F30BB4004E960 /* DisplaySettings.swift */; };
 		311637B699AEEA51F349C79E /* DisplayTint.swift in OizysApp */ = {isa = PBXBuildFile; fileRef = 66F195DD8E90763F185B8A9D /* DisplayTint.swift */; };
 		2953351EF9776F1F663E868B /* Main.swift in OizysApp */ = {isa = PBXBuildFile; fileRef = 945D4B4A37A269A4CE6589DF /* Main.swift */; };
+		68329C1C45688C03CC9B78E8 /* MenuBarExtras.swift in OizysApp */ = {isa = PBXBuildFile; fileRef = 67E1C777C362AD636C80794E /* MenuBarExtras.swift */; };
 		BE70213247D952BF8D65A388 /* OizysDesign.swift in OizysApp */ = {isa = PBXBuildFile; fileRef = 595DDE31A7673F25568E07F0 /* OizysDesign.swift */; };
 		6B21F2105F09C61F6529A5B5 /* OizysLogo.swift in OizysApp */ = {isa = PBXBuildFile; fileRef = 59BC76CE3FC1774ED73C8E0E /* OizysLogo.swift */; };
 		796D345FC0A0ACA55E03467F /* OizysMenuBar.swift in OizysApp */ = {isa = PBXBuildFile; fileRef = 6BC7A0A6AAF7BA376A5B28E8 /* OizysMenuBar.swift */; };
@@ -174,8 +176,10 @@
 		3DEE5D5E5D207CD24CEA8780 /* DebugPermissions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DebugPermissions.swift; path = Sources/OizysApp/DebugPermissions.swift; sourceTree = SOURCE_ROOT; };
 		FEA78EF48E937C1FA9802574 /* DevDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DevDiagnostics.swift; path = Sources/OizysApp/DevDiagnostics.swift; sourceTree = SOURCE_ROOT; };
 		128BD5F987CB6D3B259C5A90 /* DiagnosticReport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DiagnosticReport.swift; path = Sources/OizysApp/DiagnosticReport.swift; sourceTree = SOURCE_ROOT; };
+		F8B440078D7F30BB4004E960 /* DisplaySettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DisplaySettings.swift; path = Sources/OizysApp/DisplaySettings.swift; sourceTree = SOURCE_ROOT; };
 		66F195DD8E90763F185B8A9D /* DisplayTint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DisplayTint.swift; path = Sources/OizysApp/DisplayTint.swift; sourceTree = SOURCE_ROOT; };
 		945D4B4A37A269A4CE6589DF /* Main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Main.swift; path = Sources/OizysApp/Main.swift; sourceTree = SOURCE_ROOT; };
+		67E1C777C362AD636C80794E /* MenuBarExtras.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MenuBarExtras.swift; path = Sources/OizysApp/MenuBarExtras.swift; sourceTree = SOURCE_ROOT; };
 		595DDE31A7673F25568E07F0 /* OizysDesign.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OizysDesign.swift; path = Sources/OizysApp/OizysDesign.swift; sourceTree = SOURCE_ROOT; };
 		59BC76CE3FC1774ED73C8E0E /* OizysLogo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OizysLogo.swift; path = Sources/OizysApp/OizysLogo.swift; sourceTree = SOURCE_ROOT; };
 		6BC7A0A6AAF7BA376A5B28E8 /* OizysMenuBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OizysMenuBar.swift; path = Sources/OizysApp/OizysMenuBar.swift; sourceTree = SOURCE_ROOT; };
@@ -457,8 +461,10 @@
 				3DEE5D5E5D207CD24CEA8780 /* DebugPermissions.swift */,
 				FEA78EF48E937C1FA9802574 /* DevDiagnostics.swift */,
 				128BD5F987CB6D3B259C5A90 /* DiagnosticReport.swift */,
+				F8B440078D7F30BB4004E960 /* DisplaySettings.swift */,
 				66F195DD8E90763F185B8A9D /* DisplayTint.swift */,
 				945D4B4A37A269A4CE6589DF /* Main.swift */,
+				67E1C777C362AD636C80794E /* MenuBarExtras.swift */,
 				595DDE31A7673F25568E07F0 /* OizysDesign.swift */,
 				59BC76CE3FC1774ED73C8E0E /* OizysLogo.swift */,
 				6BC7A0A6AAF7BA376A5B28E8 /* OizysMenuBar.swift */,
@@ -778,8 +784,10 @@
 				B7560249CA6BB9A813AA7CE5 /* DebugPermissions.swift */,
 				A34FC258810ACE6E9F7D99D6 /* DevDiagnostics.swift */,
 				F3E6D66195D05E2FB51CCEFE /* DiagnosticReport.swift */,
+				6A7B772922E55E300B895DF9 /* DisplaySettings.swift */,
 				311637B699AEEA51F349C79E /* DisplayTint.swift */,
 				2953351EF9776F1F663E868B /* Main.swift */,
+				68329C1C45688C03CC9B78E8 /* MenuBarExtras.swift */,
 				BE70213247D952BF8D65A388 /* OizysDesign.swift */,
 				6B21F2105F09C61F6529A5B5 /* OizysLogo.swift */,
 				796D345FC0A0ACA55E03467F /* OizysMenuBar.swift */,

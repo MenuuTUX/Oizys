@@ -130,6 +130,36 @@ struct SegmentedChoice<Value: Hashable>: View {
     }
 }
 
+/// The same chips, wrapped over as many rows as they need. A display can offer a dozen
+/// resolutions, which is several more than one row holds at this width, and a system pop-up
+/// menu is exactly the AppKit-backed control the rest of this panel avoids.
+struct ChipChoice<Value: Hashable>: View {
+    let options: [(label: String, value: Value)]
+    @Binding var selection: Value
+    var minimum: CGFloat = 96
+
+    var body: some View {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: minimum), spacing: 4)],
+                  alignment: .leading, spacing: 4) {
+            ForEach(options, id: \.value) { option in
+                let chosen = option.value == selection
+                Button { selection = option.value } label: {
+                    Text(option.label)
+                        .font(.system(size: 11, weight: chosen ? .semibold : .regular))
+                        .foregroundStyle(chosen ? Ink.primary : Ink.secondary)
+                        .lineLimit(1)
+                        .frame(maxWidth: .infinity)
+                        .padding(.horizontal, 8).padding(.vertical, 4)
+                        .background(RoundedRectangle(cornerRadius: 5)
+                            .fill(chosen ? Color.white.opacity(0.14) : Ink.panel))
+                        .overlay(RoundedRectangle(cornerRadius: 5).stroke(Ink.hairline))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+}
+
 /// A switch drawn rather than borrowed. The system toggle brings its own accent colour into
 /// a strictly monochrome panel, and it is AppKit-backed, so it does not survive being
 /// rendered offscreen for review. This is two shapes and reads the same in both themes.

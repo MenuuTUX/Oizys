@@ -432,31 +432,100 @@ static inline void store_scaled(int32_t *out, int16x8_t value) {
     vst1q_s32(out + 4, vshlq_n_s32(vmovl_s16(vget_high_s16(value)), 6));
 }
 
-/* A channel spans 0..255 and a plane carries it at 64 per unit. */
-#define OIZYS_PLANE_LIMIT (255 * 64)
-
+/*
+ * Brightness scales from black -- out = in * g -- so unity is its ceiling and every value
+ * below it darkens. Contrast pivots on mid-grey instead: out = (in - 128) * c + 128, which
+ * has to be able to go both ways to mean anything, so that one runs either side of unity.
+ * Above it, highlights clip and shadows crush, which is what raising contrast on a monitor
+ * does too.
+ */
 static int g_gain_q8 = 256;
+static int g_contrast_q8 = 256;
 
 /*
  * Per-channel correction, as three 256-entry tables.
  *
- * The uniform gain above acts on the planes, which is exact because they are a linear
- * transform of R, G and B and one factor scales all three alike. A per-channel correction
- * does not commute with that transform -- blue_delta is B minus G, so scaling B and G
- * differently is not a scaling of blue_delta -- so it has to happen on the pixels, before
- * the transform. That is what this is, and why it is a separate mechanism.
+ * A per-channel correction does not commute with the plane transform -- blue_delta is B
+ * minus G, so scaling B and G differently is not a scaling of blue_delta -- so it has to
+ * happen on the pixels, before the transform. That is what this is.
  *
  * NULL until a calibration is installed, and then the tables are read-only for the life of
  * the frame: they are swapped between frames, never during one.
  */
 static const uint8_t (*g_channel_lut)[256];
 
-void oizys_video_set_channel_lut(const uint8_t (*tables)[256]) {
-    g_channel_lut = tables;
+/*
+ * Brightness and contrast live here too, composed into the same tables.
+ *
+ * They used to be applied afterwards, as a scale and a lift on the three planes. That is
+ * algebraically the same transform -- the planes are linear in R, G and B -- right up to the
+ * point where a value leaves 0..255, and then it is not the same at all. A real monitor
+ * clips per channel: raise contrast and a bright red clips its red and keeps its green and
+ * blue. Clamping planes clips a channel *difference* and a luma independently of each other,
+ * which is not any RGB triple, so the reconstruction on the far side of the dock came back
+ * as blocks of wrong colour. Brightness alone was safe; anything that pushed a channel out
+ * of range was not, which is why this looked like it half worked.
+ *
+ * Done on the pixels it is exact and it is free: the LUT pass already existed for the
+ * calibration, and this composes into it, so a head with both set costs one table lookup
+ * rather than a lookup and a per-plane multiply.
+ */
+static uint8_t g_tone_lut[3][256];
+/* What the converter actually reads: the calibration alone, the composed table, or NULL. */
+static const uint8_t (*g_active_lut)[256];
+
+/* Contrast about mid-grey, then brightness from black -- the same order, and the same
+   arithmetic, as DisplayTint's gamma ramp, so a head and a Sidecar iPad set to the same two
+   numbers look the same. */
+static uint8_t tone_map(int level) {
+    int shaped = 128 + (((level - 128) * g_contrast_q8 + 128) >> 8);
+    shaped = shaped < 0 ? 0 : shaped > 255 ? 255 : shaped;
+    int lit = (shaped * g_gain_q8 + 128) >> 8;
+    return (uint8_t)(lit < 0 ? 0 : lit > 255 ? 255 : lit);
 }
 
+static void rebuild_active_lut(void) {
+    if (g_gain_q8 == 256 && g_contrast_q8 == 256) {
+        /* Unity has to stay byte-for-byte free, so no table is installed for it. */
+        g_active_lut = g_channel_lut;
+        return;
+    }
+    for (int channel = 0; channel < 3; channel++) {
+        for (int level = 0; level < 256; level++) {
+            g_tone_lut[channel][level] =
+                tone_map(g_channel_lut ? g_channel_lut[channel][level] : level);
+        }
+    }
+    g_active_lut = (const uint8_t (*)[256])g_tone_lut;
+}
+
+void oizys_video_set_channel_lut(const uint8_t (*tables)[256]) {
+    g_channel_lut = tables;
+    rebuild_active_lut();
+}
+
+/* The calibration's own presence, not the composed table's: brightness is not a calibration
+   and must not read as one. */
 int oizys_video_has_channel_lut(void) {
     return g_channel_lut != NULL;
+}
+
+void oizys_video_set_gain(int gain_q8) {
+    g_gain_q8 = gain_q8 < 0 ? 0 : gain_q8 > 256 ? 256 : gain_q8;
+    rebuild_active_lut();
+}
+
+int oizys_video_gain(void) {
+    return g_gain_q8;
+}
+
+void oizys_video_set_contrast(int contrast_q8) {
+    g_contrast_q8 = contrast_q8 < 128 ? 128 : contrast_q8 > 384 ? 384 : contrast_q8;
+    rebuild_active_lut();
+}
+
+int oizys_video_contrast(void) {
+    return g_contrast_q8;
 }
 
 /*
@@ -480,33 +549,6 @@ static inline void load_table(uint8x16x4_t *out, const uint8_t *source) {
     for (int quarter = 0; quarter < 4; quarter++) {
         out[quarter] = vld1q_u8_x4(source + quarter * 64);
     }
-}
-
-void oizys_video_set_gain(int gain_q8) {
-    g_gain_q8 = gain_q8 < 0 ? 0 : gain_q8 > 256 ? 256 : gain_q8;
-}
-
-int oizys_video_gain(void) {
-    return g_gain_q8;
-}
-
-/*
- * Contrast, as the other half of the same pass.
- *
- * Brightness scales from black -- out = in * g -- so unity is its ceiling and every value
- * below it darkens. Contrast pivots on mid-grey instead: out = (in - 128) * c + 128, which
- * has to be able to go both ways to mean anything, so this one runs either side of unity.
- * Above it, highlights clip and shadows crush, which is what raising contrast on a monitor
- * does too.
- */
-static int g_contrast_q8 = 256;
-
-void oizys_video_set_contrast(int contrast_q8) {
-    g_contrast_q8 = contrast_q8 < 128 ? 128 : contrast_q8 > 384 ? 384 : contrast_q8;
-}
-
-int oizys_video_contrast(void) {
-    return g_contrast_q8;
 }
 
 /*
@@ -538,17 +580,13 @@ static inline void convert_pixel_row(const uint8_t *pixels, int32_t *blue_plane,
 }
 
 /*
- * Uniform output gain, 256 = unity, set per head before its strips are encoded.
+ * One strip, converted through whatever table is installed and encoded.
  *
- * The three planes are a linear transform of R, G and B, so scaling all three by one factor
- * is exactly scaling R, G and B by that factor -- no colour shift, no separate chroma
- * handling. That is why this is a gain and not a per-channel correction: a per-channel one
- * does not commute with the transform and would have to happen on the pixels instead.
- *
- * This dims the signal Oizys sends. It is not the monitor's backlight, which lives behind
- * the panel's own controls and is not reachable over a DisplayLink output.
+ * Brightness, contrast and the calibration are all one table lookup here, applied to the
+ * pixels before the transform. They dim the signal Oizys sends. None of them is the
+ * monitor's backlight, which lives behind the panel's own controls and is not reachable over
+ * a DisplayLink output.
  */
-
 size_t oizys_video_colour_strip_bgra(uint8_t *out, size_t capacity, uint16_t x, uint16_t y,
                                      const uint8_t *bgra, size_t stride, uint32_t width,
                                      uint32_t height) {
@@ -561,10 +599,10 @@ size_t oizys_video_colour_strip_bgra(uint8_t *out, size_t capacity, uint16_t x, 
     /* Twelve vector registers' worth, loaded once per strip rather than once per row. */
     uint8x16x4_t tables[12];
     const uint8x16x4_t *active = NULL;
-    if (g_channel_lut) {
-        load_table(tables + 0, g_channel_lut[0]);
-        load_table(tables + 4, g_channel_lut[1]);
-        load_table(tables + 8, g_channel_lut[2]);
+    if (g_active_lut) {
+        load_table(tables + 0, g_active_lut[0]);
+        load_table(tables + 4, g_active_lut[1]);
+        load_table(tables + 8, g_active_lut[2]);
         active = tables;
     }
     if ((size_t)x + OIZYS_STRIP_W <= width && (size_t)y + OIZYS_STRIP_H <= height) {
@@ -593,10 +631,10 @@ size_t oizys_video_colour_strip_bgra(uint8_t *out, size_t capacity, uint16_t x, 
                     int blue = pixel[0];
                     int green = pixel[1];
                     int red = pixel[2];
-                    if (g_channel_lut) {
-                        red = g_channel_lut[0][red];
-                        green = g_channel_lut[1][green];
-                        blue = g_channel_lut[2][blue];
+                    if (g_active_lut) {
+                        red = g_active_lut[0][red];
+                        green = g_active_lut[1][green];
+                        blue = g_active_lut[2][blue];
                     }
                     int red_delta = red - green;
                     int blue_delta = blue - green;
@@ -605,32 +643,6 @@ size_t oizys_video_colour_strip_bgra(uint8_t *out, size_t capacity, uint16_t x, 
                     planes[block][1][sample] = 64 * red_delta;
                     planes[block][2][sample] =
                         64 * green + 64 * ((red_delta + blue_delta) >> 2);
-                }
-            }
-        }
-    }
-    if (g_gain_q8 != 256 || g_contrast_q8 != 256) {
-        /*
-         * Both controls in one multiply. Composing them per channel gives
-         *   out = ((in - 128) * c + 128) * g = in * c * g + 128 * g * (1 - c)
-         * and the constant term survives on the luma plane only: the other two planes are
-         * channel differences, and a value added to every channel alike cancels out of a
-         * difference. So the chroma planes are a pure scale, and mid-grey lives in one lift
-         * applied to plane 2. The plane scale is 64 per unit, hence 8192 for the 128.
-         */
-        int64_t scale = (int64_t)g_gain_q8 * g_contrast_q8;              /* Q16 */
-        int32_t lift = (int32_t)(8192LL * g_gain_q8 * (256 - g_contrast_q8) >> 16);
-        for (int block = 0; block < 16; block++) {
-            for (int plane = 0; plane < 3; plane++) {
-                int32_t bias = plane == 2 ? lift : 0;
-                int32_t *value = planes[block][plane];
-                for (int i = 0; i < 64; i++) {
-                    int64_t scaled = ((int64_t)value[i] * scale >> 16) + bias;
-                    /* A channel cannot leave 0..255, so a plane cannot leave ±255*64.
-                       Raised contrast is meant to clip; it must not be allowed to wrap. */
-                    value[i] = (int32_t)(scaled < -OIZYS_PLANE_LIMIT ? -OIZYS_PLANE_LIMIT
-                                         : scaled > OIZYS_PLANE_LIMIT ? OIZYS_PLANE_LIMIT
-                                                                      : scaled);
                 }
             }
         }

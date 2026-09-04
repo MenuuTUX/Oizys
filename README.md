@@ -269,7 +269,20 @@ oizys config set head.left.brightness 70
 
 The menu bar has the same control as a halftone slider. It dims the picture, not the
 backlight, and it only darkens: driving above unity clips highlights rather than matching
-them. A change repaints the head, because the cached strips were encoded at the old gain.
+them. `head.<side>.contrast` is the other half, pivoting on mid-grey so it goes both ways.
+
+Both are applied to the pixels, through the same 256-entry per-channel lookup the
+calibration uses, and not to the encoded planes afterwards. The two are the same transform
+until a value leaves 0..255, and then they are not: a monitor clips per channel, while
+clamping planes clips a channel difference and a luma independently of each other, which is
+not any RGB triple and comes back off the dock as blocks of wrong colour.
+
+A change repaints the head *and* re-encodes it. Every cached strip body was encoded at the
+old setting, and both the frame path and the idle repaint path replay those bodies
+untouched, so invalidating the cache is what makes a new brightness reach the tiles that did
+not happen to move under it. On a desktop nobody is touching, ScreenCaptureKit delivers no
+frames at all, so the driver presents the last one it was handed rather than waiting for
+something to move.
 
 Settings are re-read by a running driver within a second, so this and most other keys take
 effect without a restart.

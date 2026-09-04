@@ -21,6 +21,11 @@ struct OizysCaptureOutput {
     char failure[160];
     os_unfair_lock lock;
     CMSampleBufferRef pending;
+    /* The last frame actually presented, held so it can be presented again. Nothing else
+       in the process keeps a copy of the desktop: the damage ledger stores fingerprints and
+       the driver stores encoded bodies, neither of which can be re-encoded at a new
+       brightness. */
+    CMSampleBufferRef last;
     uint64_t pending_time;
     OizysDirtyRect pending_rects[OIZYS_CAPTURE_MAX_RECTS];
     int pending_rect_count;
@@ -46,6 +51,8 @@ void oizys_output_disable(OizysCaptureOutput *o) {
     atomic_store(&o->enabled, false);
     if (o->pending) CFRelease(o->pending);
     o->pending = NULL;
+    if (o->last) CFRelease(o->last);
+    o->last = NULL;
     os_unfair_lock_unlock(&o->lock);
 }
 
@@ -177,7 +184,25 @@ static void consume(OizysCaptureOutput *o) {
     o->pending = NULL; o->scheduled = false; o->pending_rect_count = 0;
     os_unfair_lock_unlock(&o->lock);
     if (!sample) return;
-    if (atomic_load(&o->enabled)) present(o, sample, timestamp, rects, rect_count);
+    if (atomic_load(&o->enabled)) {
+        present(o, sample, timestamp, rects, rect_count);
+        os_unfair_lock_lock(&o->lock);
+        CMSampleBufferRef previous = o->last;
+        o->last = (CMSampleBufferRef)CFRetain(sample);
+        os_unfair_lock_unlock(&o->lock);
+        if (previous) CFRelease(previous);
+    }
+    CFRelease(sample);
+}
+
+void oizys_output_repaint(OizysCaptureOutput *o) {
+    if (!o || !atomic_load(&o->enabled)) return;
+    os_unfair_lock_lock(&o->lock);
+    CMSampleBufferRef sample = o->last ? (CMSampleBufferRef)CFRetain(o->last) : NULL;
+    os_unfair_lock_unlock(&o->lock);
+    if (!sample) return;
+    /* No rectangles: this is not a report of what moved, it is the whole surface again. */
+    present(o, sample, 0, NULL, 0);
     CFRelease(sample);
 }
 

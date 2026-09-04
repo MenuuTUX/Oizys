@@ -78,9 +78,27 @@ appends new displays to the end of one row, and with Sidecar active it mirrored 
 an iPad, so the dock drove the iPad's framebuffer at the iPad's aspect ratio. A pair the
 user has already arranged as a contiguous block is left alone.
 
+Every write to the desktop layout goes through one `CGBeginDisplayConfiguration` /
+`CGCompleteDisplayConfiguration` pair, because each commit is a mode set: the desk blanks,
+every window server client redraws, and the heads renegotiate. `oizys_displays_settle` is
+what both the login path and the reconfiguration watcher call, and it stages the snapshot
+restore and the head seating into the same transaction. A desk that is already correct
+stages nothing and is not blanked at all.
+
+The watcher debounces. A single display arriving raises the reconfiguration callback many
+times — a begin and an end phase per display, plus macOS's own intermediate steps — and
+booting with the dock attached raised dozens. Each callback used to schedule its own restore
+and its own arrange, so the desk was still being reconfigured when the next batch landed:
+the flicker was the driver answering itself. Callbacks now re-arm a single deadline, and the
+block that runs waits out any deadline that moved while it was waiting, which makes one
+topology change cost one blank however many callbacks announced it.
+
 `Capture.swift` binds the ScreenCaptureKit streams and the refresh clock. ScreenCaptureKit
 delivers frames only on change and stops entirely on a still desktop, so the clock carries
-both the control session's cadence and any transmission debt a strip still owes.
+both the control session's cadence and any transmission debt a strip still owes. It also
+carries the repaint: a setting that changes how a frame is encoded rather than what is in it
+would otherwise not reach the panel until something moved on it, so the last captured frame
+is presented again.
 
 
 Capture ingestion and encoding use separate serial queues. Ingestion retains at most one

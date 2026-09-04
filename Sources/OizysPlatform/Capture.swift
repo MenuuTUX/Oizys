@@ -191,8 +191,16 @@ func captureClock(_ raw: UnsafeMutableRawPointer?, _ driver: OpaquePointer?, _ h
             return
         }
         for head in 0..<min(Int(heads), capture.count) {
-            guard let output = capture.outputs[head], oizys_driver_head_is_armed(driver, UInt8(head)) != 0,
-                  oizys_output_needs_refresh(output.output) != 0 else { continue }
+            guard let output = capture.outputs[head], oizys_driver_head_is_armed(driver, UInt8(head)) != 0
+            else { continue }
+            // Brightness, contrast or a calibration moved, so every cached strip body is
+            // stale. Only real pixels can be re-encoded at the new setting, and a still
+            // desktop produces no frames of its own, so the last one is presented again.
+            if oizys_driver_head_needs_recode(driver, UInt8(head)) != 0 {
+                oizys_output_repaint(output.output)
+                continue
+            }
+            guard oizys_output_needs_refresh(output.output) != 0 else { continue }
             if oizys_driver_refresh_head(driver, UInt8(head)) < 0 { oizys_output_fail(output.output, "cached desktop refresh failed") }
         }
         capture.applyFrameRate(oizys_driver_capture_fps_target(driver))

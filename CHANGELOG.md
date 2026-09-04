@@ -22,6 +22,32 @@ firmware trace and on the glass.
 - Log the dock's firmware trace without discarding bytes below `0x20`, which had been
   running its fields together and hiding the arguments that identified all of the above.
 - Add a full-screen terminal UI, an ASCII logo generator, and `.dmg` packaging.
+- Apply head brightness and contrast to the pixels, composed into the same per-channel
+  lookup as the calibration, instead of scaling and lifting the encoded planes afterwards.
+  The two agree until a value leaves 0..255; past that, clamping planes clips a channel
+  difference and a luma independently of each other, which is not any RGB triple, and the
+  dock reconstructed blocks of wrong colour from it.
+- Invalidate a head's cached strip bodies when its brightness, contrast or calibration
+  changes. The cache is keyed on source pixels, which do not move when a setting does, so a
+  new brightness used to reach only the tiles that happened to change under it.
+- Present the last captured frame again when those settings change. ScreenCaptureKit
+  delivers nothing at all on a still desktop, so a change made while nothing was moving
+  waited for something to move.
+- Restore the arrangement and seat the heads in one display transaction, and debounce the
+  reconfiguration callback into a single settle per burst. Each commit is a mode set and
+  each mode set blanks the desk; booting with the dock attached had dozens of callbacks each
+  scheduling their own restore and arrange, so the driver was flickering at itself.
+- Do everything System Settings > Displays does that has a public route, in the Displays
+  panel: resolution, refresh rate, main display, mirroring and relative placement. Name the
+  four that have no route rather than offering controls that do nothing.
+- Own the switch for Control Center's Screen Mirroring module in the Oizys menu, and stop
+  writing that preference on first run. The preference hides the module; it does nothing to
+  the purple indicator macOS shows while an iPad or AirPlay display is attached, so writing
+  it changed a system setting nobody asked to change and removed no icon. That indicator and
+  the screen-recording one both belong to macOS and neither has a supported switch; the same
+  section now says which is which, what Oizys captures, and what makes each of them leave.
+- Cut the menu-bar item from `Logo.png` and the panel header from `tiny_Logo.png`, which is
+  the way round that works: white stipple on black is what a template mask wants.
 
 - Use `Oizys.png` for repository branding and native macOS app icons.
 - Measure Python tools and separately compiled native tests alongside instrumented

@@ -95,7 +95,7 @@ final class OizysMenuBar: NSObject, NSWindowDelegate {
     private func showPanel() {
         guard let button = item?.button, let bar = button.window else { return }
         model.refresh()
-        let size = NSSize(width: 330, height: 460)
+        let size = NSSize(width: 330, height: 560)
         let content = NSHostingView(rootView:
             MenuPopover(model: model,
                         openWindow: { [weak self] in self?.openWindow() },

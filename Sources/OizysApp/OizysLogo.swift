@@ -4,13 +4,12 @@ import SwiftUI
 /*
  * The artwork, and the effect stack it was made with.
  *
- * Two pictures, both in Assets/, each named for the one job it has. Assets/Logo.png is the
- * app's own mark — the stipple head that becomes the icon in the Dock and the header of the
- * panel. Assets/tiny_Logo.png is the smaller portrait the menu-bar item is cut from, and only
- * that: it survives being thresholded to 18 points, which the full mark does not. They are
- * bundled under those same names, so a resource lookup here and a glance at the repository
- * agree about which picture is which. Both are stipple on a near-black ground, so two things
- * follow for the interface.
+ * Two pictures, both in Assets/. Assets/Logo.png is the stipple head, and it is what the
+ * menu-bar item is cut from: white grain on black is exactly what a template mask wants, so
+ * it is the one that survives being thresholded to 18 points. Assets/tiny_Logo.png is the
+ * softer portrait, and it is the header of the panel, where there is room for a continuous
+ * tone image. Both are bundled under those same names, so a resource lookup here and a
+ * glance at the repository agree about which picture is which.
  *
  * First, the menu-bar item cannot be the image scaled down. A menu-bar icon is a *template*:
  * macOS throws the colour away and tints whatever is opaque, so an image whose subject is
@@ -31,12 +30,12 @@ enum Logo {
         return NSImage(named: NSImage.applicationIconName)
     }
 
-    /// The app's mark, at full size: Dock icon and panel header. Nil in a build whose
-    /// resources were not packaged.
-    static let artwork: NSImage? = bundled("Logo")
+    /// The header of the panel, at full size. Nil in a build whose resources were not
+    /// packaged.
+    static let artwork: NSImage? = bundled("tiny_Logo")
 
     /// The only picture the menu-bar template is ever cut from.
-    static let mark: NSImage? = bundled("tiny_Logo")
+    static let mark: NSImage? = bundled("Logo")
 
     private static var cache: [String: NSImage] = [:]
 
@@ -48,13 +47,13 @@ enum Logo {
         guard let mark, let full = mark.cgImage(forProposedRect: nil, context: nil, hints: nil)
         else { return nil }
 
-        // Crop to the head before scaling. The lower third of the artwork is body and hands,
-        // which threshold away to almost nothing at this size and would otherwise cost a
-        // third of an 18-point square to render as empty margin.
+        // Crop to the head before scaling. The margin around it is ground stipple, which
+        // thresholds away to nothing at this size and would otherwise cost most of an
+        // 18-point square to render as empty border.
         let width = CGFloat(full.width), height = CGFloat(full.height)
-        // CGImage crops from the top-left, so this takes the hood and face and leaves the
-        // body below it out.
-        let box = CGRect(x: width * 0.12, y: height * 0.02, width: width * 0.76, height: height * 0.76)
+        // CGImage crops from the top-left, so this runs from just above the crown to just
+        // below the chin and leaves the shoulder out.
+        let box = CGRect(x: width * 0.12, y: height * 0.05, width: width * 0.85, height: height * 0.85)
         let source = full.cropping(to: box) ?? full
 
         // Render at 3x so the Retina menu bar has real pixels to work with.

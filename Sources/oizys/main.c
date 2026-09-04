@@ -407,6 +407,14 @@ static int arrange_heads(const uint32_t *ids) {
     return count ? oizys_displays_arrange(packed, count, OIZYS_HEAD_W, OIZYS_HEAD_H) : -1;
 }
 
+/* Put the desk back and seat the heads in one mode set. Two calls are two screen blanks,
+   and this runs at login where every blank is visible. */
+static int settle_heads(const uint32_t *ids) {
+    uint32_t packed[OIZYS_HEADS];
+    int count = packed_display_ids(ids, packed);
+    return count ? oizys_displays_settle(packed, count, OIZYS_HEAD_W, OIZYS_HEAD_H) : -1;
+}
+
 static void cmd_displays(void) {
     puts("creating 1920x1080@60 virtual displays (CGVirtualDisplay) for heads.active");
     puts("they live only while this process runs — Ctrl-C to drop them");
@@ -423,8 +431,7 @@ static void cmd_displays(void) {
             printf("  %-12s CGDirectDisplayID %u\n", HEAD_NAME[head], ids[head]);
         }
     }
-    oizys_displays_restore();
-    arrange_heads(ids);
+    settle_heads(ids);
     report_head_modes(ids, OIZYS_HEADS);
     report_sidecar_displays();
 
@@ -868,8 +875,7 @@ static int cmd_run(int takeover, int profile, int stats, int supervisor_fd) {
     }
     uint32_t ids[OIZYS_HEADS];
     int driven = head_display_ids(g_run.heads, ids);
-    oizys_displays_restore();
-    if (arrange_heads(ids) != 0) {
+    if (settle_heads(ids) != 0) {
         fputs("could not seat the Oizys heads; check System Settings > Displays\n", stderr);
     }
     printf("physical endpoints trained; %d virtual display%s (%u, %u)\n", driven,

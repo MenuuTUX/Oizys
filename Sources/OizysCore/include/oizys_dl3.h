@@ -137,6 +137,10 @@ int oizys_driver_refresh_head(OizysDriver *driver, uint8_t head);
 /* Non-zero while this head is blanked by head.<side>.standby_min. The display still exists
  * and the layout is untouched; only its pixels are black. */
 int oizys_driver_head_is_blanked(const OizysDriver *driver, uint8_t head);
+/* Non-zero while this head's cached strip bodies were encoded at settings that have since
+   changed. Nothing in the cache is worth sending until a real frame has been re-encoded, so
+   the capture clock answers this with a repaint rather than the usual cached repayment. */
+int oizys_driver_head_needs_recode(const OizysDriver *driver, uint8_t head);
 
 /* Seconds since anything on this head last changed, 0 before the first frame. */
 int oizys_driver_head_idle_seconds(const OizysDriver *driver, uint8_t head);
