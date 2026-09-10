@@ -184,3 +184,34 @@ def test_only_ridge_has_a_profile():
     assert profile.contents.ddc_selector[0] != profile.contents.ddc_selector[1]
     for unknown in (0x0000, 0xFFFF, 0x6001):
         assert not core.lib.oizys_dl3_profile(unknown), f"{unknown:#06x} returned a profile"
+
+
+def test_sealing_rejects_invalid_lengths_before_writing():
+    key, nonce = core.as_u8(bytes(16)), core.as_u8(bytes(8))
+    plain = core.as_u8(bytes(4097))
+    output = core.buffer(4129, fill=0xA5)
+    pointer = ctypes.cast(output, ctypes.POINTER(ctypes.c_uint8))
+    for length, capacity in [(4097, 4129), (ctypes.c_size_t(-1).value, 4129),
+                             (1, 32), (0, 31)]:
+        assert core.lib.oizys_dl3_seal_live(pointer, capacity, key, nonce,
+                                           0x24, 0, 1, plain, length) == 0
+        assert bytes(output) == bytes([0xA5]) * len(output)
+
+
+@pytest.mark.parametrize("length", [0, 1, 4096])
+def test_sealed_control_roundtrip_and_tamper_rejection(length):
+    key, nonce = core.as_u8(bytes(range(16))), core.as_u8(bytes(range(8)))
+    plain = bytes(i % 251 for i in range(length))
+    wire, decoded = core.buffer(length + 32), core.buffer(max(1, length), fill=0xA5)
+    p = ctypes.POINTER(ctypes.c_uint8)
+    assert core.lib.oizys_dl3_seal_cp(ctypes.cast(wire, p), len(wire), key, nonce,
+                                     0x14, 7, core.as_u8(plain), length) == len(wire)
+    body = ctypes.cast(ctypes.byref(wire, 16), p)
+    assert core.lib.oizys_dl3_open_cp(key, nonce, 7, body, length + 16,
+                                     ctypes.cast(decoded, p), length) == length
+    assert bytes(decoded[:length]) == plain
+    wire[-1] ^= 1
+    ctypes.memset(decoded, 0xA5, len(decoded))
+    assert core.lib.oizys_dl3_open_cp(key, nonce, 7, body, length + 16,
+                                     ctypes.cast(decoded, p), length) == -1
+    assert bytes(decoded) == bytes([0xA5]) * len(decoded)

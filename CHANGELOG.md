@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4.0
 
 Both physical panels now render a live desktop, and the login service brings them up
 without help. Six faults stood between the driver and a picture, and not one produced a

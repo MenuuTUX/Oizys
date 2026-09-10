@@ -256,6 +256,7 @@ static uint16_t aux_for_id(uint16_t id) {
 size_t oizys_dl3_seal_cp(uint8_t *out, size_t cap, const uint8_t ks[16], const uint8_t riv[8],
                          uint16_t inner_id, uint32_t wire_seq, const uint8_t *inner,
                          size_t inner_len) {
+    if (!ks) return 0;
     uint8_t key[16];
     oizys_cp_session_key(ks, key);
     return oizys_dl3_seal_live(out, cap, key, riv, 0x24, aux_for_id(inner_id), wire_seq, inner,
@@ -265,11 +266,13 @@ size_t oizys_dl3_seal_cp(uint8_t *out, size_t cap, const uint8_t ks[16], const u
 size_t oizys_dl3_seal_live(uint8_t *out, size_t cap, const uint8_t live_key[16],
                            const uint8_t riv[8], uint16_t wire_sub, uint16_t aux,
                            uint32_t wire_seq, const uint8_t *plain, size_t plain_len) {
-    size_t body_len = plain_len + 16;
-    size_t total = 16 + body_len;
-    if (total > cap) {
+    /* Validate before arithmetic or encryption: rejected frames must not touch out. */
+    if (!out || !live_key || !riv || (!plain && plain_len) ||
+        plain_len > 4096 || cap < 32 || plain_len > cap - 32) {
         return 0;
     }
+    size_t body_len = plain_len + 16;
+    size_t total = 16 + body_len;
     oizys_dl3_header(out, 4, wire_sub, aux, wire_seq, body_len);
     uint8_t *ct = out + 16;
     oizys_aes_ctr_xor(live_key, riv, wire_seq, plain, ct, plain_len);
@@ -277,9 +280,6 @@ size_t oizys_dl3_seal_live(uint8_t *out, size_t cap, const uint8_t live_key[16],
     memcpy(mac_nonce, riv, 8);
     mac_nonce[0] ^= 0x80;
     uint8_t macbuf[8 + 8 + 4096];
-    if (plain_len > 4096) {
-        return 0;
-    }
     memcpy(macbuf, mac_nonce, 8);
     uint64_t seq64 = wire_seq;
     for (int i = 0; i < 8; i++) {
@@ -292,7 +292,8 @@ size_t oizys_dl3_seal_live(uint8_t *out, size_t cap, const uint8_t live_key[16],
 
 int oizys_dl3_open_cp(const uint8_t ks[16], const uint8_t in_riv[8], uint32_t seq,
                       const uint8_t *body, size_t body_len, uint8_t *pt, size_t pt_cap) {
-    if (body_len < 16 || body_len - 16 > pt_cap) {
+    if (!ks || !in_riv || !body || !pt || body_len < 16 ||
+        body_len - 16 > 4096 || body_len - 16 > pt_cap) {
         return -1;
     }
     uint8_t key[16];
@@ -305,9 +306,6 @@ int oizys_dl3_open_cp(const uint8_t ks[16], const uint8_t in_riv[8], uint32_t se
     memcpy(mac_nonce, in_riv, 8);
     mac_nonce[0] ^= 0x80;
     uint8_t macbuf[8 + 8 + 4096];
-    if (ct_len > 4096) {
-        return -1;
-    }
     memcpy(macbuf, mac_nonce, 8);
     uint64_t seq64 = seq;
     for (int i = 0; i < 8; i++) {
@@ -326,4 +324,3 @@ int oizys_dl3_open_cp(const uint8_t ks[16], const uint8_t in_riv[8], uint32_t se
     oizys_aes_ctr_xor(key, in_riv, seq, body, pt, ct_len);
     return (int)ct_len;
 }
-

@@ -41,13 +41,22 @@ private func dirtyRects(_ info: [SCStreamFrameInfo: Any]) -> [OizysDirtyRect] {
     out.reserveCapacity(raw.count)
     for entry in raw {
         guard let rect = CGRect(dictionaryRepresentation: entry as CFDictionary) else { return [] }
+        // Validate the compositor value before integral can normalize a malformed
+        // negative-size CGRect into a plausible positive rectangle.
+        guard rect.origin.x.isFinite, rect.origin.y.isFinite,
+              rect.size.width.isFinite, rect.size.height.isFinite,
+              rect.size.width >= 0, rect.size.height >= 0 else { return [] }
         let r = rect.integral
         // macOS reports a (0,0,0,0) rect on the first frame of a stream, and occasionally
         // later. It means "this entry covers nothing", not "this list is wrong": dropping
         // the whole list for it threw away every real rectangle in the frame and sent the
         // driver back to fingerprinting all 8 MB.
         if r.width <= 0 || r.height <= 0 { continue }
-        guard r.minX >= 0, r.minY >= 0 else { return [] }
+        guard r.minX.isFinite, r.minY.isFinite, r.maxX.isFinite, r.maxY.isFinite,
+              r.minX >= 0, r.minY >= 0,
+              r.maxX <= CGFloat(UInt32.max), r.maxY <= CGFloat(UInt32.max),
+              r.width <= CGFloat(UInt32.max), r.height <= CGFloat(UInt32.max)
+        else { return [] }
         out.append(OizysDirtyRect(x: UInt32(r.minX), y: UInt32(r.minY),
                                   w: UInt32(r.width), h: UInt32(r.height)))
     }
@@ -80,16 +89,29 @@ private final class Capture {
     /// window server is asked for instead of throwing away frames after it has made them.
     var configurations: [SCStreamConfiguration] = []
     var appliedFPS: Int32 = 0
+    var rateUpdateGeneration = 0
     init(_ count: Int) { self.count = count }
     /// Ask the window server for a different rate, and only when it actually changed. The
     /// call is asynchronous and cheap, but issuing it a hundred times a second would not be.
     func applyFrameRate(_ fps: Int32) {
         guard fps > 0, fps != appliedFPS else { return }
         appliedFPS = fps
+        rateUpdateGeneration += 1
+        let generation = rateUpdateGeneration
         for (index, stream) in streams.enumerated() where index < configurations.count {
             let configuration = configurations[index]
             configuration.minimumFrameInterval = CMTime(value: 1, timescale: fps)
-            stream.updateConfiguration(configuration) { _ in }
+            stream.updateConfiguration(configuration) { [weak self] error in
+                guard let self, error != nil else { return }
+                // Retry a failed update at most once a second, not on every clock tick.
+                self.worker.asyncAfter(deadline: .now() + 1) {
+                    // A failure from an older request must not invalidate a newer request
+                    // that happened to select the same rate again.
+                    if self.rateUpdateGeneration == generation, self.appliedFPS == fps {
+                        self.appliedFPS = 0
+                    }
+                }
+            }
         }
     }
 

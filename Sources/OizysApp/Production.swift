@@ -156,6 +156,7 @@ private final class ProductionController: NSObject, NSApplicationDelegate {
             retry = Timer.scheduledTimer(withTimeInterval: 5, repeats: false) { [weak self] _ in self?.reconcile() }
             return
         }
+        reportedBlocked = false
         guard worker == nil else { return }
         let process = Process()
         process.executableURL = Bundle.main.url(forAuxiliaryExecutable: "OizysDriver")
@@ -196,7 +197,7 @@ private final class ProductionController: NSObject, NSApplicationDelegate {
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         quitting = true; retry?.invalidate(); retry = nil
         stopWorker()
-        guard worker != nil else { return .terminateNow }
+        guard worker?.isRunning == true else { worker = nil; return .terminateNow }
         // A worker that ignores its own teardown must never hold login or a takeover open.
         quitDeadline = Timer.scheduledTimer(withTimeInterval: 8, repeats: false) { [weak self] _ in self?.finishQuit() }
         return .terminateLater

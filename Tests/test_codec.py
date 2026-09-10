@@ -96,3 +96,48 @@ def test_vector_quantiser_agrees_with_the_scalar_one():
     definition. oizys_encode_selftest runs both over generated coefficients inside the
     library, where the static vector path is reachable."""
     assert core.lib.oizys_encode_selftest(None, None, 1) == 0
+
+
+def test_encoder_rejects_invalid_output_or_surface():
+    """The C entry point must fail before touching memory on invalid trust-boundary inputs."""
+    surface = bytes([0, 0, 0, 255]) * (core.STRIP_W * core.STRIP_H)
+    source = core.as_u8(surface)
+    assert core.lib.oizys_video_colour_strip_bgra(None, 16384, 0, 0, source,
+                                                   core.STRIP_W * 4, core.STRIP_W,
+                                                   core.STRIP_H) == 0
+    out = core.buffer(16384)
+    assert core.lib.oizys_video_colour_strip_bgra(out, 16384, 0, 0, source,
+                                                   core.STRIP_W * 4, 0, core.STRIP_H) == 0
+    assert core.lib.oizys_video_colour_strip_bgra(out, 16384, core.STRIP_W, 0, source,
+                                                   core.STRIP_W * 4, core.STRIP_W,
+                                                   core.STRIP_H) == 0
+
+
+# Golden solid strips, captured from the encoder and verified byte-for-byte against the
+# pre-CLZ escape coder. White is the case that matters: its luma DC is 1020, the largest
+# magnitude the strip builder can produce, and it sits in the top category the codebook
+# has. A saturating escape coder that clamped the category without clamping the magnitude
+# would still pass every other row here and corrupt only this one.
+SOLID_STRIPS = {
+    (255, 255, 255): "012800000000000000003a003a000000fc007e003f801fc00fe007f003f801fc0"
+                     "07e003f801fc00fe007f003f801fcff27000000000000000000",
+    (0, 0, 0): "01280000000000000000360036000000fc007e003f801fc00fe007f003f801fc0"
+               "07e003f801fc00fe007f003f8010000000000000000",
+    (255, 0, 0): "012800000000000000003a003a000000fc007e003f801fc00fe007f003f801fc0"
+                 "07e003f801fc00fe007f003f801fefdfffb0400000000000000",
+    (0, 0, 255): "012800000000000000003a003a000000fc007e003f801fc00fe007f003f801fc0"
+                 "07e003f801fc00fe007f003f801fffefdfb0400000000000000",
+    (17, 200, 90): "012800000000000000003c003c000000fc007e003f801fc00fe007f003f801fc0"
+                   "07e003f801fc00fe007f003f8017f9d7f76ff7d0400000000000000",
+}
+
+
+@pytest.mark.parametrize("colour", sorted(SOLID_STRIPS))
+def test_solid_strip_bytes_are_stable(colour):
+    assert core.solid_strip(*colour) == bytes.fromhex(SOLID_STRIPS[colour])
+
+
+def test_solid_strip_rejects_a_null_output():
+    """The public entry point's only write is an unconditional memset, so it has to check
+    out before computing a length that would let it through."""
+    assert core.lib.oizys_video_solid_strip(None, 256, 0, 0, 255, 255, 255) == 0

@@ -426,7 +426,7 @@ static void synthesise(OizysPatch *patches, int count, const double *scale,
 int oizys_calibration_selftest(void) {
     g_failures = 0;
     OizysPatch patches[8];
-    OizysResponse fitted;
+    OizysResponse fitted = {0};
 
     /* The fit recovers the response it was generated from. */
     const double scale[3] = {0.92, 1.00, 0.81};
@@ -442,9 +442,9 @@ int oizys_calibration_selftest(void) {
     CHECK(oizys_calibration_fit(patches, 2, &fitted) == -1);
 
     /* Correcting a display onto itself is a no-op to within rounding. */
-    OizysResponse self;
+    OizysResponse self = {0};
     CHECK(oizys_calibration_fit(patches, 8, &self) == 0);
-    OizysCalibration same;
+    OizysCalibration same = {0};
     CHECK(oizys_calibration_solve(&self, &self, &same) == 0);
     for (int channel = 0; channel < 3; channel++) {
         CHECK(fabs(same.gain[channel] - 1.0) < 1e-9);
@@ -459,8 +459,8 @@ int oizys_calibration_selftest(void) {
     OizysPatch cool[8], neutral[8];
     synthesise(cool, 8, blue_scale, flat);
     synthesise(neutral, 8, neutral_scale, flat);
-    OizysResponse cool_fit, neutral_fit;
-    OizysCalibration fix;
+    OizysResponse cool_fit = {0}, neutral_fit = {0};
+    OizysCalibration fix = {0};
     CHECK(oizys_calibration_fit(cool, 8, &cool_fit) == 0);
     CHECK(oizys_calibration_fit(neutral, 8, &neutral_fit) == 0);
     CHECK(oizys_calibration_solve(&cool_fit, &neutral_fit, &fix) == 0);
@@ -482,8 +482,8 @@ int oizys_calibration_selftest(void) {
     const double bright_scale[3] = {1.00, 1.00, 1.00};
     synthesise(dim, 8, dim_scale, flat);
     synthesise(bright, 8, bright_scale, flat);
-    OizysResponse dim_fit, bright_fit;
-    OizysCalibration raise;
+    OizysResponse dim_fit = {0}, bright_fit = {0};
+    OizysCalibration raise = {0};
     CHECK(oizys_calibration_fit(dim, 8, &dim_fit) == 0);
     CHECK(oizys_calibration_fit(bright, 8, &bright_fit) == 0);
     CHECK(oizys_calibration_solve(&dim_fit, &bright_fit, &raise) == 0);

@@ -1,0 +1,16 @@
+{
+  "host": "Mac15,12 (Apple M3)",
+  "os": "macOS 27.0",
+  "compiler": "Apple clang version 21.0.0 (clang-2100.1.1)",
+  "sdk": "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk (26.5)",
+  "flags": "clang -target arm64-apple-macos14.0 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk -O3 -mcpu=apple-m1 -mmacosx-version-min=14.0 -DOIZYS_DIAGNOSTICS=0 -I Sources/OizysCore/include -dynamiclib",
+  "workload": "8 fixed random BGRA 64x16 tiles; 1000 encodes per sample; 9 alternating-order samples; 2 warmup rounds",
+  "before_median_us": 72.86,
+  "after_median_us": 66.15,
+  "median_speedup": 1.1015,
+  "encoded_bytes_identical": true,
+  "samples_before_us": [76.02, 70.34, 90.67, 75.82, 77.92, 72.08, 69.46, 72.03, 72.86],
+  "samples_after_us": [90.26, 65.20, 67.56, 65.76, 78.00, 65.56, 65.43, 79.35, 66.15],
+  "method": "Build HEAD wht.c as before and candidate wht.c as after; ctypes harness alternates library order by round, warms both, asserts exact output equality, and reports per-call wall-clock medians.",
+  "limits": "Single host and SDK; medians are directional evidence, not a cross-machine guarantee."
+}

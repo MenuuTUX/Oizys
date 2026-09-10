@@ -57,7 +57,7 @@ heartbeat, which run whether or not anything moved.
 ## Requirements
 
 macOS 14 or later on Apple silicon, Xcode 16 or later, and Screen Recording permission for
-the built binary. The encoder is NEON and is compiled for the host core.
+the built binary. The encoder uses NEON and targets the M1 instruction set by default.
 
 ## Installing a release
 

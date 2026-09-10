@@ -81,45 +81,34 @@ struct MenuPopover: View {
     }
 }
 
-/*
- * The menu-bar items Oizys is asked about, and which of them it can actually change.
- *
- * Two purple items sit beside Oizys's own while it is working: macOS's screen-recording
- * indicator, because Oizys is capturing the head desktops, and the mirroring indicator, lit by
- * whatever iPad or AirPlay display is attached. Neither has an off switch anywhere in macOS.
- *
- * The switch here is for Control Center's Screen Mirroring module, which is a different item
- * with a confusingly similar name. It writes the same preference System Settings > Control
- * Center writes, so either place turns it off and either place turns it back on -- and neither
- * place touches the indicator that a live session puts there.
- *
- * The screen-recording line is a statement, not a switch, and deliberately so: macOS gives no
- * way to turn that indicator off, which is the point of it. Saying so here, next to what Oizys
- * actually captures, is the useful version of that.
- */
 private struct MenuBarSection: View {
     @State private var mirroringIcon = MenuBarExtras.mirroringIconVisible
+    @State private var preferenceFailed = false
 
     var body: some View {
         SectionLabel(text: "Menu bar")
         Row(label: "Screen mirroring module",
-            detail: "Control Center's, not Oizys's. Hiding it leaves the purple item macOS "
-                  + "shows while an iPad is attached; that one has no switch.") {
+            detail: "Show the optional Screen Mirroring shortcut in the menu bar.") {
             QuietSwitch(isOn: Binding(get: { mirroringIcon },
-                                      set: { mirroringIcon = $0
-                                             MenuBarExtras.setMirroringIconVisible($0) }))
+                                      set: { value in
+                preferenceFailed = !MenuBarExtras.setMirroringIconVisible(value)
+                mirroringIcon = MenuBarExtras.mirroringIconVisible
+            }))
         }
-        Row(label: "Screen recording",
-            detail: MenuBarExtras.capturing
-                ? "Granted. Oizys captures the two head desktops and encodes them onto the dock."
-                : "Not granted, so the heads stay dark.") {
+        if preferenceFailed {
+            Text("Could not save the menu-bar preference. Try System Settings.")
+                .font(.system(size: 10)).foregroundStyle(Ink.faint)
+        }
+        Row(label: "Screen recording permission",
+            detail: MenuBarExtras.screenRecordingGranted
+                ? "Granted. Oizys uses this permission while driving the dock displays."
+                : "Required to send the dock desktops to your monitors.") {
             QuietButton(title: "Settings…") { MenuBarExtras.openScreenRecordingSettings() }
         }
-        Text("Oizys installs one menu-bar item. The two purple ones beside it belong to "
-             + "macOS: one for the capture Oizys is doing, one for the display that is "
-             + "attached. Neither can be turned off, and Oizys would not hide them if it "
-             + "could -- they are what tell you a driver is reading your desktop and where "
-             + "the picture is going. They leave when the capture and the display do.")
+        Text("Oizys installs one menu-bar item. macOS shows the purple status item while "
+             + "screen capture or Sidecar is active; that one is not Oizys's, and no "
+             + "supported API hides it. The shortcut setting above does not remove an "
+             + "active session's indicator.")
             .font(.system(size: 10)).foregroundStyle(Ink.faint).padding(.top, 6)
     }
 }

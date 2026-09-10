@@ -80,7 +80,8 @@ int oizys_bench_encoder(void) {
     paint_desktop(bgra, stride);
 
     const uint32_t cols = BENCH_W / OIZYS_STRIP_W;
-    const uint32_t strips = cols * (BENCH_H / OIZYS_STRIP_H);
+    const uint32_t rows = (BENCH_H + OIZYS_STRIP_H - 1) / OIZYS_STRIP_H;
+    const uint32_t strips = cols * rows;
     const uint32_t macro = OIZYS_MACRO_STRIPS * OIZYS_MACRO_STRIPS;
 
     /* Best of N. One timed run on a laptop swings wider than most changes worth measuring. */
@@ -94,6 +95,15 @@ int oizys_bench_encoder(void) {
         double t = now_ms();
         keyframe_strips =
             oizys_damage_plan(map, bgra, stride, owed, OIZYS_MAX_STRIPS, &presentations);
+        if (keyframe_strips != (int)strips) {
+            fprintf(stderr, "encoder benchmark plan mismatch: got %d strips, expected %u\n",
+                    keyframe_strips, strips);
+            free(bgra);
+            free(map);
+            free(owed);
+            free(bodies);
+            return 2;
+        }
         plan_first = best(plan_first, now_ms() - t);
         oizys_damage_presented(map);
 

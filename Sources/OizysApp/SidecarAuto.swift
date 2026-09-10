@@ -64,12 +64,14 @@ final class SidecarAuto: ObservableObject {
     /// switch in the panel takes effect at the next event without restarting anything.
     func start(reading settings: @escaping () -> Settings) {
         read = settings
-        guard !armed, SidecarBridge.available else {
+        guard !armed else {
             evaluate("settings")
             return
         }
         armed = true
-        _ = SidecarBridge.devices()   // prime: SidecarCore only pushes once it has been asked
+        if SidecarBridge.available {
+            _ = SidecarBridge.devices()   // prime: SidecarCore only pushes once it has been asked
+        }
 
         let center = NotificationCenter.default
         for name in ["SidecarDevicesChangedNotification",

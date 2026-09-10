@@ -43,7 +43,6 @@ GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE
 GCC_WARN_64_TO_32_BIT_CONVERSION = YES
 WARNING_CFLAGS = -Wall -Wextra -Wpointer-arith -Wcast-align -Wwrite-strings -Wno-unused-parameter
 
-// -mcpu names the actual core so clang emits the full NEON set for this machine rather
-// than a portable arm64 baseline. The encoder depends on it.
+// Target the oldest supported Apple silicon core so release binaries also run on M1.
 OIZYS_CPU = -mcpu=apple-m1
 // Bridging header imports C only. Swift is limited to Apple framework integration.

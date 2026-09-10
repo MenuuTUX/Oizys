@@ -196,6 +196,7 @@ static uint32_t av_service_display_id(IOAVServiceRef service, const uint32_t *id
 }
 
 /* Returns a retained service. A zero requested ID selects the first verified native panel. */
+static IOAVServiceRef matching_av_service(uint32_t requested, uint32_t *matched) CF_RETURNS_RETAINED;
 static IOAVServiceRef matching_av_service(uint32_t requested, uint32_t *matched) {
     if (!load_ioav()) return NULL;
     uint32_t ids[16], count = 0;

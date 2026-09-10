@@ -114,11 +114,11 @@ static void ridge_symbol(RidgeBits *bits, int32_t value, unsigned cap) {
         ridge_bit(bits, 0);
         return;
     }
-    uint32_t magnitude = (uint32_t)(value < 0 ? -value : value);
-    unsigned category = 0;
-    for (uint32_t n = magnitude; n; n >>= 1) {
-        category++;
+    uint32_t magnitude = (uint32_t)value;
+    if (value < 0) {
+        magnitude = 0u - magnitude;
     }
+    unsigned category = 32u - (unsigned)__builtin_clz(magnitude);
     /* Saturate rather than fail.  A magnitude past the codebook would otherwise put
        cap+1 ones on the wire, and a decoder that stops counting at cap reads the extra
        one as an offset bit.  Clamping costs one tile its precision; overflowing costs
@@ -590,7 +590,10 @@ static inline void convert_pixel_row(const uint8_t *pixels, int32_t *blue_plane,
 size_t oizys_video_colour_strip_bgra(uint8_t *out, size_t capacity, uint16_t x, uint16_t y,
                                      const uint8_t *bgra, size_t stride, uint32_t width,
                                      uint32_t height) {
-    if (!bgra || stride < (size_t)width * 4) {
+    /* Keep the public wrapper's trust-boundary checks here: every caller (driver, tests,
+       and future bindings) gets the same safe failure instead of descending into memset. */
+    if (!out || !bgra || !width || !height || x >= width || y >= height ||
+        stride < (size_t)width * 4) {
         return 0;
     }
     OIZYS_PROFILE_BEGIN(strip, OIZYS_ZONE_STRIP);

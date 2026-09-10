@@ -40,6 +40,7 @@ enum SidecarBridge {
         guard let manager else { return false }
         return manager.responds(to: NSSelectorFromString("devices"))
             && manager.responds(to: NSSelectorFromString("connectToDevice:completion:"))
+            && manager.responds(to: NSSelectorFromString("disconnectFromDevice:completion:"))
     }
 
     /// Devices Sidecar will actually accept.

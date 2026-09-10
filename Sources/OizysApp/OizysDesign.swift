@@ -11,7 +11,7 @@ enum Ink {
     static let hairline = Color.white.opacity(0.08)
     static let primary = Color.white.opacity(0.92)
     static let secondary = Color.white.opacity(0.58)
-    static let faint = Color.white.opacity(0.34)
+    static let faint = Color.white.opacity(0.50)
     static let live = Color(red: 0.60, green: 0.85, blue: 0.62)
     static let warn = Color(red: 0.92, green: 0.70, blue: 0.36)
 

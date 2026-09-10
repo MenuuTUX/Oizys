@@ -929,27 +929,23 @@ static void put_flat_sync(BitWriter *writer) {
     }
 }
 
-static void put_escape(BitWriter *writer, int value, unsigned max_category) {
+static void put_escape(BitWriter *writer, int value) {
     if (value == 0) {
         put_bit(writer, 0);
         return;
     }
-    unsigned magnitude = (unsigned)(value < 0 ? -value : value);
-    unsigned category = 0;
-    for (unsigned n = magnitude; n; n >>= 1) {
-        category++;
-    }
-    if (category > max_category) {
-        category = max_category;
-    }
+    unsigned magnitude = (unsigned)value;
+    if (value < 0) magnitude = 0u - magnitude;
+    unsigned category = 32u - (unsigned)__builtin_clz(magnitude);
+    if (!category) return;
+    if (category > 10) category = 10;
     for (unsigned i = 0; i < category; i++) {
         put_bit(writer, 1);
     }
-    if (category < max_category) {
+    if (category < 10) {
         put_bit(writer, 0);
     }
-    unsigned base = 1u << (category - 1);
-    unsigned offset = magnitude - base;
+    unsigned offset = magnitude - (1u << (category - 1));
     for (unsigned bit = category - 1; bit > 0; bit--) {
         put_bit(writer, (offset >> (bit - 1)) & 1);
     }
@@ -963,6 +959,7 @@ static int round_signed_shift(int value, unsigned shift) {
 
 static size_t solid_strip(uint8_t *out, size_t capacity, uint16_t x, uint16_t y, uint8_t red,
                           uint8_t green, uint8_t blue) {
+    if (!out) return 0;
     uint8_t main_bytes[128];
     BitWriter main;
     bit_writer_init(&main, main_bytes, sizeof(main_bytes));
@@ -983,7 +980,7 @@ static size_t solid_strip(uint8_t *out, size_t capacity, uint16_t x, uint16_t y,
     int previous[3] = {0, 0, 0};
     for (int block = 0; block < 16; block++) {
         for (int plane = 0; plane < 3; plane++) {
-            put_escape(&main, dc[plane] - previous[plane], 10);
+            put_escape(&main, dc[plane] - previous[plane]);
             previous[plane] = dc[plane];
         }
     }
@@ -2002,7 +1999,6 @@ static int present_bgra_mosaic(OizysDriver *driver, uint8_t head, const uint8_t 
         driver->damage[head].keyframe_owed = 1;
         oizys_log("head %u woke on new content", head);
     }
-    driver->last_change_ns[head] = monotonic_ns();
     apply_head_correction(driver, head);
     /*
      * DisplayLink Manager does not stream whole frames. It hashes the surface a strip at
@@ -2026,6 +2022,11 @@ static int present_bgra_mosaic(OizysDriver *driver, uint8_t head, const uint8_t 
         submit_strip_frame(driver, head, owed, count, presentations) < 0) {
         return -1;
     }
+    /* A capture callback is not necessarily new content: WindowServer can emit a
+       metadata/no-op frame, and the damage ledger deliberately filters those out.
+       Power-aware capture must follow actual successful scanout work or an idle
+       desktop never reaches the low-rate path. */
+    driver->last_change_ns[head] = monotonic_ns();
     driver->recode[head] = 0;
     oizys_damage_presented(&driver->damage[head]);
     /* A static desktop is silent on the control plane, which makes a healthy idle stream

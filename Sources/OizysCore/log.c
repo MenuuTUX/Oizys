@@ -5,7 +5,10 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <time.h>
+
+#define OIZYS_LOG_CAP (4 * 1024 * 1024)
 
 static FILE *g_log;
 
@@ -15,7 +18,10 @@ void oizys_log_open(const char *path) {
     }
     // Stream to the debug UI. Only direct CLI sessions also need their own file.
     const char *stream = getenv("OIZYS_LOG_STDOUT");
-    g_log = stream && strcmp(stream, "1") == 0 ? stdout : path ? fopen(path, "a") : stdout;
+    const char *mode = "a";
+    struct stat info;
+    if (path && stat(path, &info) == 0 && info.st_size >= OIZYS_LOG_CAP) mode = "w";
+    g_log = stream && strcmp(stream, "1") == 0 ? stdout : path ? fopen(path, mode) : stdout;
     if (g_log) {
         setvbuf(g_log, NULL, _IONBF, 0);
     }

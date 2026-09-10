@@ -106,6 +106,9 @@ _SIGNATURES = {
     "oizys_video_colour_strip_bgra": (ctypes.c_size_t, [
         _u8p, ctypes.c_size_t, ctypes.c_uint16, ctypes.c_uint16, _u8p,
         ctypes.c_size_t, ctypes.c_uint32, ctypes.c_uint32]),
+    "oizys_video_solid_strip": (ctypes.c_size_t, [
+        _u8p, ctypes.c_size_t, ctypes.c_uint16, ctypes.c_uint16,
+        ctypes.c_uint8, ctypes.c_uint8, ctypes.c_uint8]),
     "oizys_video_set_gain": (None, [ctypes.c_int]),
     "oizys_video_set_channel_lut": (None, [ctypes.c_void_p]),
     "oizys_video_has_channel_lut": (ctypes.c_int, []),
@@ -133,6 +136,7 @@ _SIGNATURES = {
         ctypes.POINTER(DamageMap), _u8p, ctypes.c_size_t, ctypes.POINTER(Strip), ctypes.c_int]),
     # config
     "oizys_config_selftest": (ctypes.c_int, []),
+    "oizys_calibration_selftest": (ctypes.c_int, []),
     "oizys_config_get": (ctypes.c_int, [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_size_t]),
     "oizys_config_set": (ctypes.c_int, [ctypes.c_char_p, ctypes.c_char_p]),
     "oizys_config_reset": (ctypes.c_int, []),
@@ -154,6 +158,14 @@ _SIGNATURES = {
     "oizys_hdcp_rsa_oaep_encrypt": (ctypes.c_int, [_u8p, _u8p, _u8p, _u8p]),
     # protocol
     "oizys_cp_session_key": (None, [_u8p, _u8p]),
+    "oizys_dl3_seal_cp": (ctypes.c_size_t, [
+        _u8p, ctypes.c_size_t, _u8p, _u8p, ctypes.c_uint16, ctypes.c_uint32,
+        _u8p, ctypes.c_size_t]),
+    "oizys_dl3_seal_live": (ctypes.c_size_t, [
+        _u8p, ctypes.c_size_t, _u8p, _u8p, ctypes.c_uint16, ctypes.c_uint16,
+        ctypes.c_uint32, _u8p, ctypes.c_size_t]),
+    "oizys_dl3_open_cp": (ctypes.c_int, [
+        _u8p, _u8p, ctypes.c_uint32, _u8p, ctypes.c_size_t, _u8p, ctypes.c_size_t]),
     "oizys_dl3_parse_ridge_edid": (ctypes.c_int, [
         _u8p, ctypes.c_size_t, _u8p, ctypes.c_size_t, ctypes.POINTER(ctypes.c_size_t)]),
     "oizys_dl3_header": (None, [
@@ -219,6 +231,15 @@ def encode_strip(surface: bytes, stride: int, width: int, height: int,
     source = as_u8(surface)
     length = lib.oizys_video_colour_strip_bgra(
         ctypes.cast(out, _u8p), capacity, x, y, source, stride, width, height)
+    return bytes(out[:length]) if length else b""
+
+
+def solid_strip(red: int, green: int, blue: int, x: int = 0, y: int = 0,
+                capacity: int = 256) -> bytes:
+    """One flat-colour strip. Returns b"" when the encoder declines."""
+    out = buffer(capacity, fill=0xC3)
+    length = lib.oizys_video_solid_strip(
+        ctypes.cast(out, _u8p), capacity, x, y, red, green, blue)
     return bytes(out[:length]) if length else b""
 
 

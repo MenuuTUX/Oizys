@@ -206,14 +206,18 @@
 		AB3E4A7CE5B83C3DEDDC341E = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = "ddc_native_test.c"; path = "Tests/Support/ddc_native_test.c"; sourceTree = SOURCE_ROOT; };
 		8E8B6084D129FE3519110A7C = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "debug_permissions_test.swift"; path = "Tests/Support/debug_permissions_test.swift"; sourceTree = SOURCE_ROOT; };
 		CE41F210AE5F724F4205BB75 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "diagnostic_report_test.swift"; path = "Tests/Support/diagnostic_report_test.swift"; sourceTree = SOURCE_ROOT; };
+		184DED0D71603D17A3A489F3 = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = "driver_idle_test.c"; path = "Tests/Support/driver_idle_test.c"; sourceTree = SOURCE_ROOT; };
 		44685A03681CFA13FC03BD72 = {isa = PBXFileReference; lastKnownFileType = text; name = "native_coverage.py"; path = "Tests/Support/native_coverage.py"; sourceTree = SOURCE_ROOT; };
 		023EA7B4A03F34571AA15F61 = {isa = PBXFileReference; lastKnownFileType = text; name = "oizyscore.py"; path = "Tests/Support/oizyscore.py"; sourceTree = SOURCE_ROOT; };
 		320EC1CA2CCE79B2D6C43B54 = {isa = PBXFileReference; lastKnownFileType = text; name = "reference.py"; path = "Tests/Support/reference.py"; sourceTree = SOURCE_ROOT; };
+		31983FD25ADD4A3FACECDF46 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "sidecar_auto_test.swift"; path = "Tests/Support/sidecar_auto_test.swift"; sourceTree = SOURCE_ROOT; };
 		C7948E4A3AC7F3005DFFE893 = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = "supervisor_test.c"; path = "Tests/Support/supervisor_test.c"; sourceTree = SOURCE_ROOT; };
 		6673C227F9C7BB35A6ABD767 = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = "usb_frame_test.c"; path = "Tests/Support/usb_frame_test.c"; sourceTree = SOURCE_ROOT; };
 		BEE555D432F9BAFE40F1BED0 = {isa = PBXFileReference; lastKnownFileType = text; name = "conftest.py"; path = "Tests/conftest.py"; sourceTree = SOURCE_ROOT; };
 		1FD45C9E303FB101D3EBD6A6 = {isa = PBXFileReference; lastKnownFileType = text; name = "test_build_tools.py"; path = "Tests/test_build_tools.py"; sourceTree = SOURCE_ROOT; };
+		C092A610AFCD74EC5828C456 = {isa = PBXFileReference; lastKnownFileType = text; name = "test_calibration.py"; path = "Tests/test_calibration.py"; sourceTree = SOURCE_ROOT; };
 		4F4DF7FDB482C869604CC941 = {isa = PBXFileReference; lastKnownFileType = text; name = "test_capture.py"; path = "Tests/test_capture.py"; sourceTree = SOURCE_ROOT; };
+		CFBCE38289C2BA3613109A2E = {isa = PBXFileReference; lastKnownFileType = text; name = "test_capture_geometry.py"; path = "Tests/test_capture_geometry.py"; sourceTree = SOURCE_ROOT; };
 		BC7A479B3BD93F710D425C06 = {isa = PBXFileReference; lastKnownFileType = text; name = "test_cli.py"; path = "Tests/test_cli.py"; sourceTree = SOURCE_ROOT; };
 		58EB06910DCF5ABE446E9851 = {isa = PBXFileReference; lastKnownFileType = text; name = "test_codec.py"; path = "Tests/test_codec.py"; sourceTree = SOURCE_ROOT; };
 		FB672CB9A4C7E21C05254C87 = {isa = PBXFileReference; lastKnownFileType = text; name = "test_config.py"; path = "Tests/test_config.py"; sourceTree = SOURCE_ROOT; };
@@ -223,11 +227,14 @@
 		4921F74DE582B01B712B5121 = {isa = PBXFileReference; lastKnownFileType = text; name = "test_debug_permissions.py"; path = "Tests/test_debug_permissions.py"; sourceTree = SOURCE_ROOT; };
 		1946E91367E67FD756B332BA = {isa = PBXFileReference; lastKnownFileType = text; name = "test_debug_session.py"; path = "Tests/test_debug_session.py"; sourceTree = SOURCE_ROOT; };
 		8E18B1FC222940D8CD949F98 = {isa = PBXFileReference; lastKnownFileType = text; name = "test_diagnostic_report.py"; path = "Tests/test_diagnostic_report.py"; sourceTree = SOURCE_ROOT; };
+		447BF23C5E0CB39E7EFA0A88 = {isa = PBXFileReference; lastKnownFileType = text; name = "test_driver_idle.py"; path = "Tests/test_driver_idle.py"; sourceTree = SOURCE_ROOT; };
 		6162FAEDF49874AFB8D1709C = {isa = PBXFileReference; lastKnownFileType = text; name = "test_fixture.py"; path = "Tests/test_fixture.py"; sourceTree = SOURCE_ROOT; };
 		ECA0DC486912A78EDFB710A3 = {isa = PBXFileReference; lastKnownFileType = text; name = "test_fixture_runtime.py"; path = "Tests/test_fixture_runtime.py"; sourceTree = SOURCE_ROOT; };
 		C13C969669C0AB53B91C5A42 = {isa = PBXFileReference; lastKnownFileType = text; name = "test_head_gain.py"; path = "Tests/test_head_gain.py"; sourceTree = SOURCE_ROOT; };
+		45ADBBEB11F7B7F0876B4A57 = {isa = PBXFileReference; lastKnownFileType = text; name = "test_log.py"; path = "Tests/test_log.py"; sourceTree = SOURCE_ROOT; };
 		76914F8BD3D0C35EBCDCD136 = {isa = PBXFileReference; lastKnownFileType = text; name = "test_profiler.py"; path = "Tests/test_profiler.py"; sourceTree = SOURCE_ROOT; };
 		0C38FDBD5F5D4D68A1ECE7AD = {isa = PBXFileReference; lastKnownFileType = text; name = "test_protocol.py"; path = "Tests/test_protocol.py"; sourceTree = SOURCE_ROOT; };
+		075AAADB694A289FEAC71589 = {isa = PBXFileReference; lastKnownFileType = text; name = "test_sidecar.py"; path = "Tests/test_sidecar.py"; sourceTree = SOURCE_ROOT; };
 		26E17847289BED0F04C5A525 = {isa = PBXFileReference; lastKnownFileType = text; name = "test_supervisor.py"; path = "Tests/test_supervisor.py"; sourceTree = SOURCE_ROOT; };
 		8214AA2F1D3B061D056911E8 = {isa = PBXFileReference; lastKnownFileType = text; name = "test_usb_frames.py"; path = "Tests/test_usb_frames.py"; sourceTree = SOURCE_ROOT; };
 		B3F21D01661BE53C03DE0FE6 = {isa = PBXFileReference; lastKnownFileType = text; name = "test_wire.py"; path = "Tests/test_wire.py"; sourceTree = SOURCE_ROOT; };
@@ -505,14 +512,18 @@
 				AB3E4A7CE5B83C3DEDDC341E /* ddc_native_test.c */,
 				8E8B6084D129FE3519110A7C /* debug_permissions_test.swift */,
 				CE41F210AE5F724F4205BB75 /* diagnostic_report_test.swift */,
+				184DED0D71603D17A3A489F3 /* driver_idle_test.c */,
 				44685A03681CFA13FC03BD72 /* native_coverage.py */,
 				023EA7B4A03F34571AA15F61 /* oizyscore.py */,
 				320EC1CA2CCE79B2D6C43B54 /* reference.py */,
+				31983FD25ADD4A3FACECDF46 /* sidecar_auto_test.swift */,
 				C7948E4A3AC7F3005DFFE893 /* supervisor_test.c */,
 				6673C227F9C7BB35A6ABD767 /* usb_frame_test.c */,
 				BEE555D432F9BAFE40F1BED0 /* conftest.py */,
 				1FD45C9E303FB101D3EBD6A6 /* test_build_tools.py */,
+				C092A610AFCD74EC5828C456 /* test_calibration.py */,
 				4F4DF7FDB482C869604CC941 /* test_capture.py */,
+				CFBCE38289C2BA3613109A2E /* test_capture_geometry.py */,
 				BC7A479B3BD93F710D425C06 /* test_cli.py */,
 				58EB06910DCF5ABE446E9851 /* test_codec.py */,
 				FB672CB9A4C7E21C05254C87 /* test_config.py */,
@@ -522,11 +533,14 @@
 				4921F74DE582B01B712B5121 /* test_debug_permissions.py */,
 				1946E91367E67FD756B332BA /* test_debug_session.py */,
 				8E18B1FC222940D8CD949F98 /* test_diagnostic_report.py */,
+				447BF23C5E0CB39E7EFA0A88 /* test_driver_idle.py */,
 				6162FAEDF49874AFB8D1709C /* test_fixture.py */,
 				ECA0DC486912A78EDFB710A3 /* test_fixture_runtime.py */,
 				C13C969669C0AB53B91C5A42 /* test_head_gain.py */,
+				45ADBBEB11F7B7F0876B4A57 /* test_log.py */,
 				76914F8BD3D0C35EBCDCD136 /* test_profiler.py */,
 				0C38FDBD5F5D4D68A1ECE7AD /* test_protocol.py */,
+				075AAADB694A289FEAC71589 /* test_sidecar.py */,
 				26E17847289BED0F04C5A525 /* test_supervisor.py */,
 				8214AA2F1D3B061D056911E8 /* test_usb_frames.py */,
 				B3F21D01661BE53C03DE0FE6 /* test_wire.py */,
@@ -1067,8 +1081,8 @@
 				INFOPLIST_KEY_NSHighResolutionCapable = YES;
 				OIZYS_VARIANT = "debug-minimal";
 				OIZYS_FALLBACK = NO;
-				MARKETING_VERSION = "0.3.0";
-				CURRENT_PROJECT_VERSION = "0.3.0";
+				MARKETING_VERSION = "0.4.0";
+				CURRENT_PROJECT_VERSION = "0.4.0";
 				CODE_SIGN_STYLE = Manual;
 				CODE_SIGN_IDENTITY = "-";
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
@@ -1092,8 +1106,8 @@
 				INFOPLIST_KEY_NSHighResolutionCapable = YES;
 				OIZYS_VARIANT = "debug-minimal";
 				OIZYS_FALLBACK = NO;
-				MARKETING_VERSION = "0.3.0";
-				CURRENT_PROJECT_VERSION = "0.3.0";
+				MARKETING_VERSION = "0.4.0";
+				CURRENT_PROJECT_VERSION = "0.4.0";
 				CODE_SIGN_STYLE = Manual;
 				CODE_SIGN_IDENTITY = "-";
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
@@ -1117,8 +1131,8 @@
 				INFOPLIST_KEY_NSHighResolutionCapable = YES;
 				OIZYS_VARIANT = "debug-minimal";
 				OIZYS_FALLBACK = NO;
-				MARKETING_VERSION = "0.3.0";
-				CURRENT_PROJECT_VERSION = "0.3.0";
+				MARKETING_VERSION = "0.4.0";
+				CURRENT_PROJECT_VERSION = "0.4.0";
 				CODE_SIGN_STYLE = Manual;
 				CODE_SIGN_IDENTITY = "-";
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
@@ -1142,8 +1156,8 @@
 				INFOPLIST_KEY_NSHighResolutionCapable = YES;
 				OIZYS_VARIANT = "debug-minimal";
 				OIZYS_FALLBACK = NO;
-				MARKETING_VERSION = "0.3.0";
-				CURRENT_PROJECT_VERSION = "0.3.0";
+				MARKETING_VERSION = "0.4.0";
+				CURRENT_PROJECT_VERSION = "0.4.0";
 				CODE_SIGN_STYLE = Manual;
 				CODE_SIGN_IDENTITY = "-";
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
@@ -1167,8 +1181,8 @@
 				INFOPLIST_KEY_NSHighResolutionCapable = YES;
 				OIZYS_VARIANT = "debug-verbose";
 				OIZYS_FALLBACK = NO;
-				MARKETING_VERSION = "0.3.0";
-				CURRENT_PROJECT_VERSION = "0.3.0";
+				MARKETING_VERSION = "0.4.0";
+				CURRENT_PROJECT_VERSION = "0.4.0";
 				CODE_SIGN_STYLE = Manual;
 				CODE_SIGN_IDENTITY = "-";
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
@@ -1192,8 +1206,8 @@
 				INFOPLIST_KEY_NSHighResolutionCapable = YES;
 				OIZYS_VARIANT = "debug-fallback";
 				OIZYS_FALLBACK = YES;
-				MARKETING_VERSION = "0.3.0";
-				CURRENT_PROJECT_VERSION = "0.3.0";
+				MARKETING_VERSION = "0.4.0";
+				CURRENT_PROJECT_VERSION = "0.4.0";
 				CODE_SIGN_STYLE = Manual;
 				CODE_SIGN_IDENTITY = "-";
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
@@ -1217,8 +1231,8 @@
 				INFOPLIST_KEY_NSHighResolutionCapable = YES;
 				OIZYS_VARIANT = "production";
 				OIZYS_FALLBACK = NO;
-				MARKETING_VERSION = "0.3.0";
-				CURRENT_PROJECT_VERSION = "0.3.0";
+				MARKETING_VERSION = "0.4.0";
+				CURRENT_PROJECT_VERSION = "0.4.0";
 				CODE_SIGN_STYLE = Manual;
 				CODE_SIGN_IDENTITY = "-";
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
@@ -1242,8 +1256,8 @@
 				INFOPLIST_KEY_NSHighResolutionCapable = YES;
 				OIZYS_VARIANT = "production-fallback";
 				OIZYS_FALLBACK = YES;
-				MARKETING_VERSION = "0.3.0";
-				CURRENT_PROJECT_VERSION = "0.3.0";
+				MARKETING_VERSION = "0.4.0";
+				CURRENT_PROJECT_VERSION = "0.4.0";
 				CODE_SIGN_STYLE = Manual;
 				CODE_SIGN_IDENTITY = "-";
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
@@ -1267,8 +1281,8 @@
 				INFOPLIST_KEY_NSHighResolutionCapable = YES;
 				OIZYS_VARIANT = "production";
 				OIZYS_FALLBACK = NO;
-				MARKETING_VERSION = "0.3.0";
-				CURRENT_PROJECT_VERSION = "0.3.0";
+				MARKETING_VERSION = "0.4.0";
+				CURRENT_PROJECT_VERSION = "0.4.0";
 				CODE_SIGN_STYLE = Manual;
 				CODE_SIGN_IDENTITY = "-";
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
@@ -1292,8 +1306,8 @@
 				INFOPLIST_KEY_NSHighResolutionCapable = YES;
 				OIZYS_VARIANT = "production-fallback";
 				OIZYS_FALLBACK = YES;
-				MARKETING_VERSION = "0.3.0";
-				CURRENT_PROJECT_VERSION = "0.3.0";
+				MARKETING_VERSION = "0.4.0";
+				CURRENT_PROJECT_VERSION = "0.4.0";
 				CODE_SIGN_STYLE = Manual;
 				CODE_SIGN_IDENTITY = "-";
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
