@@ -18,7 +18,6 @@ private final class ProductionController: NSObject, NSApplicationDelegate {
     private var quitting = false
     private var replied = false
     private var quitDeadline: Timer?
-    private var permissionPrompted = false
     private var reportedBlocked = false
     private var retry: Timer?
     private var observers: [NSObjectProtocol] = []
@@ -45,21 +44,6 @@ private final class ProductionController: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        /*
-         * Asking comes first, before the duplicate-instance guard below.
-         *
-         * The installer runs this executable with --permissions-only to raise the system
-         * dialog, and macOS only lists an app under Screen Recording once the app has asked.
-         * By the time the installer gets there the login agent has already brought the
-         * menu-bar copy up -- so with the guard first, the asking copy saw a running one,
-         * quit on the spot, and the install ended by pointing at a list Oizys was not in.
-         * This pass touches nothing else: it asks, and it exits.
-         */
-        if CommandLine.arguments.contains("--permissions-only") {
-            requestPermissionIfNeeded()
-            NSApp.terminate(nil)
-            return
-        }
         // Another copy of *this executable*, not another process out of this bundle. The
         // driver is bundled here too and is attributed to the same identifier, so the wider
         // test made the app quit on sight whenever the login agent had already started the
@@ -106,6 +90,12 @@ private final class ProductionController: NSObject, NSApplicationDelegate {
             source.setEventHandler { NSApp.terminate(nil) }; source.resume(); signals.append(source)
         }
         menu.install(quit: { NSApp.terminate(nil) })
+        if !CGPreflightScreenCaptureAccess() {
+            // A visible setup window gives first-run installs the same guided handoff as other
+            // capture apps: explain the one required permission and put its button beside the
+            // path to System Settings. macOS still owns the final approval.
+            DispatchQueue.main.async { [weak self] in self?.menu.openWindow(initial: .info) }
+        }
         // The agent's stderr is the service log. One line at startup so a desk that stays dark
         // can be explained from the log alone, without attaching anything to a running app.
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
@@ -120,22 +110,6 @@ private final class ProductionController: NSObject, NSApplicationDelegate {
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         reconcile(); menu.openWindow(); return false
-    }
-
-    /*
-     * Asking is something the user starts, never something that happens to them.
-     *
-     * This used to fire on launch, on reopen, and again from reconcile every time the dock was
-     * present without the permission. CGRequestScreenCaptureAccess puts a system dialog on
-     * screen that nothing in this app can dismiss or suppress, and an ad-hoc signed build
-     * loses its approval on every rebuild -- so the two together meant the same dialog over
-     * and over with no way to make it stop. The state now lives in About, next to a button,
-     * and the driver simply says on stderr that it is waiting.
-     */
-    private func requestPermissionIfNeeded() {
-        guard !CGPreflightScreenCaptureAccess(), !permissionPrompted else { return }
-        permissionPrompted = true
-        _ = CGRequestScreenCaptureAccess()
     }
 
     private func reconcile() {

@@ -82,8 +82,7 @@ def test_install_clears_only_oizys_screen_recording_approvals(tmp_path, installa
     bundle(applications / "Other.app", identifier="com.example.other")
     install_app.install(bundle(tmp_path / "source.app"), applications)
     resets = [command for command in calls if command[:1] == ["/usr/bin/tccutil"]]
-    assert [command[3] for command in resets] == ["org.oizys.Oizys.production",
-                                                  "org.oizys.Oizys.production-fallback"]
+    assert {command[3] for command in resets} == install_app.KNOWN_IDENTIFIERS
     assert all(command[2] == "ScreenCapture" for command in resets)
     assert not any("com.example.other" in command for command in resets)
 

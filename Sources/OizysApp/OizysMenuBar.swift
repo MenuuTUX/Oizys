@@ -173,7 +173,7 @@ final class OizysMenuBar: NSObject, NSWindowDelegate {
                                 action: #selector(toggleDriver), keyEquivalent: "")
         toggle.target = self
         menu.addItem(toggle)
-        let open = NSMenuItem(title: "Open Oizys…", action: #selector(openWindow), keyEquivalent: ",")
+        let open = NSMenuItem(title: "Open Oizys…", action: #selector(openWindowFromMenu), keyEquivalent: ",")
         open.target = self
         menu.addItem(open)
         if let extraMenu {
@@ -194,7 +194,11 @@ final class OizysMenuBar: NSObject, NSWindowDelegate {
     @objc private func toggleDriver() { model.running ? model.stop() : model.start() }
     @objc private func quitNow() { quitAction?() }
 
-    @objc func openWindow() {
+    @objc private func openWindowFromMenu() { openWindow() }
+
+    func openWindow() { openWindow(initial: .displays) }
+
+    func openWindow(initial: Panel) {
         closePanel()
         model.refreshSlowly()
         if let window {
@@ -210,7 +214,7 @@ final class OizysMenuBar: NSObject, NSWindowDelegate {
         window.isReleasedWhenClosed = false
         window.appearance = NSAppearance(named: .darkAqua)
         window.backgroundColor = NSColor(red: 0.039, green: 0.039, blue: 0.043, alpha: 1)
-        window.contentView = NSHostingView(rootView: MenuWindow(model: model))
+        window.contentView = NSHostingView(rootView: MenuWindow(model: model, initial: initial))
         window.center()
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)

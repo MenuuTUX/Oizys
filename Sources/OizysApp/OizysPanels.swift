@@ -1,4 +1,5 @@
 import AppKit
+import Darwin
 import SwiftUI
 
 // MARK: - Popover
@@ -883,6 +884,29 @@ private struct InfoPanel: View {
     private func text(_ key: String) -> String { info[key] as? String ?? "unknown" }
 
     var body: some View {
+        if !model.screenRecordingGranted {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 8) {
+                    StatusDot(health: .waiting)
+                    Text("Finish setting up Oizys")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Ink.primary)
+                }
+                Text("Oizys needs Screen & System Audio Recording to capture your desktop and send it to the dock. macOS requires you to approve this once in System Settings; Oizys cannot grant it for you.")
+                    .font(Ink.label).foregroundStyle(Ink.secondary)
+                HStack(spacing: 8) {
+                    QuietButton(title: "Open Screen Recording Settings…") {
+                        model.requestScreenRecording()
+                    }
+                    QuietButton(title: "Check again") { model.refresh() }
+                }
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 10).fill(Ink.panel))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Ink.hairline))
+            .padding(.bottom, 6)
+        }
         SectionLabel(text: "Permission")
         Row(label: "Screen Recording",
             detail: model.screenRecordingGranted
@@ -1017,8 +1041,9 @@ private struct SignalPath: View {
             let count = dots - ring * 5
             for step in 0..<max(4, count) {
                 let angle = Double(step) / Double(max(4, count)) * .pi * 2 + Double(seed + ring) * 0.4
-                let point = CGRect(x: centre.x + cos(angle) * scale - 0.8,
-                                   y: centre.y + sin(angle) * scale - 0.8, width: 1.6, height: 1.6)
+                let point = CGRect(x: centre.x + CGFloat(Darwin.cos(angle)) * scale - 0.8,
+                                   y: centre.y + CGFloat(Darwin.sin(angle)) * scale - 0.8,
+                                   width: 1.6, height: 1.6)
                 context.fill(Path(ellipseIn: point),
                              with: .color(.white.opacity(alpha * (1 - Double(ring) * 0.22))))
             }

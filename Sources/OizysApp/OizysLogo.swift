@@ -1,4 +1,5 @@
 import AppKit
+import Darwin
 import SwiftUI
 
 /*
@@ -96,16 +97,19 @@ enum Logo {
 
     /// Drawn rings, for a build with no artwork to read.
     private static func fallback(active: Bool) -> NSImage {
-        let image = NSImage(size: NSSize(width: 18, height: 18), flipped: false) { rect in
+        let image = NSImage(size: NSSize(width: 18, height: 18), flipped: false) { rect -> Bool in
             let centre = CGPoint(x: rect.midX, y: rect.midY)
-            for (index, radius) in [3.2, 5.6, 8.0].enumerated() {
+            let radii: [CGFloat] = [3.2, 5.6, 8.0]
+            for (index, radius) in radii.enumerated() {
                 let dots = 8 + index * 6
-                NSColor.black.withAlphaComponent(active ? 1.0 - Double(index) * 0.22
-                                                        : 0.55 - Double(index) * 0.14).setFill()
+                let opacity = active ? 1.0 - Double(index) * 0.22 : 0.55 - Double(index) * 0.14
+                NSColor.black.withAlphaComponent(opacity).setFill()
                 for step in 0..<dots {
                     let angle = Double(step) / Double(dots) * .pi * 2 + Double(index) * 0.3
-                    NSBezierPath(ovalIn: CGRect(x: centre.x + cos(angle) * radius - 0.8,
-                                                y: centre.y + sin(angle) * radius - 0.8,
+                    let x = centre.x + CGFloat(Darwin.cos(angle)) * radius - 0.8
+                    let y = centre.y + CGFloat(Darwin.sin(angle)) * radius - 0.8
+                    NSBezierPath(ovalIn: CGRect(x: x,
+                                                y: y,
                                                 width: 1.6, height: 1.6)).fill()
                 }
             }

@@ -69,8 +69,9 @@ Tagged builds are published from `.github/workflows/release.yml`.
 | `Oizys-debug-<version>.dmg` | portable diagnostic; installs nothing, owns the dock only while it runs |
 | ZIP / PKG + `SHA256SUMS.txt` | the same builds, for scripted installs |
 
-Launch the production app once so macOS can ask for Screen Recording. The driver captures
-the desktop to send it over USB and cannot drive a panel without it.
+Launch the production app once; when Screen Recording is missing it opens About with a Grant
+button for the macOS approval pane. The driver captures the desktop to send it over USB and
+cannot drive a panel without it.
 
 Those bundles are signed ad hoc. macOS will refuse them on a machine other than the one
 that built them without an explicit Gatekeeper override, and they are not notarized, so
@@ -113,10 +114,11 @@ every rebuild. The old approval outlives the bundle it belonged to, so System Se
 Oizys already ticked while every preflight fails — and the login agent starts, refuses, exits,
 and is respawned ten seconds later, forever.
 
-So installing clears Oizys's own approval and asks for a fresh one: the app's dialog first,
-then the Screen Recording pane, and it waits at a terminal until the box is ticked. Only
-`org.oizys.*` identifiers are touched, nothing is ever granted by script, and the running
-service still never goes near TCC.
+So installing clears Oizys's own approval and starts the app with its About panel open. Press
+Grant there to open the Screen Recording pane and approve Oizys; an interactive terminal
+install also opens that pane and waits until the box is ticked. Only `org.oizys.*` identifiers
+are touched, nothing is ever granted by script, and the running service still never goes near
+TCC.
 
 ```bash
 python3 Tools/install_app.py <bundle> --keep-permissions   # leave the approval alone

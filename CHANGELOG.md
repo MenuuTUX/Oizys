@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.1
+
+- Open the About panel on first launch when Screen Recording is missing, with a direct button
+  to the macOS approval pane, instead of leaving a black dock unexplained.
+- Clear stale Screen Recording approvals for every Oizys bundle identifier shipped by the
+  project before starting the new login agent.
+- Keep the production build compiling with current Xcode Swift type checking.
+
 ## 0.4.0
 
 Both physical panels now render a live desktop, and the login service brings them up

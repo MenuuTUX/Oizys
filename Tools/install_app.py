@@ -15,6 +15,13 @@ import time
 LABEL = "org.oizys.Oizys.login"
 # The one privacy permission Oizys asks for. Nothing else here touches TCC.
 TCC_SERVICE = "ScreenCapture"
+KNOWN_IDENTIFIERS = {
+    "org.oizys.Oizys.production",
+    "org.oizys.Oizys.production-fallback",
+    "org.oizys.Oizys.debug-minimal",
+    "org.oizys.Oizys.debug-verbose",
+    "org.oizys.Oizys.debug-fallback",
+}
 
 
 def app_info(bundle):
@@ -132,24 +139,15 @@ SCREEN_RECORDING_PANE = ("x-apple.systempreferences:"
                          "com.apple.preference.security?Privacy_ScreenCapture")
 
 
-def request_permission(destination, timeout=300, settle=90):
+def request_permission(destination, settle=90):
     """Ask while somebody is still at the keyboard.
 
     The alternative is an install that reports success and leaves a dark desk, because the
     only thing between the two is a checkbox nothing has prompted for yet.
 
-    Two attempts, because the first one is not dependable. The app's own dialog is the nicer
-    of the two, but an installer run from a shell does not always hold a window server session
-    to put a modal on, and when it does not the dialog never appears and nothing says so. The
-    settings pane always opens, so that is the fallback, and then this waits: an install that
-    ends the moment it opens a pane has handed the problem back rather than finished it.
+    Open the Screen Recording pane and wait while somebody is at the keyboard. The installed
+    app also opens its About panel, where its Grant button performs the same handoff later.
     """
-    app = destination / "Contents/MacOS/Oizys"
-    if app.exists():
-        try:
-            subprocess.run([str(app), "--permissions-only"], check=False, timeout=timeout)
-        except (OSError, subprocess.SubprocessError):
-            pass
     if screen_recording_granted(destination):
         return True
     # Only wait when a person is watching. Under CI or a pipe there is nobody to tick it, and
@@ -189,7 +187,9 @@ def install(bundle, applications=Path("/Applications"), login=True,
             installed.update(path for path in directory.glob("*.app") if owned(path) and not path.is_symlink())
     # Read the identifiers now: the bundles carrying them are about to be removed, and a
     # superseded variant's stale approval is exactly the one worth clearing.
-    identifiers = oizys_identifiers({*installed, bundle})
+    # Reset every identifier this project has shipped. A deleted old bundle can leave a stale
+    # TCC row behind, so looking only at files still on disk misses first-time installs.
+    identifiers = KNOWN_IDENTIFIERS | set(oizys_identifiers({*installed, bundle}))
     agent = Path.home() / "Library/LaunchAgents" / (LABEL + ".plist")
     domain = f"gui/{os.getuid()}"
     loaded = launchctl("print", f"{domain}/{LABEL}").returncode == 0
@@ -260,6 +260,8 @@ def install(bundle, applications=Path("/Applications"), login=True,
             }
             staging_agent = agent.with_suffix(".plist.tmp")
             staging_agent.write_bytes(plistlib.dumps(value)); staging_agent.chmod(0o644); staging_agent.replace(agent)
+            if not keep_permissions:
+                cleared = reset_permissions(identifiers)
             if login:
                 launchctl("enable", f"{domain}/{LABEL}", check=True)
                 launchctl("bootstrap", domain, str(agent), check=True)
@@ -301,7 +303,6 @@ def install(bundle, applications=Path("/Applications"), login=True,
         print("Screen Recording: left as it was "
               f"({'granted' if granted else 'NOT granted'} for this build).")
     else:
-        cleared = reset_permissions(identifiers)
         print("Screen Recording: cleared for " + (", ".join(cleared) if cleared else "nothing")
               + " so this build asks for its own.")
         granted = request_permission(destination) if prompt else False
