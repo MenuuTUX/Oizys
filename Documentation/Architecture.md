@@ -29,6 +29,15 @@ the dock actually said, and several of this driver's bugs were only visible ther
 derivations, and RSA-OAEP through Security.framework. `dl3.c` builds control frames and
 parses the dock's replies, including EDIDs.
 
+Receiver certificates must verify with the published DCP LLC issuer key or match the
+explicit SHA-256 pin for the supported local Ridge dock. The dock's certificate collected
+on 2026-10-10 did not verify with that issuer, so the owner approved its exact fingerprint
+`ecd4974c73487fa953c2c54a42982c1ccc2fb1aab04684ea9b74fc54f60287e8`.
+This pin identifies one observed certificate; it does not establish a DCP issuer chain
+or apply to every dock with the same USB product ID. Unknown certificates remain blocked.
+There is no automatic enrollment. `Tests/Support/ridge_receiver_certificate.hex` contains
+that public certificate for regression checks. Session-key proofs remain required.
+
 `driver.c` runs the session: engage, authenticate, fetch EDIDs, set both heads to 1080p60,
 then present. It also runs the control clocks, which matter more than they look. The dock
 expects a `0x14/0x0c` status poll about every 13 ms and a `0x16/0x75` heartbeat every 3 s,
@@ -139,8 +148,17 @@ Three things keep this from trading correctness for the saving:
 It restarts Oizys after worker failures, waits while the dock is absent or ambiguous, and
 uses a 1–8 second retry backoff. A worker must start within 45 seconds and then report its
 health every second; 15 seconds without a report triggers shutdown. Shutdown gets 10
-seconds in diagnostic builds and three seconds in production before terminating an unresponsive worker. No encoding runs in the
+seconds in diagnostic builds and eight seconds in production before terminating an unresponsive worker. No encoding runs in the
 supervisor, and no vendor binary is used for recovery.
+
+The supervisor publishes an atomic, per-user `oizys-driver.status` JSON record beside its
+lock in the Darwin user temporary directory. Version 1 reports the supervisor PID,
+`waiting`, `starting`, `forwarding`, `recovering`, or `stopping`, the worker PID, and a bit
+mask for the left and right heads. The first worker heartbeat marks forwarding. Later
+heartbeats keep the worker alive; the record is updated on transitions and removed on
+normal exit. Readers check the lock's live PID against the record and treat a missing or
+invalid record as unknown status. This reports software forwarding, not a confirmed
+picture on a physical panel.
 
 A per-user file lock prevents duplicate services. Screen Recording permission and head
 selection are checked before takeover. Stopping the service restores DisplayLink only if

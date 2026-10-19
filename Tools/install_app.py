@@ -33,6 +33,16 @@ def owned(bundle):
     return str(app_info(bundle).get("CFBundleIdentifier", "")).startswith("org.oizys.")
 
 
+def developer_id_requirement(bundle):
+    result = subprocess.run(["codesign", "--display", "--verbose=2", "--requirements", "-", str(bundle)],
+                            capture_output=True, text=True, check=False)
+    output = (result.stdout or "") + (result.stderr or "")
+    if result.returncode != 0 or "Authority=Developer ID Application:" not in output:
+        return None
+    return next((line.removeprefix("designated => ").strip() for line in output.splitlines()
+                 if line.startswith("designated => ") and "anchor apple" in line), None)
+
+
 def running_apps():
     rows = []
     output = subprocess.check_output(["ps", "-axo", "pid=,ppid=,uid=,comm="], text=True)
@@ -123,32 +133,48 @@ def reset_permissions(identifiers):
     return cleared
 
 
-def screen_recording_granted(destination):
-    """What the driver's own preflight says. The agent runs the driver, not the app wrapper,
-    and on an ad-hoc bundle the two do not necessarily share an identity."""
-    driver = destination / "Contents/MacOS/OizysDriver"
+def screen_recording_granted(service_log):
+    """Use the login app's own preflight, not a CLI launched by the installing terminal.
+
+    macOS can attribute the CLI's capture access to Terminal. That answer was true while
+    the newly installed login app was denied and both virtual displays disappeared.
+    """
     try:
-        result = subprocess.run([str(driver), "service", "status"], text=True,
-                                capture_output=True, check=False, timeout=20)
-    except (OSError, subprocess.SubprocessError):
-        return False
-    return "access for this executable: granted" in (result.stdout or "")
+        lines = service_log.read_text(errors="replace").splitlines()
+    except OSError:
+        return None
+    for line in reversed(lines):
+        if "Screen Recording granted to this app" in line or "started at login: screen recording granted" in line:
+            return True
+        if "started at login: screen recording NOT granted" in line:
+            return False
+    return None
+
+
+def wait_for_screen_recording(service_log, seconds=8):
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline:
+        granted = screen_recording_granted(service_log)
+        if granted is not None:
+            return granted
+        time.sleep(.2)
+    return screen_recording_granted(service_log)
 
 
 SCREEN_RECORDING_PANE = ("x-apple.systempreferences:"
                          "com.apple.preference.security?Privacy_ScreenCapture")
 
 
-def request_permission(destination, settle=90):
+def request_permission(service_log, settle=90):
     """Ask while somebody is still at the keyboard.
 
     The alternative is an install that reports success and leaves a dark desk, because the
     only thing between the two is a checkbox nothing has prompted for yet.
 
     Open the Screen Recording pane and wait while somebody is at the keyboard. The installed
-    app also opens its About panel, where its Grant button performs the same handoff later.
+    app also opens Overview, where its Grant button performs the same handoff later.
     """
-    if screen_recording_granted(destination):
+    if screen_recording_granted(service_log):
         return True
     # Only wait when a person is watching. Under CI or a pipe there is nobody to tick it, and
     # a scripted install must not sit here for a minute and a half to find that out.
@@ -159,7 +185,7 @@ def request_permission(destination, settle=90):
           flush=True)
     deadline = time.monotonic() + settle
     while time.monotonic() < deadline:
-        if screen_recording_granted(destination):
+        if screen_recording_granted(service_log):
             return True
         time.sleep(2)
     return False
@@ -185,6 +211,17 @@ def install(bundle, applications=Path("/Applications"), login=True,
     for directory in {applications, Path("/Applications"), Path.home() / "Applications"}:
         if directory.is_dir():
             installed.update(path for path in directory.glob("*.app") if owned(path) and not path.is_symlink())
+    workspace = Path.home() / "Library/Application Support/Oizys"
+    service_log = workspace / "logs/service.log"
+    check_retained_permission = keep_permissions
+    if not keep_permissions:
+        requirement = developer_id_requirement(bundle)
+        if requirement and any(app_info(path).get("CFBundleIdentifier") == info["CFBundleIdentifier"]
+                               and developer_id_requirement(path) == requirement for path in installed):
+            keep_permissions = True
+            # An update must retain a previously observed grant. An app that was already
+            # unapproved still needs setup; that is not an update failure.
+            check_retained_permission = screen_recording_granted(service_log) is True
     # Read the identifiers now: the bundles carrying them are about to be removed, and a
     # superseded variant's stale approval is exactly the one worth clearing.
     # Reset every identifier this project has shipped. A deleted old bundle can leave a stale
@@ -196,8 +233,6 @@ def install(bundle, applications=Path("/Applications"), login=True,
     old_agent = agent.read_bytes() if agent.exists() else None
     link = cli_location()
     old_link = link.readlink() if link.is_symlink() else None
-    workspace = Path.home() / "Library/Application Support/Oizys"
-    service_log = workspace / "logs/service.log"
     obsolete_agents = []
     if agent.parent.exists():
         for candidate in agent.parent.glob("*.plist"):
@@ -241,7 +276,7 @@ def install(bundle, applications=Path("/Applications"), login=True,
                 # and nothing the user can click grants the driver -- so the agent started,
                 # refused, exited, and was respawned every ten seconds for ever. A child process
                 # inherits the responsible process's access, so with the app in front there is
-                # one thing to grant and one place to grant it (About > Grant). It also means
+                # one thing to grant and one place to grant it (Overview > Grant). It also means
                 # the menu-bar item is always up, instead of depending on somebody launching
                 # the app by hand after every install.
                 "ProgramArguments": [str(destination / "Contents/MacOS/Oizys"), "--background"],
@@ -265,6 +300,8 @@ def install(bundle, applications=Path("/Applications"), login=True,
             if login:
                 launchctl("enable", f"{domain}/{LABEL}", check=True)
                 launchctl("bootstrap", domain, str(agent), check=True)
+                if check_retained_permission and moved and wait_for_screen_recording(service_log) is not True:
+                    raise RuntimeError("Updated Oizys did not retain Screen Recording access; restoring the previous app")
             else:
                 launchctl("disable", f"{domain}/{LABEL}", check=True)
             temporary_link = link.with_name(".oizys-link-" + str(os.getpid()))
@@ -299,13 +336,13 @@ def install(bundle, applications=Path("/Applications"), login=True,
     # Only once the new bundle is in place and the old ones are gone: a rollback restores an
     # app whose approval should still be its own.
     if keep_permissions:
-        granted = screen_recording_granted(destination)
+        granted = screen_recording_granted(service_log)
         print("Screen Recording: left as it was "
-              f"({'granted' if granted else 'NOT granted'} for this build).")
+              f"({'granted' if granted is True else 'NOT granted' if granted is False else 'not yet observed'} for this build).")
     else:
         print("Screen Recording: cleared for " + (", ".join(cleared) if cleared else "nothing")
               + " so this build asks for its own.")
-        granted = request_permission(destination) if prompt else False
+        granted = request_permission(service_log) if prompt else screen_recording_granted(service_log) is True
         if granted:
             print("Screen Recording: granted. The driver starts on its own.")
         else:

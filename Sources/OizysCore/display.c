@@ -62,7 +62,8 @@ static void detach_mirror_set(CGDisplayConfigRef config, uint32_t head) {
 }
 
 /*
- * Every display's origin and mode, taken before anything is created and put back afterwards.
+ * Every display's origin, mode and mirror relationship, taken before anything is created and
+ * put back afterwards.
  *
  * Creating a virtual display makes macOS re-lay-out the whole desktop, and the heads are
  * not the only thing it moves — a Sidecar iPad gets shoved along the row too. Restoring
@@ -82,6 +83,7 @@ static struct {
     uint32_t id;
     int32_t x, y;
     CGDisplayModeRef mode; /* retained; NULL when the display would not report one */
+    uint32_t mirror_of;    /* zero when this display was not a mirror slave */
 } g_snapshot[OIZYS_SNAPSHOT_CAP];
 static uint32_t g_snapshot_count;
 
@@ -120,6 +122,8 @@ void oizys_displays_snapshot(void) {
         g_snapshot[g_snapshot_count].x = (int32_t)bounds.origin.x;
         g_snapshot[g_snapshot_count].y = (int32_t)bounds.origin.y;
         g_snapshot[g_snapshot_count].mode = CGDisplayCopyDisplayMode(ids[i]);
+        CGDirectDisplayID master = CGDisplayMirrorsDisplay(ids[i]);
+        g_snapshot[g_snapshot_count].mirror_of = master == kCGNullDirectDisplay ? 0 : master;
         g_snapshot_count++;
     }
 }
@@ -160,6 +164,19 @@ static int plan_restore(CGDisplayConfigRef config) {
                 }
                 if (current) {
                     CGDisplayModeRelease(current);
+                }
+            }
+            if (g_snapshot[i].mirror_of) {
+                int master_online = 0;
+                for (uint32_t k = 0; k < count; k++) {
+                    if (ids[k] == g_snapshot[i].mirror_of) {
+                        master_online = 1;
+                        break;
+                    }
+                }
+                if (master_online && CGDisplayMirrorsDisplay(ids[j]) != g_snapshot[i].mirror_of) {
+                    CGConfigureDisplayMirrorOfDisplay(config, ids[j], g_snapshot[i].mirror_of);
+                    changed = 1;
                 }
             }
             break;
@@ -448,7 +465,9 @@ static void settle_now(void) {
     if (monotonic_seconds() - g_topology_at >= OIZYS_TOPOLOGY_SETTLE_S) {
         oizys_displays_snapshot();
     }
-    oizys_displays_settle(watch.ids, watch.count, watch.width, watch.height);
+    if (oizys_displays_settle(watch.ids, watch.count, watch.width, watch.height) != 0) {
+        oizys_log("display settle failed; will retry on the next reconfiguration");
+    }
 }
 
 static void settle_after(double seconds) {
@@ -521,4 +540,3 @@ int oizys_display_mode(uint32_t id, uint32_t *width, uint32_t *height, double *r
 int oizys_display_is_mirrored(uint32_t id) {
     return CGDisplayMirrorsDisplay(id) != kCGNullDirectDisplay;
 }
-

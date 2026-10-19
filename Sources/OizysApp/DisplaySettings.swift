@@ -22,6 +22,25 @@ import ObjectiveC
  * not have. Those four open System Settings instead of pretending.
  */
 enum DisplaySettings {
+    private struct DisplayState {
+        let id: CGDirectDisplayID
+        let mode: CGDisplayMode
+        let origin: CGPoint
+        let mirrorOf: CGDirectDisplayID
+    }
+
+    private struct PendingChange {
+        let id: UUID
+        let before: [DisplayState]
+        let alert: NSAlert
+    }
+
+    private static var pending: PendingChange?
+
+    static func revertPending() {
+        if let change = pending { finish(change.id, keep: false) }
+    }
+
     struct Mode: Identifiable, Hashable {
         let index: Int
         let width: Int, height: Int          // points
@@ -88,8 +107,12 @@ enum DisplaySettings {
     @discardableResult
     static func apply(_ display: CGDirectDisplayID, _ mode: Mode) -> Bool {
         guard let raw = CGDisplayCopyAllDisplayModes(display, nil) as? [CGDisplayMode],
-              mode.index < raw.count else { return false }
-        return transaction { CGConfigureDisplayWithDisplayMode($0, display, raw[mode.index], nil) }
+              let selected = raw.first(where: {
+                  $0.width == mode.width && $0.height == mode.height
+                      && $0.pixelWidth == mode.pixelWidth && $0.pixelHeight == mode.pixelHeight
+                      && abs($0.refreshRate - mode.refresh) < 0.01
+              }) else { return false }
+        return transaction { CGConfigureDisplayWithDisplayMode($0, display, selected, nil) }
     }
 
     static func rotation(_ display: CGDirectDisplayID) -> Int {
@@ -158,16 +181,83 @@ enum DisplaySettings {
         }
     }
 
-    /// One transaction, one commit, one blank. A staging call that fails cancels rather than
-    /// committing half an arrangement.
+    /// Apply one change, then restore the previous desk unless the user can see and confirm it.
     private static func transaction(_ stage: (CGDisplayConfigRef) -> CGError) -> Bool {
+        guard pending == nil, let window = NSApp.keyWindow ?? NSApp.mainWindow,
+              let before = snapshot() else { return false }
         var config: CGDisplayConfigRef?
         guard CGBeginDisplayConfiguration(&config) == .success, let config else { return false }
         guard stage(config) == .success else {
             CGCancelDisplayConfiguration(config)
             return false
         }
-        return CGCompleteDisplayConfiguration(config, .permanently) == .success
+        guard CGCompleteDisplayConfiguration(config, .permanently) == .success else { return false }
+        let alert = NSAlert()
+        alert.messageText = "Keep this display change?"
+        alert.informativeText = "The previous display setup returns in 15 seconds unless you keep this one."
+        alert.addButton(withTitle: "Keep change")
+        alert.addButton(withTitle: "Revert")
+        let id = UUID()
+        pending = PendingChange(id: id, before: before, alert: alert)
+        alert.beginSheetModal(for: window) { response in
+            finish(id, keep: response == .alertFirstButtonReturn)
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 15) { finish(id, keep: false) }
+        return true
+    }
+
+    private static func snapshot() -> [DisplayState]? {
+        var states: [DisplayState] = []
+        for id in online() {
+            guard let mode = CGDisplayCopyDisplayMode(id) else { return nil }
+            states.append(DisplayState(id: id, mode: mode, origin: CGDisplayBounds(id).origin,
+                                       mirrorOf: CGDisplayMirrorsDisplay(id)))
+        }
+        return states.isEmpty ? nil : states
+    }
+
+    private static func finish(_ id: UUID, keep: Bool) {
+        guard let change = pending, change.id == id else { return }
+        pending = nil
+        if !keep { restore(change.before) }
+        if let parent = change.alert.window.sheetParent {
+            parent.endSheet(change.alert.window, returnCode: .alertSecondButtonReturn)
+        }
+    }
+
+    private static func restore(_ before: [DisplayState]) {
+        let available = Set(online())
+        var config: CGDisplayConfigRef?
+        guard CGBeginDisplayConfiguration(&config) == .success, let config else { return }
+        for state in before where available.contains(state.id) {
+            if CGDisplayMirrorsDisplay(state.id) != kCGNullDirectDisplay,
+               CGConfigureDisplayMirrorOfDisplay(config, state.id,
+                                                 kCGNullDirectDisplay) != .success {
+                CGCancelDisplayConfiguration(config); return
+            }
+        }
+        for state in before where available.contains(state.id) && state.mirrorOf == kCGNullDirectDisplay {
+            let now = CGDisplayCopyDisplayMode(state.id)
+            if now?.width != state.mode.width || now?.height != state.mode.height
+                || now?.pixelWidth != state.mode.pixelWidth
+                || now?.pixelHeight != state.mode.pixelHeight
+                || now?.refreshRate != state.mode.refreshRate {
+                if CGConfigureDisplayWithDisplayMode(config, state.id, state.mode, nil) != .success {
+                    CGCancelDisplayConfiguration(config); return
+                }
+            }
+            if CGConfigureDisplayOrigin(config, state.id, Int32(state.origin.x),
+                                        Int32(state.origin.y)) != .success {
+                CGCancelDisplayConfiguration(config); return
+            }
+        }
+        for state in before where available.contains(state.id) && state.mirrorOf != kCGNullDirectDisplay
+            && available.contains(state.mirrorOf) {
+            if CGConfigureDisplayMirrorOfDisplay(config, state.id, state.mirrorOf) != .success {
+                CGCancelDisplayConfiguration(config); return
+            }
+        }
+        _ = CGCompleteDisplayConfiguration(config, .permanently)
     }
 
     // MARK: - System Settings

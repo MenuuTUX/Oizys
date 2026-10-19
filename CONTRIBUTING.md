@@ -57,6 +57,8 @@ Update `VERSION` for a release and keep changes in `CHANGELOG.md`. Build all fiv
 through CI. Production must exclude diagnostics and vendor fallback unless the explicit
 fallback variant was chosen. Local ad-hoc signatures are for local installation;
 distribution to other Macs requires Developer ID signing and notarization.
+See [the release procedure](Documentation/Releasing.md) for the credential gate and the
+clean Mac hardware checks required before sharing a build.
 
 The installer preserves settings during a normal upgrade. Removing all user data and
 resetting permissions is a separate, destructive clean-install operation, not a build step.

@@ -118,14 +118,26 @@ private final class Capture {
     func stop() {
         timer?.cancel(); timer = nil
         for output in outputs.values { oizys_output_disable(output.output) }
-        for stream in streams {
-            let done = DispatchSemaphore(value: 0)
-            stream.stopCapture { _ in done.signal() }
-            _ = done.wait(timeout: .now() + 2)
-        }
+        // The refresh clock can already be executing on the worker when cancel() returns.
+        // Drain it before the C owner releases the driver that the output holds.
         ingest.sync {}
         worker.sync {}
-        streams.removeAll(); outputs.removeAll()
+        guard !streams.isEmpty else {
+            streams.removeAll(); outputs.removeAll(); configurations.removeAll()
+            return
+        }
+        let stopped = DispatchGroup()
+        for stream in streams {
+            stopped.enter()
+            stream.stopCapture { _ in stopped.leave() }
+        }
+        // Keep the streams and delegates alive until ScreenCaptureKit has finished every
+        // asynchronous stop. Output is already disabled, so callbacks that arrive meanwhile
+        // cannot touch the driver. The closure retains self until it is safe to release them.
+        stopped.notify(queue: ingest) { [self] in
+            worker.sync {}
+            streams.removeAll(); outputs.removeAll(); configurations.removeAll()
+        }
     }
 }
 

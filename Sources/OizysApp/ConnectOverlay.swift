@@ -19,7 +19,9 @@ private struct ConnectRipple: View {
     let start: Date
     static let duration: Double = 1.7
 
-    private let dots = Stipple.ripple(rings: 18, perRing: 56, seed: 0x51D3)
+    /// Seeded and fixed, so built once for the process rather than per view value.
+    private static let dots = Stipple.ripple(rings: 18, perRing: 56, seed: 0x51D3)
+    private var dots: [Stipple.Dot] { Self.dots }
     /// The scrim's reach. A display's short side is the right scale for it.
     private var geometrySide: CGFloat { 420 }
 
@@ -63,7 +65,7 @@ private struct ConnectRipple: View {
                 }
                 VStack(spacing: 8) {
                     Text(title)
-                        .font(.system(size: 26, weight: .light)).tracking(6)
+                        .font(.system(size: 26, weight: .regular)).tracking(6)
                         .foregroundStyle(.white.opacity(0.98 * fade))
                     Text(subtitle.uppercased())
                         .font(.system(size: 11, weight: .medium)).tracking(3.6)
@@ -147,7 +149,7 @@ enum ConnectOverlay {
     private static var shownRecently: [CGDirectDisplayID: Date] = [:]
 
     static func show(on display: CGDirectDisplayID, title: String, subtitle: String) {
-        guard enabled else { return }
+        guard enabled, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else { return }
         // A single reconfiguration can report the same display more than once, and a
         // reconnecting dock can report it repeatedly. One ripple per display per few seconds.
         if let last = shownRecently[display], Date().timeIntervalSince(last) < 4 { return }
@@ -216,7 +218,15 @@ enum ConnectOverlay {
 
     private static func nameFor(_ id: CGDirectDisplayID, _ kind: OizysDisplay.Kind) -> String {
         switch kind {
-        case .head: return "Oizys head \(id % 100)"
+        // By serial, never by display ID: macOS issues a fresh ID every time a virtual
+        // display is created, so an ID-based name climbed with every reconnect. The serials
+        // are fixed in main.c (HEAD_SERIAL), matching the names macOS shows for the heads.
+        case .head:
+            switch CGDisplaySerialNumber(id) {
+            case 0x4d560001: return "Oizys Left"
+            case 0x4d560002: return "Oizys Right"
+            default: return "Oizys display"
+            }
         case .builtin: return "Built-in display"
         case .sidecar: return "iPad (Sidecar)"
         case .external: return "External display"

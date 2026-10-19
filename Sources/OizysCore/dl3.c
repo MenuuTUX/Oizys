@@ -230,7 +230,7 @@ size_t oizys_dl3_set_mode_1080p60(uint8_t *out, size_t cap, uint16_t counter, ui
     memcpy(b + 68, &depth, 2);
     uint32_t clock = 14850;
     memcpy(b + 70, &clock, 4);
-    oizys_hdcp_random(b + 74, 6);
+    if (oizys_hdcp_random(b + 74, 6) < 0) return 0;
     if (sizeof(b) > cap) {
         return 0;
     }

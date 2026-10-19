@@ -377,12 +377,16 @@ static void read_value(void *context, const char *key, const char *value) {
 
 static OizysConfig g_config;
 static int g_loaded;
+static struct stat g_config_stat;
+static int g_config_exists;
 
 const OizysConfig *oizys_config(void) {
     if (g_loaded) {
         return &g_config;
     }
     load_defaults(&g_config);
+    /* Snapshot before reading: a replacement during the read must trigger another load. */
+    g_config_exists = stat(oizys_config_path(), &g_config_stat) == 0;
     oizys_settings_read(oizys_config_path(), &g_config, read_value);
 #if !OIZYS_DIAGNOSTICS
     g_config.capture_dump_frames = 0;
@@ -402,27 +406,28 @@ void oizys_config_reload(void) {
  * A running driver reads its settings from the cache, so a change made anywhere else -- the
  * menu bar, `oizys config set`, an editor -- would otherwise wait for a restart. That is the
  * wrong shape for a brightness slider. One stat per second is cheap enough to sit on the
- * control path, and mtime is the only thing that has to be compared: any write to the file
- * moves it, and the read that follows is the same read startup does.
+ * control path. File identity catches atomic replacements, and nanosecond mtime catches
+ * writes to the same file within one second.
  */
 int oizys_config_refresh_if_changed(void) {
-    static time_t last_seen;
     static time_t last_checked;
+    if (!g_loaded) {
+        oizys_config();
+        return 0;
+    }
     time_t now = time(NULL);
     if (now == last_checked) {
         return 0;
     }
     last_checked = now;
     struct stat info;
-    time_t stamp = stat(oizys_config_path(), &info) == 0 ? info.st_mtime : 0;
-    if (stamp == last_seen) {
-        return 0;
-    }
-    last_seen = stamp;
-    /* The first observation is the state the cache was already built from. */
-    static int primed;
-    if (!primed) {
-        primed = 1;
+    int exists = stat(oizys_config_path(), &info) == 0;
+    if (exists == g_config_exists &&
+        (!exists || (info.st_dev == g_config_stat.st_dev &&
+                     info.st_ino == g_config_stat.st_ino &&
+                     info.st_size == g_config_stat.st_size &&
+                     info.st_mtimespec.tv_sec == g_config_stat.st_mtimespec.tv_sec &&
+                     info.st_mtimespec.tv_nsec == g_config_stat.st_mtimespec.tv_nsec))) {
         return 0;
     }
     oizys_config_reload();
@@ -484,6 +489,46 @@ void oizys_config_print(FILE *out) {
             fprintf(out, "  %-28s %-14s (default %s)\n", FIELDS[i].key, value, fallback);
         }
     }
+}
+
+static void json_string(FILE *out, const char *value) {
+    fputc('"', out);
+    for (const unsigned char *p = (const unsigned char *)value; *p; p++) {
+        switch (*p) {
+        case '"': fputs("\\\"", out); break;
+        case '\\': fputs("\\\\", out); break;
+        case '\n': fputs("\\n", out); break;
+        case '\r': fputs("\\r", out); break;
+        case '\t': fputs("\\t", out); break;
+        default:
+            if (*p < 0x20 || *p == 0x7f) fprintf(out, "\\u%04x", *p);
+            else fputc(*p, out);
+        }
+    }
+    fputc('"', out);
+}
+
+void oizys_config_print_json(FILE *out) {
+    const OizysConfig *config = oizys_config();
+    OizysConfig defaults;
+    load_defaults(&defaults);
+    fputs("{\"version\":1,\"path\":", out);
+    json_string(out, oizys_config_path());
+    fputs(",\"settings\":[", out);
+    for (size_t i = 0; i < FIELD_COUNT; i++) {
+        char value[64], fallback[64];
+        render(config, &FIELDS[i], value, sizeof(value));
+        render(&defaults, &FIELDS[i], fallback, sizeof(fallback));
+        if (i) fputc(',', out);
+        fputs("{\"key\":", out);
+        json_string(out, FIELDS[i].key);
+        fputs(",\"value\":", out);
+        json_string(out, value);
+        fputs(",\"default\":", out);
+        json_string(out, fallback);
+        fputc('}', out);
+    }
+    fputs("]}\n", out);
 }
 
 int oizys_config_get(const char *key, char *out, size_t capacity) {

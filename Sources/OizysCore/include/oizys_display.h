@@ -48,8 +48,9 @@ void oizys_displays_watch(const uint32_t *ids, int count, uint32_t width, uint32
  * one framebuffer to the window server, and ScreenCaptureKit will hand back the other
  * display's desktop for a stream opened on this one. */
 int oizys_display_unit_is_shared(uint32_t id);
-/* Record every display's origin, and put them all back. Creating a virtual display makes
- * macOS re-lay-out the desktop and move displays that have nothing to do with the dock. */
+/* Record every display's origin, mode and mirror relationship, and put them all back. Creating
+ * a virtual display makes macOS re-lay-out the desktop and move displays that have nothing to
+ * do with the dock. */
 void oizys_displays_snapshot(void);
 int oizys_displays_restore(void);
 /* Restore and arrange in one display transaction, and therefore one mode set. Two commits

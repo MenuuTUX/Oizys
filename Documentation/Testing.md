@@ -19,6 +19,17 @@ For Xcode’s Test navigator, first run `./dev.sh setup`, then Command-U.
 The XCTest bridge attaches the existing Python suite output to the result bundle;
 it does not rebuild recursively. See [Xcode workflows](Xcode.md).
 
+The built DebugVerbose app also provides `--check-interface`. It opens only an offscreen
+window with preview data, navigates all six sections with arrow keys, sends keyboard input
+to the settings search, and checks accessible
+actions and brightness controls for healthy, permission-blocked, and recovering states.
+It does not start a display service or write user settings. This check complements the native
+slider tests; full VoiceOver navigation and physical display observations remain manual gates.
+
+```bash
+build/DebugVerbose/Oizys-debug.app/Contents/MacOS/Oizys-debug --check-interface
+```
+
 ## Developer dashboard
 
 Portable debug variants expose **Developer Dashboard** in the main window and menu-bar menu.
@@ -69,6 +80,8 @@ catches.
 | `test_debug_permissions.py`, `test_diagnostic_report.py` | Swift permission policy and private report export |
 | `test_build_tools.py` | icon generation, installation rollback, build-policy rejection, and coverage validation |
 | `test_cli.py` | CLI build policy, isolated configuration, and invalid controls without hardware changes |
+| `test_app_model.py` | shipping Swift settings model with isolated CLI processes; failed saves, refresh during edits, individual reset, observed-state history, report privacy, timeouts, native slider input, and gamma restoration |
+| `test_calibration.py`, `test_calibration_session.py` | calibration solver, staged save, undo and conflict protection, live HTTPS certificate identity, authenticated routes, fragmented requests, session replay, certificate renewal, and listener shutdown |
 | `test_fixture*.py`, `test_debug_session.py` | developer fixture and debug-session tooling |
 
 Surfaces are drawn from several styles rather than one. The codec's paths are content
@@ -143,8 +156,12 @@ undefined` tries the ctypes suite first, because it reaches every fuzzed input, 
 back to the same native runner when the load is refused, so the command means the same
 thing on a laptop as it does on CI.
 
-The permission policy and diagnostic export have native Swift checks. ScreenCaptureKit,
-virtual displays, and most app lifecycle/UI paths still need additional tests and live
+The permission policy, diagnostic export, settings model, and gamma restoration have
+native Swift checks. The slider check hosts the shipping SwiftUI control in its own
+offscreen window. It inspects the accessibility label and value description, exercises
+accessibility increments and decrements, and sends a right-arrow key event to verify a
+deferred commit. It does not exercise the entire app with VoiceOver.
+ScreenCaptureKit, virtual displays, and most app lifecycle/UI paths still need live
 validation.
 
 ## Reading a run

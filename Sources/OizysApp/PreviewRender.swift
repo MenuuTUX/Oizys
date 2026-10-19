@@ -14,6 +14,110 @@ import SwiftUI
  */
 enum PreviewRender {
     @MainActor
+    static func checkInteractions() -> Int32 {
+        NSApplication.shared.accessibilitySetValue(true,
+            forAttribute: NSAccessibility.Attribute(rawValue: "AXEnhancedUserInterface"))
+        let hosting = NSHostingView(rootView: MenuWindow(model: OizysModel.preview(), initial: .settings))
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 720, height: 480),
+                              styleMask: [.titled], backing: .buffered, defer: false)
+        window.contentView = hosting
+        window.setFrameOrigin(NSPoint(x: 40000, y: 40000))
+        window.orderFront(nil)
+        defer { window.orderOut(nil) }
+        window.layoutIfNeeded()
+        window.displayIfNeeded()
+        RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+
+        func legacy(_ element: AnyObject, _ attribute: String) -> Any? {
+            let selector = NSSelectorFromString("accessibilityAttributeValue:")
+            guard let object = element as? NSObject, object.responds(to: selector) else { return nil }
+            return object.perform(selector, with: attribute as NSString)?.takeUnretainedValue()
+        }
+        func nodes(_ item: Any, depth: Int = 0) -> [AnyObject] {
+            guard depth < 30 else { return [] }
+            let element = item as AnyObject
+            let children = element.accessibilityChildren?() ?? (legacy(element, "AXChildren") as? [Any]) ?? []
+            return [element] + children.flatMap { nodes($0, depth: depth + 1) }
+        }
+        func name(_ element: AnyObject) -> String {
+            let selector = NSSelectorFromString("accessibilityValue")
+            var value = ""
+            if let object = element as? NSObject, object.responds(to: selector) {
+                value = object.perform(selector)?.takeUnretainedValue() as? String ?? ""
+            }
+            if value.isEmpty { value = legacy(element, "AXValue") as? String ?? "" }
+            return (element.accessibilityLabel?() ?? "") + " "
+                + (element.accessibilityTitle?() ?? (legacy(element, "AXTitle") as? String) ?? "") + " " + value
+        }
+        var tree = nodes(hosting)
+        guard Panel.allCases.allSatisfy({ panel in tree.contains { name($0).contains(panel.rawValue) } }),
+              tree.contains(where: { $0.accessibilityRole?() == .textField
+                  && name($0).contains("Search driver settings") }) else {
+            fputs("Interface check: navigation or accessible search field is missing\n", stderr)
+            return 1
+        }
+        window.makeKey()
+        window.makeFirstResponder(hosting)
+        guard let find = tree.first(where: { $0.accessibilityRole?() == .button && name($0).contains("Find driver setting") }),
+              find.accessibilityPerformPress?() == true else {
+            fputs("Interface check: Find action is unavailable\n", stderr)
+            return 1
+        }
+        RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        let query = "head.left.brightness"
+        let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [],
+                                    timestamp: ProcessInfo.processInfo.systemUptime,
+                                    windowNumber: window.windowNumber, context: nil,
+                                    characters: query, charactersIgnoringModifiers: query,
+                                    isARepeat: false, keyCode: 0)!
+        window.sendEvent(event)
+        RunLoop.current.run(until: Date().addingTimeInterval(0.15))
+        tree = nodes(hosting)
+        guard tree.contains(where: { name($0).contains("Edit head.left.brightness") }),
+              !tree.contains(where: { name($0).contains("Edit control.poll_ms") }),
+              tree.contains(where: { name($0).contains("Reset head.left.brightness to default") }) else {
+            fputs("Interface check: keyboard search did not filter settings or reset is unnamed\n", stderr)
+            return 1
+        }
+        guard let sidebar = tree.first(where: { $0 is NSOutlineView }) as? NSOutlineView,
+              window.makeFirstResponder(sidebar) else {
+            fputs("Interface check: sidebar cannot receive keyboard focus\n", stderr)
+            return 1
+        }
+        for heading in ["USB PORTS", "MATCH THE MONITORS", "DISPLAY ARRANGEMENT", "ATTACHED DISPLAYS", "DOCK DISPLAYS"] {
+            let up = "\u{F700}"
+            let arrow = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [],
+                                        timestamp: ProcessInfo.processInfo.systemUptime,
+                                        windowNumber: window.windowNumber, context: nil,
+                                        characters: up, charactersIgnoringModifiers: up,
+                                        isARepeat: false, keyCode: 126)!
+            window.sendEvent(arrow)
+            RunLoop.current.run(until: Date().addingTimeInterval(0.15))
+            guard nodes(hosting).contains(where: { name($0).contains(heading) }) else {
+                fputs("Interface check: keyboard navigation did not reach \(heading)\n", stderr)
+                return 1
+            }
+        }
+        for (model, action, sliders) in [(OizysModel.preview(), "Stop", 2),
+                                        (OizysModel.preview(recordingGranted: false), "Grant access…", 0),
+                                        (OizysModel.preview(recordingGranted: false, dockCount: 0), "Grant access…", 0),
+                                        (OizysModel.preview(phase: .recovering), "Retry connection", 0)] {
+            let popover = NSHostingView(rootView: MenuPopover(model: model, openWindow: {}, quit: {}))
+            window.contentView = popover
+            window.layoutIfNeeded()
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+            let elements = nodes(popover)
+            guard elements.contains(where: { $0.accessibilityRole?() == .button && name($0).contains(action) }),
+                  elements.filter({ $0.accessibilityRole?() == .slider }).count == sliders else {
+                fputs("Interface check: incorrect action or brightness controls for \(model.summary)\n", stderr)
+                return 1
+            }
+        }
+        print("PASS interface keyboard navigation, search and accessible state controls")
+        return 0
+    }
+
+    @MainActor
     static func run(into directory: String) -> Int32 {
         let folder = URL(fileURLWithPath: directory)
         do {
@@ -23,12 +127,27 @@ enum PreviewRender {
             return 1
         }
         let model = OizysModel.preview()
+        let blocked = OizysModel.preview(recordingGranted: false)
+        let recovering = OizysModel.preview(phase: .recovering)
         var failures = 0
+        if model.health != .live || blocked.summary != "Screen Recording required"
+            || recovering.summary != "Recovering connection…" {
+            fputs("Preview status states are inconsistent\n", stderr)
+            failures += 1
+        }
 
         failures += write(MenuPopover(model: model, openWindow: {}, quit: {})
             .frame(width: 330), to: folder.appendingPathComponent("popover.png"))
-        failures += write(MenuWindow(model: model, initial: .displays)
+        failures += write(MenuPopover(model: blocked, openWindow: {}, quit: {})
+            .frame(width: 330), to: folder.appendingPathComponent("popover-permission.png"))
+        failures += write(MenuPopover(model: recovering, openWindow: {}, quit: {})
+            .frame(width: 330), to: folder.appendingPathComponent("popover-recovering.png"))
+        failures += write(MenuPopover(model: OizysModel.preview(recordingGranted: false, dockCount: 0), openWindow: {}, quit: {})
+            .frame(width: 330), to: folder.appendingPathComponent("popover-setup.png"))
+        failures += write(MenuWindow(model: model)
             .frame(width: 820, height: 560), to: folder.appendingPathComponent("window.png"))
+        failures += write(MenuWindow(model: model)
+            .frame(width: 720, height: 480), to: folder.appendingPathComponent("window-minimum.png"))
 
         for panel in Panel.allCases {
             let name = panel.rawValue.lowercased()
@@ -86,12 +205,35 @@ enum PreviewRender {
 
     @MainActor
     private static func write<V: View>(_ view: V, to url: URL) -> Int {
-        let renderer = ImageRenderer(content: view)
-        renderer.scale = 2
-        guard let image = renderer.nsImage,
-              let data = image.tiffRepresentation,
-              let bitmap = NSBitmapImageRep(data: data),
-              let png = bitmap.representation(using: .png, properties: [:]) else {
+        // ImageRenderer cannot snapshot AppKit-backed controls (Toggle, Picker, Slider,
+        // List): they come out as yellow placeholders with a prohibition sign. A real
+        // window, never shown, gives them a host to draw into.
+        // An opaque ground prevents cacheDisplay from saving only the compositing mask.
+        let hosting = NSHostingView(rootView: view.background(Ink.ground)
+            .environment(\.colorScheme, .dark))
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 64, height: 64),
+                              styleMask: [.borderless], backing: .buffered, defer: false)
+        // Pin the review look: offscreen windows resolve an inconsistent mix of
+        // appearances, which photographs native bezels white with white text.
+        window.appearance = NSAppearance(named: .darkAqua)
+        window.contentView = hosting
+        window.layoutIfNeeded()
+        var size = hosting.fittingSize
+        size.width = max(size.width, 1)
+        size.height = max(size.height, 1)
+        window.setContentSize(size)
+        RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+        window.layoutIfNeeded()
+        window.displayIfNeeded()
+        guard let content = window.contentView,
+              let bitmap = content.bitmapImageRepForCachingDisplay(in: content.bounds) else {
+            fputs("Could not render \(url.lastPathComponent)\n", stderr)
+            return 1
+        }
+        window.appearance?.performAsCurrentDrawingAppearance {
+            content.cacheDisplay(in: content.bounds, to: bitmap)
+        }
+        guard let png = bitmap.representation(using: .png, properties: [:]) else {
             fputs("Could not render \(url.lastPathComponent)\n", stderr)
             return 1
         }

@@ -54,7 +54,6 @@
 		AEA1EEAB76E0A3AEE0C45A56 /* config.c in oizys */ = {isa = PBXBuildFile; fileRef = D84D26C78DEF97C8F1123C16 /* config.c */; };
 		2752BDB59A24B1E5867C9B4D /* crypto.c in oizys */ = {isa = PBXBuildFile; fileRef = 3B32423357F906EBA67305CD /* crypto.c */; };
 		1C431784C109DC7578247593 /* ddc_native.c in oizys */ = {isa = PBXBuildFile; fileRef = 6E923A000FA6991C4973A5DF /* ddc_native.c */; };
-		34AF31947EA4F34CA2C57B49 /* ddc_tunnel.c in oizys */ = {isa = PBXBuildFile; fileRef = 22F36929F5334BB385D06954 /* ddc_tunnel.c */; };
 		F23DDB6DC87994557EBD37FA /* display.c in oizys */ = {isa = PBXBuildFile; fileRef = BBCD0F1FE7BBD144E1376A42 /* display.c */; };
 		F680AD6EFD17ADB3CB9A4E34 /* dl3.c in oizys */ = {isa = PBXBuildFile; fileRef = A0E0F016740BCCB3D349E1E8 /* dl3.c */; };
 		91A29460027136E1EC1BD620 /* driver.c in oizys */ = {isa = PBXBuildFile; fileRef = F57E32910C395FEEBF5C17D9 /* driver.c */; };
@@ -197,11 +196,14 @@
 		8CDA9285FD41E3077587483A = {isa = PBXFileReference; lastKnownFileType = text; name = "OriginalBrief.md"; path = "Documentation/OriginalBrief.md"; sourceTree = SOURCE_ROOT; };
 		CF05053E159299B83ACD7B00 = {isa = PBXFileReference; lastKnownFileType = text; name = "Performance-2026-08-30.md"; path = "Documentation/Performance-2026-08-30.md"; sourceTree = SOURCE_ROOT; };
 		C3F2E6B328AE26E1B7CBE310 = {isa = PBXFileReference; lastKnownFileType = text; name = "Ports.md"; path = "Documentation/Ports.md"; sourceTree = SOURCE_ROOT; };
+		CDF44F4B71C71946F9343A35 = {isa = PBXFileReference; lastKnownFileType = text; name = "Product-Audit-and-Redesign-2026-09-26.md"; path = "Documentation/Product-Audit-and-Redesign-2026-09-26.md"; sourceTree = SOURCE_ROOT; };
 		B348D2F3794A333F06CCCDA3 = {isa = PBXFileReference; lastKnownFileType = text; name = "Protocol.md"; path = "Documentation/Protocol.md"; sourceTree = SOURCE_ROOT; };
+		35D4544CB653AD657BF4C73C = {isa = PBXFileReference; lastKnownFileType = text; name = "Releasing.md"; path = "Documentation/Releasing.md"; sourceTree = SOURCE_ROOT; };
 		EA87C733CE8C41B98948CC91 = {isa = PBXFileReference; lastKnownFileType = text; name = "Routing.md"; path = "Documentation/Routing.md"; sourceTree = SOURCE_ROOT; };
 		F276D2CABF3D0FCCCC182759 = {isa = PBXFileReference; lastKnownFileType = text; name = "Testing.md"; path = "Documentation/Testing.md"; sourceTree = SOURCE_ROOT; };
 		225DB77BA9C39FB96D5E66FD = {isa = PBXFileReference; lastKnownFileType = text; name = "Xcode.md"; path = "Documentation/Xcode.md"; sourceTree = SOURCE_ROOT; };
 		95F400267BCE4521576DA2CB = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = "asan_runner.c"; path = "Tests/Support/asan_runner.c"; sourceTree = SOURCE_ROOT; };
+		7C78068A666B77BC3382E475 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "calibration_session_test.swift"; path = "Tests/Support/calibration_session_test.swift"; sourceTree = SOURCE_ROOT; };
 		26AE79822092186F35ABFC2F = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = "capture_test.c"; path = "Tests/Support/capture_test.c"; sourceTree = SOURCE_ROOT; };
 		AB3E4A7CE5B83C3DEDDC341E = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = "ddc_native_test.c"; path = "Tests/Support/ddc_native_test.c"; sourceTree = SOURCE_ROOT; };
 		8E8B6084D129FE3519110A7C = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "debug_permissions_test.swift"; path = "Tests/Support/debug_permissions_test.swift"; sourceTree = SOURCE_ROOT; };
@@ -216,6 +218,7 @@
 		BEE555D432F9BAFE40F1BED0 = {isa = PBXFileReference; lastKnownFileType = text; name = "conftest.py"; path = "Tests/conftest.py"; sourceTree = SOURCE_ROOT; };
 		1FD45C9E303FB101D3EBD6A6 = {isa = PBXFileReference; lastKnownFileType = text; name = "test_build_tools.py"; path = "Tests/test_build_tools.py"; sourceTree = SOURCE_ROOT; };
 		C092A610AFCD74EC5828C456 = {isa = PBXFileReference; lastKnownFileType = text; name = "test_calibration.py"; path = "Tests/test_calibration.py"; sourceTree = SOURCE_ROOT; };
+		3821BC3E67BB3B33F836DC28 = {isa = PBXFileReference; lastKnownFileType = text; name = "test_calibration_session.py"; path = "Tests/test_calibration_session.py"; sourceTree = SOURCE_ROOT; };
 		4F4DF7FDB482C869604CC941 = {isa = PBXFileReference; lastKnownFileType = text; name = "test_capture.py"; path = "Tests/test_capture.py"; sourceTree = SOURCE_ROOT; };
 		CFBCE38289C2BA3613109A2E = {isa = PBXFileReference; lastKnownFileType = text; name = "test_capture_geometry.py"; path = "Tests/test_capture_geometry.py"; sourceTree = SOURCE_ROOT; };
 		BC7A479B3BD93F710D425C06 = {isa = PBXFileReference; lastKnownFileType = text; name = "test_cli.py"; path = "Tests/test_cli.py"; sourceTree = SOURCE_ROOT; };
@@ -224,6 +227,7 @@
 		B3AD56AE2BC0333262B7D308 = {isa = PBXFileReference; lastKnownFileType = text; name = "test_crypto.py"; path = "Tests/test_crypto.py"; sourceTree = SOURCE_ROOT; };
 		2888A24A61E19ADAC3D463A7 = {isa = PBXFileReference; lastKnownFileType = text; name = "test_damage.py"; path = "Tests/test_damage.py"; sourceTree = SOURCE_ROOT; };
 		F929532D04321AA564ACA42D = {isa = PBXFileReference; lastKnownFileType = text; name = "test_ddc.py"; path = "Tests/test_ddc.py"; sourceTree = SOURCE_ROOT; };
+		35A5C452670134CBCF3054AE = {isa = PBXFileReference; lastKnownFileType = text; name = "test_ddc_tunnel.py"; path = "Tests/test_ddc_tunnel.py"; sourceTree = SOURCE_ROOT; };
 		4921F74DE582B01B712B5121 = {isa = PBXFileReference; lastKnownFileType = text; name = "test_debug_permissions.py"; path = "Tests/test_debug_permissions.py"; sourceTree = SOURCE_ROOT; };
 		1946E91367E67FD756B332BA = {isa = PBXFileReference; lastKnownFileType = text; name = "test_debug_session.py"; path = "Tests/test_debug_session.py"; sourceTree = SOURCE_ROOT; };
 		8E18B1FC222940D8CD949F98 = {isa = PBXFileReference; lastKnownFileType = text; name = "test_diagnostic_report.py"; path = "Tests/test_diagnostic_report.py"; sourceTree = SOURCE_ROOT; };
@@ -234,6 +238,7 @@
 		45ADBBEB11F7B7F0876B4A57 = {isa = PBXFileReference; lastKnownFileType = text; name = "test_log.py"; path = "Tests/test_log.py"; sourceTree = SOURCE_ROOT; };
 		76914F8BD3D0C35EBCDCD136 = {isa = PBXFileReference; lastKnownFileType = text; name = "test_profiler.py"; path = "Tests/test_profiler.py"; sourceTree = SOURCE_ROOT; };
 		0C38FDBD5F5D4D68A1ECE7AD = {isa = PBXFileReference; lastKnownFileType = text; name = "test_protocol.py"; path = "Tests/test_protocol.py"; sourceTree = SOURCE_ROOT; };
+		46041931A9905C13E87CB3EA = {isa = PBXFileReference; lastKnownFileType = text; name = "test_release_tools.py"; path = "Tests/test_release_tools.py"; sourceTree = SOURCE_ROOT; };
 		075AAADB694A289FEAC71589 = {isa = PBXFileReference; lastKnownFileType = text; name = "test_sidecar.py"; path = "Tests/test_sidecar.py"; sourceTree = SOURCE_ROOT; };
 		26E17847289BED0F04C5A525 = {isa = PBXFileReference; lastKnownFileType = text; name = "test_supervisor.py"; path = "Tests/test_supervisor.py"; sourceTree = SOURCE_ROOT; };
 		8214AA2F1D3B061D056911E8 = {isa = PBXFileReference; lastKnownFileType = text; name = "test_usb_frames.py"; path = "Tests/test_usb_frames.py"; sourceTree = SOURCE_ROOT; };
@@ -252,6 +257,7 @@
 		A84EBF5462C6F2508751D12C = {isa = PBXFileReference; lastKnownFileType = text; name = "make_xcodeproj.py"; path = "Tools/make_xcodeproj.py"; sourceTree = SOURCE_ROOT; };
 		4CCBF8D93ECE1B037B73DAF5 = {isa = PBXFileReference; lastKnownFileType = text; name = "measure_processes.py"; path = "Tools/measure_processes.py"; sourceTree = SOURCE_ROOT; };
 		6C75A42862F4CC73D7D0FB88 = {isa = PBXFileReference; lastKnownFileType = text; name = "mutate.py"; path = "Tools/mutate.py"; sourceTree = SOURCE_ROOT; };
+		62B9B418BA772F22FA12C195 = {isa = PBXFileReference; lastKnownFileType = text; name = "notarize_release.py"; path = "Tools/notarize_release.py"; sourceTree = SOURCE_ROOT; };
 		A03C030E26E308B104040A94 = {isa = PBXFileReference; lastKnownFileType = text; name = "package_resources.py"; path = "Tools/package_resources.py"; sourceTree = SOURCE_ROOT; };
 		3E955C9A53EEE6EB1D64F82E = {isa = PBXFileReference; lastKnownFileType = text; name = "profile.py"; path = "Tools/profile.py"; sourceTree = SOURCE_ROOT; };
 		F032671C5658B4B70F60B44E = {isa = PBXFileReference; lastKnownFileType = text; name = "report.py"; path = "Tools/report.py"; sourceTree = SOURCE_ROOT; };
@@ -503,11 +509,14 @@
 				8CDA9285FD41E3077587483A /* OriginalBrief.md */,
 				CF05053E159299B83ACD7B00 /* Performance-2026-08-30.md */,
 				C3F2E6B328AE26E1B7CBE310 /* Ports.md */,
+				CDF44F4B71C71946F9343A35 /* Product-Audit-and-Redesign-2026-09-26.md */,
 				B348D2F3794A333F06CCCDA3 /* Protocol.md */,
+				35D4544CB653AD657BF4C73C /* Releasing.md */,
 				EA87C733CE8C41B98948CC91 /* Routing.md */,
 				F276D2CABF3D0FCCCC182759 /* Testing.md */,
 				225DB77BA9C39FB96D5E66FD /* Xcode.md */,
 				95F400267BCE4521576DA2CB /* asan_runner.c */,
+				7C78068A666B77BC3382E475 /* calibration_session_test.swift */,
 				26AE79822092186F35ABFC2F /* capture_test.c */,
 				AB3E4A7CE5B83C3DEDDC341E /* ddc_native_test.c */,
 				8E8B6084D129FE3519110A7C /* debug_permissions_test.swift */,
@@ -522,6 +531,7 @@
 				BEE555D432F9BAFE40F1BED0 /* conftest.py */,
 				1FD45C9E303FB101D3EBD6A6 /* test_build_tools.py */,
 				C092A610AFCD74EC5828C456 /* test_calibration.py */,
+				3821BC3E67BB3B33F836DC28 /* test_calibration_session.py */,
 				4F4DF7FDB482C869604CC941 /* test_capture.py */,
 				CFBCE38289C2BA3613109A2E /* test_capture_geometry.py */,
 				BC7A479B3BD93F710D425C06 /* test_cli.py */,
@@ -530,6 +540,7 @@
 				B3AD56AE2BC0333262B7D308 /* test_crypto.py */,
 				2888A24A61E19ADAC3D463A7 /* test_damage.py */,
 				F929532D04321AA564ACA42D /* test_ddc.py */,
+				35A5C452670134CBCF3054AE /* test_ddc_tunnel.py */,
 				4921F74DE582B01B712B5121 /* test_debug_permissions.py */,
 				1946E91367E67FD756B332BA /* test_debug_session.py */,
 				8E18B1FC222940D8CD949F98 /* test_diagnostic_report.py */,
@@ -540,6 +551,7 @@
 				45ADBBEB11F7B7F0876B4A57 /* test_log.py */,
 				76914F8BD3D0C35EBCDCD136 /* test_profiler.py */,
 				0C38FDBD5F5D4D68A1ECE7AD /* test_protocol.py */,
+				46041931A9905C13E87CB3EA /* test_release_tools.py */,
 				075AAADB694A289FEAC71589 /* test_sidecar.py */,
 				26E17847289BED0F04C5A525 /* test_supervisor.py */,
 				8214AA2F1D3B061D056911E8 /* test_usb_frames.py */,
@@ -558,6 +570,7 @@
 				A84EBF5462C6F2508751D12C /* make_xcodeproj.py */,
 				4CCBF8D93ECE1B037B73DAF5 /* measure_processes.py */,
 				6C75A42862F4CC73D7D0FB88 /* mutate.py */,
+				62B9B418BA772F22FA12C195 /* notarize_release.py */,
 				A03C030E26E308B104040A94 /* package_resources.py */,
 				3E955C9A53EEE6EB1D64F82E /* profile.py */,
 				F032671C5658B4B70F60B44E /* report.py */,
@@ -775,7 +788,6 @@
 				AEA1EEAB76E0A3AEE0C45A56 /* config.c */,
 				2752BDB59A24B1E5867C9B4D /* crypto.c */,
 				1C431784C109DC7578247593 /* ddc_native.c */,
-				34AF31947EA4F34CA2C57B49 /* ddc_tunnel.c */,
 				F23DDB6DC87994557EBD37FA /* display.c */,
 				F680AD6EFD17ADB3CB9A4E34 /* dl3.c */,
 				91A29460027136E1EC1BD620 /* driver.c */,

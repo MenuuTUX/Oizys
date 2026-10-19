@@ -18,7 +18,8 @@ static int test_proc_listallpids(void *buffer, int size) {
 }
 static int test_proc_name(int pid, void *buffer, uint32_t capacity) {
     (void)pid;
-    const char *name = "DisplayLinkUserAgent";
+    const char *name = getenv("OIZYS_TEST_VENDOR_NAME");
+    if (!name || !*name) name = "DisplayLinkUserAgent";
     if (capacity <= strlen(name)) return 0;
     strcpy(buffer, name);
     return (int)strlen(name);

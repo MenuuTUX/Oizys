@@ -57,7 +57,14 @@ int oizys_dl3_open_cp(const uint8_t ks[16], const uint8_t in_riv[8], uint32_t se
 void oizys_aes_cmac(const uint8_t key[16], const uint8_t *msg, size_t n, uint8_t tag[16]);
 void oizys_aes_ctr_xor(const uint8_t key[16], const uint8_t riv[8], uint32_t seq,
                        const uint8_t *in, uint8_t *out, size_t n);
-void oizys_hdcp_random(void *buf, size_t n);
+int oizys_hdcp_random(void *buf, size_t n);
+/* Verify the 522-byte receiver certificate with a trusted 3072-bit DCP issuer key. */
+int oizys_hdcp_verify_receiver_cert(const uint8_t *cert, size_t cert_len,
+                                    const uint8_t issuer_modulus[384]);
+int oizys_hdcp_verify_ake_cert_payload(const uint8_t *payload, size_t payload_len,
+                                       const uint8_t issuer_modulus[384]);
+/* DCP signature or the explicitly approved certificate pin for the local Ridge dock. */
+int oizys_dl3_verify_ridge_certificate(const uint8_t *payload, size_t payload_len);
 void oizys_hdcp_derive_kd(const uint8_t km[16], const uint8_t rtx[8], const uint8_t rrx[8],
                           uint8_t kd[32]);
 void oizys_hdcp_ske_edkey(const uint8_t km[16], const uint8_t rtx[8], const uint8_t rrx[8],
@@ -151,6 +158,9 @@ int oizys_driver_capture_fps_target(const OizysDriver *driver);
 /* Run the control session's own clocks: a 13 ms status poll and a 3 s heartbeat. These
  * are independent of whether any pixels moved. Call it often; it rate-limits itself. */
 int oizys_driver_service_control(OizysDriver *driver);
+/* Milliseconds since oizys_driver_service_control last ran, or -1 if it never has. Safe to
+ * call from any thread; it is how a watchdog off the capture queue sees that queue hang. */
+int oizys_driver_service_age_ms(const OizysDriver *driver);
 
 /* Pack a Ridge video frame (row records + trailer) from BGRA. strips==NULL encodes the
  * full 1920x1080 grid. Used by tests and the desktop scanout path. */

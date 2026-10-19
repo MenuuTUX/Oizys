@@ -1,5 +1,6 @@
 """Exercise crash/reconnect/timeout supervision using real child processes, no dock."""
 import os
+import json
 import pathlib
 import signal
 import subprocess
@@ -33,8 +34,16 @@ def eventually(predicate, seconds=8):
     assert predicate(), "supervisor did not reach the expected state in time"
 
 
+def status(directory):
+    path = directory / "oizys-driver.status"
+    try:
+        return json.loads(path.read_text())
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+
 @contextmanager
-def service(supervisor, directory, vendor=False, topology=1, stubborn=False):
+def service(supervisor, directory, vendor=False, topology=1, stubborn=False, vendor_name=None):
     worker = directory / "worker"
     worker.write_text(f"#!{sys.executable}\n" + '''
 import os, pathlib, signal, time
@@ -45,7 +54,7 @@ if os.environ.get("OIZYS_TEST_STUBBORN") and len(pidfile.read_text().splitlines(
     signal.signal(signal.SIGTERM, signal.SIG_IGN)
 fd = int(next(arg.split("=", 1)[1] for arg in __import__("sys").argv if arg.startswith("--worker-fd=")))
 while True:
-    os.write(fd, b".")
+    os.write(fd, b"3")
     time.sleep(0.1)
 ''')
     worker.chmod(0o700)
@@ -59,6 +68,8 @@ while True:
         env["OIZYS_TEST_STUBBORN"] = "1"
     if vendor:
         env["OIZYS_TEST_VENDOR"] = "1"
+    if vendor_name:
+        env["OIZYS_TEST_VENDOR_NAME"] = vendor_name
     logfile = directory / "service.log"
     with logfile.open("w") as log:
         process = subprocess.Popen([str(supervisor), str(worker)], env=env, stdout=log,
@@ -77,16 +88,31 @@ while True:
 def test_crash_restarts_oizys_and_restores_vendor_only_on_stop(supervisor, tmp_path):
     with service(supervisor, tmp_path, vendor=True) as (process, log, pids, _, _, _):
         eventually(lambda: "worker ready" in log.read_text())
+        eventually(lambda: status(tmp_path).get("phase") == "forwarding")
+        assert status(tmp_path)["head_mask"] == 3
+        assert status(tmp_path)["pid"] == process.pid
         os.kill(int(pids.read_text().splitlines()[-1]), signal.SIGKILL)
+        eventually(lambda: status(tmp_path).get("phase") == "recovering")
         eventually(lambda: log.read_text().count("worker ready") == 2)
+        eventually(lambda: status(tmp_path).get("phase") == "forwarding")
         assert process.poll() is None
         assert "vendor restore" not in log.read_text()
+    assert log.read_text().count("TEST vendor restore") == 1
+    assert not (tmp_path / "oizys-driver.status").exists()
+
+
+def test_displaylink_manager_is_restored_when_it_preceded_takeover(supervisor, tmp_path):
+    with service(supervisor, tmp_path, vendor=True, vendor_name="DisplayLink Manager") as (process, log, *_):
+        eventually(lambda: "worker ready" in log.read_text())
+        assert process.poll() is None
+        assert "TEST vendor restore" not in log.read_text()
     assert log.read_text().count("TEST vendor restore") == 1
 
 
 def test_absent_ambiguous_and_reconnected_dock(supervisor, tmp_path):
     with service(supervisor, tmp_path, topology=0) as (process, log, pids, topology, _, _):
         eventually(lambda: "waiting for one supported" in log.read_text())
+        eventually(lambda: status(tmp_path).get("phase") == "waiting")
         assert not pids.read_text()
         topology.write_text("2")
         time.sleep(1.2)
@@ -119,6 +145,7 @@ def test_unresponsive_worker_is_reaped_before_restart(supervisor, tmp_path):
         eventually(lambda: "worker ready" in log.read_text())
         hung = int(pids.read_text().splitlines()[-1])
         os.kill(hung, signal.SIGSTOP)
+        eventually(lambda: status(tmp_path).get("phase") == "recovering", seconds=18)
         eventually(lambda: log.read_text().count("worker ready") == 2, seconds=30)
         assert "stopped responding" in log.read_text()
         assert "did not stop in 10 seconds" in log.read_text()

@@ -1,2 +1,5 @@
 #include "ProductionFallback.xcconfig"
 CODE_SIGN_INJECT_BASE_ENTITLEMENTS = YES
+// Instruments needs the symbols the shipping build strips.
+DEPLOYMENT_POSTPROCESSING = NO
+STRIP_INSTALLED_PRODUCT = NO

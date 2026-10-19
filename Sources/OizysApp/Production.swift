@@ -94,7 +94,7 @@ private final class ProductionController: NSObject, NSApplicationDelegate {
             // A visible setup window gives first-run installs the same guided handoff as other
             // capture apps: explain the one required permission and put its button beside the
             // path to System Settings. macOS still owns the final approval.
-            DispatchQueue.main.async { [weak self] in self?.menu.openWindow(initial: .info) }
+            DispatchQueue.main.async { [weak self] in self?.menu.openWindow(initial: .overview) }
         }
         // The agent's stderr is the service log. One line at startup so a desk that stays dark
         // can be explained from the log alone, without attaching anything to a running app.
@@ -125,22 +125,28 @@ private final class ProductionController: NSObject, NSApplicationDelegate {
             if !reportedBlocked {
                 reportedBlocked = true
                 note("dock attached but Screen Recording is not granted to this app; waiting. "
-                     + "Grant it in Oizys > About, or System Settings > Privacy & Security.")
+                     + "Grant it in Oizys > Overview, or System Settings > Privacy & Security.")
             }
             retry = Timer.scheduledTimer(withTimeInterval: 5, repeats: false) { [weak self] _ in self?.reconcile() }
             return
         }
+        if reportedBlocked { note("Screen Recording granted to this app; resuming.") }
         reportedBlocked = false
         guard worker == nil else { return }
         let process = Process()
         process.executableURL = Bundle.main.url(forAuxiliaryExecutable: "OizysDriver")
         process.arguments = ["serve", "--takeover"]
         process.currentDirectoryURL = workspace
-        process.standardInput = FileHandle.nullDevice; process.standardOutput = FileHandle.nullDevice; process.standardError = FileHandle.nullDevice
+        process.standardInput = FileHandle.nullDevice
+        // LaunchAgent routes this app's stderr to service.log. Keep the worker's diagnostics
+        // there too; /dev/null made a failed handoff indistinguishable from a slow startup.
+        process.standardOutput = FileHandle.standardError
+        process.standardError = FileHandle.standardError
         process.terminationHandler = { [weak self] process in
             DispatchQueue.main.async {
                 guard let self, self.worker === process else { return }
                 self.worker = nil
+                self.menu.refreshNow()
                 let expected = self.stopping; self.stopping = false
                 if self.quitting { self.finishQuit(); return }
                 guard self.eligible else { return }
@@ -149,8 +155,18 @@ private final class ProductionController: NSObject, NSApplicationDelegate {
                 self.retry = Timer.scheduledTimer(withTimeInterval: expected ? 0.1 : min(8, pow(2, Double(self.failures))), repeats: false) { [weak self] _ in self?.reconcile() }
             }
         }
-        do { try process.run(); worker = process; began = Date() }
-        catch { retry = Timer.scheduledTimer(withTimeInterval: 5, repeats: false) { [weak self] _ in self?.reconcile() } }
+        do {
+            try process.run(); worker = process; began = Date()
+            DispatchQueue.main.async { [weak self] in self?.menu.refreshNow() }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                guard let self, self.worker === process else { return }
+                self.menu.refreshNow()
+            }
+        }
+        catch {
+            menu.refreshNow()
+            retry = Timer.scheduledTimer(withTimeInterval: 5, repeats: false) { [weak self] _ in self?.reconcile() }
+        }
     }
 
     private func stopWorker() {
@@ -173,11 +189,12 @@ private final class ProductionController: NSObject, NSApplicationDelegate {
         stopWorker()
         guard worker?.isRunning == true else { worker = nil; return .terminateNow }
         // A worker that ignores its own teardown must never hold login or a takeover open.
-        quitDeadline = Timer.scheduledTimer(withTimeInterval: 8, repeats: false) { [weak self] _ in self?.finishQuit() }
+        quitDeadline = Timer.scheduledTimer(withTimeInterval: 15, repeats: false) { [weak self] _ in self?.finishQuit() }
         return .terminateLater
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        DisplaySettings.revertPending()
         // A gamma ramp outlives the process that set it. Leaving one behind is a dim screen
         // the user cannot explain and cannot find a setting for.
         DisplayTint.clearAll()

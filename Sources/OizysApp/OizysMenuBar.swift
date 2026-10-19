@@ -29,6 +29,41 @@ final class OizysMenuBar: NSObject, NSWindowDelegate {
     /// terminates, and a debug session has a driver handover to finish first.
     func install(quit: @escaping () -> Void) {
         quitAction = quit
+        model.onServiceChange = { [weak self] in self?.syncIcon() }
+        if Self.extraVisible { makeItem() }
+
+        model.watchDisplays { [weak self] added in
+            guard let self else { return }
+            self.model.refresh()
+            ConnectOverlay.announce(added, model: self.model)
+        }
+        refreshNow()
+        model.refreshSlowly()
+        // Sidecar auto-connect arms its own push triggers and then costs nothing until one
+        // fires. It reads the switch on every decision, so an installed watcher with the
+        // setting off does nothing at all.
+        SidecarAuto.shared.start { [model] in model.sidecarSettings }
+        retick(fast: false)
+        NotificationCenter.default.addObserver(self, selector: #selector(extraVisibilityChanged),
+                                               name: .oizysExtraVisibilityChanged, object: nil)
+    }
+
+    /// The menu-bar extra is opt-in and never load-bearing: the app is fully usable from
+    /// the window (Spotlight or relaunch reopens it), because the system hides and culls
+    /// extras on its own schedule.
+    private static let extraKey = "OizysShowMenuBarItem"
+    static var extraVisible: Bool {
+        get { UserDefaults.standard.object(forKey: extraKey) as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: extraKey) }
+    }
+
+    /// Called from Settings, which has no handle on the menu instance.
+    static func setExtraVisibleRequest(_ visible: Bool) {
+        extraVisible = visible
+        NotificationCenter.default.post(name: .oizysExtraVisibilityChanged, object: nil)
+    }
+
+    private func makeItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         item.button?.image = Logo.menuBar(active: false)
         item.button?.setAccessibilityLabel("Oizys")
@@ -37,19 +72,17 @@ final class OizysMenuBar: NSObject, NSWindowDelegate {
         item.button?.action = #selector(toggle)
         item.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
         self.item = item
+        syncIcon()
+    }
 
-        model.watchDisplays { [weak self] added in
-            guard let self else { return }
-            self.model.refresh()
-            ConnectOverlay.announce(added, model: self.model)
+    @objc private func extraVisibilityChanged() {
+        if Self.extraVisible {
+            if item == nil { makeItem() }
+        } else {
+            closePanel()
+            if let item { NSStatusBar.system.removeStatusItem(item) }
+            self.item = nil
         }
-        model.refresh()
-        model.refreshSlowly()
-        // Sidecar auto-connect arms its own push triggers and then costs nothing until one
-        // fires. It reads the switch on every decision, so an installed watcher with the
-        // setting off does nothing at all.
-        SidecarAuto.shared.start { [model] in model.sidecarSettings }
-        retick(fast: false)
     }
 
     /// With nothing attached there is no timer at all: the dormant login item stays dormant
@@ -61,7 +94,7 @@ final class OizysMenuBar: NSObject, NSWindowDelegate {
         tick = Timer.scheduledTimer(withTimeInterval: fast ? 1.5 : 20, repeats: true) { [weak self] _ in
             guard let self else { return }
             self.model.refresh()
-            self.item?.button?.image = Logo.menuBar(active: self.model.running)
+            self.syncIcon()
             if !self.model.dockPresent, self.panel == nil { self.retick(fast: false) }
         }
     }
@@ -69,8 +102,14 @@ final class OizysMenuBar: NSObject, NSWindowDelegate {
     /// Called by the host app when its own dock or session notification fires.
     func refreshNow() {
         model.refresh()
-        item?.button?.image = Logo.menuBar(active: model.running)
+        syncIcon()
         retick(fast: panel != nil)
+    }
+
+    private func syncIcon() {
+        item?.button?.image = Logo.menuBar(active: model.health == .live)
+        item?.button?.toolTip = model.summary
+        item?.button?.setAccessibilityLabel("Oizys, \(model.summary)")
     }
 
     @objc private func toggle() {
@@ -95,11 +134,14 @@ final class OizysMenuBar: NSObject, NSWindowDelegate {
     private func showPanel() {
         guard let button = item?.button, let bar = button.window else { return }
         model.refresh()
+        model.refreshSlowly()
+        syncIcon()
         let size = NSSize(width: 330, height: 560)
         let content = NSHostingView(rootView:
             MenuPopover(model: model,
                         openWindow: { [weak self] in self?.openWindow() },
-                        quit: { [weak self] in self?.quitAction?() }))
+                        quit: { [weak self] in self?.quitAction?() },
+                        refresh: { [weak self] in self?.refreshNow() }))
         content.frame = NSRect(origin: .zero, size: size)
         content.wantsLayer = true
         content.layer?.cornerRadius = 12
@@ -117,7 +159,6 @@ final class OizysMenuBar: NSObject, NSWindowDelegate {
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = true
-        panel.appearance = NSAppearance(named: .darkAqua)
         panel.animationBehavior = .utilityWindow
         panel.setFrameOrigin(origin(under: bar.convertToScreen(button.convert(button.bounds, to: nil)),
                                     size: size, on: bar.screen))
@@ -166,40 +207,63 @@ final class OizysMenuBar: NSObject, NSWindowDelegate {
     func windowDidResignKey(_ notification: Notification) { closePanel() }
 
     private func showMenu() {
+        refreshNow()
         let menu = NSMenu()
         menu.addItem(withTitle: model.summary, action: nil, keyEquivalent: "")
         menu.addItem(.separator())
-        let toggle = NSMenuItem(title: model.running ? "Stop Oizys" : "Start Oizys",
-                                action: #selector(toggleDriver), keyEquivalent: "")
-        toggle.target = self
-        menu.addItem(toggle)
-        let open = NSMenuItem(title: "Open Oizys…", action: #selector(openWindowFromMenu), keyEquivalent: ",")
-        open.target = self
-        menu.addItem(open)
+        if model.dockPresent && !model.screenRecordingGranted {
+            menu.addItem(menuItem("Grant Screen Recording…", action: #selector(grantRecording),
+                                  symbol: "record.circle"))
+        } else {
+            menu.addItem(menuItem(model.running ? "Stop Oizys" : "Start Oizys",
+                                  action: #selector(toggleDriver),
+                                  symbol: model.running ? "stop.fill" : "play.fill"))
+        }
+        menu.addItem(menuItem("Open Oizys…", action: #selector(openWindowFromMenu),
+                              key: ",", symbol: "slider.horizontal.3"))
         if let extraMenu {
             menu.addItem(.separator())
-            let entry = NSMenuItem(title: "Debug session", action: nil, keyEquivalent: "")
+            let entry = menuItem("Debug session", symbol: "hammer.fill")
             entry.submenu = extraMenu
             menu.addItem(entry)
         }
         menu.addItem(.separator())
-        let quit = NSMenuItem(title: "Quit Oizys", action: #selector(quitNow), keyEquivalent: "q")
-        quit.target = self
-        menu.addItem(quit)
+        menu.addItem(menuItem("Quit Oizys", action: #selector(quitNow), key: "q",
+                              symbol: "power", destructive: true))
         item?.menu = menu
         item?.button?.performClick(nil)
         item?.menu = nil // so the next left click returns to the popover
     }
 
-    @objc private func toggleDriver() { model.running ? model.stop() : model.start() }
+    private func menuItem(_ title: String, action: Selector? = nil, key: String = "",
+                          symbol: String? = nil, destructive: Bool = false) -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: action, keyEquivalent: key)
+        item.target = self
+        if let symbol {
+            item.image = NSImage(systemSymbolName: symbol,
+                                  accessibilityDescription: title)
+        }
+        if destructive {
+            item.attributedTitle = NSAttributedString(string: title,
+                                                       attributes: [.foregroundColor: NSColor.systemRed])
+        }
+        return item
+    }
+
+    @objc private func toggleDriver() {
+        model.running ? model.stop() : model.start()
+        syncIcon()
+    }
+    @objc private func grantRecording() { model.requestScreenRecording() }
     @objc private func quitNow() { quitAction?() }
 
     @objc private func openWindowFromMenu() { openWindow() }
 
-    func openWindow() { openWindow(initial: .displays) }
+    func openWindow() { openWindow(initial: .overview) }
 
     func openWindow(initial: Panel) {
         closePanel()
+        refreshNow()
         model.refreshSlowly()
         if let window {
             window.makeKeyAndOrderFront(nil)
@@ -212,8 +276,6 @@ final class OizysMenuBar: NSObject, NSWindowDelegate {
         window.title = "Oizys"
         window.titlebarAppearsTransparent = true
         window.isReleasedWhenClosed = false
-        window.appearance = NSAppearance(named: .darkAqua)
-        window.backgroundColor = NSColor(red: 0.039, green: 0.039, blue: 0.043, alpha: 1)
         window.contentView = NSHostingView(rootView: MenuWindow(model: model, initial: initial))
         window.center()
         window.makeKeyAndOrderFront(nil)
@@ -222,10 +284,15 @@ final class OizysMenuBar: NSObject, NSWindowDelegate {
     }
 
     func shutdown() {
+        NotificationCenter.default.removeObserver(self, name: .oizysExtraVisibilityChanged, object: nil)
         tick?.invalidate(); tick = nil
         closePanel()
         if let item { NSStatusBar.system.removeStatusItem(item) }
     }
+}
+
+extension Notification.Name {
+    static let oizysExtraVisibilityChanged = Notification.Name("OizysExtraVisibilityChanged")
 }
 
 /// A borderless panel takes key only if it says it can, and the panel holds switches and

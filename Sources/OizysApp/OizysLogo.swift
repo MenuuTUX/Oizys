@@ -187,7 +187,7 @@ struct Halftone: View {
                                          y: (CGFloat(row) + 0.5) * (size.height / CGFloat(rows)))
                     context.fill(Path(ellipseIn: CGRect(x: centre.x - radius, y: centre.y - radius,
                                                         width: radius * 2, height: radius * 2)),
-                                 with: .color(.white.opacity(0.30 + weight * 0.55)))
+                                 with: .color(Color(nsColor: .labelColor).opacity(0.30 + weight * 0.55)))
                 }
             }
         }
@@ -195,59 +195,36 @@ struct Halftone: View {
     }
 }
 
-/// The halftone meter, made draggable. The meter and the control are one object: a dot
-/// screen already shows a level, so putting a system slider beside it would say the same
-/// thing twice in two visual languages.
+/// A standard slider for a 0...1 level. Native drag, arrow-key and VoiceOver support;
+/// the halftone dot screen stays a pure meter wherever a level is only displayed.
 struct HalftoneSlider: View {
     @Binding var value: Double          // 0...1
     var onCommit: (Double) -> Void = { _ in }
-    var body: some View {
-        GeometryReader { proxy in
-            Halftone(value: value)
-                .contentShape(Rectangle())
-                .gesture(DragGesture(minimumDistance: 0)
-                    .onChanged { drag in
-                        value = min(1, max(0, drag.location.x / max(proxy.size.width, 1)))
-                    }
-                    .onEnded { _ in onCommit(value) })
-        }
-        .frame(height: 16)
-        .accessibilityElement()
-        .accessibilityValue(Text("\(Int(value * 100)) percent"))
-    }
-}
+    var label = "Percentage"
+    var announcedValue: String? = nil
+    @State private var editing = false
+    @State private var pendingCommit: DispatchWorkItem?
 
-/// The artwork itself as a header, faded into the ground so text stays readable over it.
-struct LogoHeader: View {
-    var height: CGFloat = 108
-    var active: Bool
+    private func scheduleCommit() {
+        pendingCommit?.cancel()
+        let work = DispatchWorkItem { if !editing { onCommit(value) } }
+        pendingCommit = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1, execute: work)
+    }
+
     var body: some View {
-        ZStack(alignment: .bottomLeading) {
-            if let artwork = Logo.artwork {
-                // The head fills the frame, so a centred fill crop lands on jaw and shoulder.
-                // Scale to the width and anchor high, which puts the profile in the band.
-                GeometryReader { proxy in
-                    Image(nsImage: artwork)
-                        .resizable().aspectRatio(contentMode: .fill)
-                        .frame(width: proxy.size.width, height: proxy.size.width)
-                        .offset(y: -proxy.size.width * 0.36)
-                        .saturation(0)                       // the stack ends monochrome
-                        .contrast(active ? 1.35 : 1.05)      // Curves
-                        .brightness(active ? -0.04 : -0.12)
-                        .opacity(active ? 0.92 : 0.62)
-                }
-                .frame(height: height).clipped()
-            } else {
-                RippleField(intensity: active ? 0.85 : 0.3).frame(height: height)
-            }
-            Vignette(strength: 0.5).frame(height: height)
-            Grain(opacity: 0.05).frame(height: height)
-            LinearGradient(colors: [Ink.ground.opacity(0), Ink.ground.opacity(0.75), Ink.ground],
-                           startPoint: .top, endPoint: .bottom)
-                .frame(height: height)
-        }
-        .frame(height: height)
-        .clipped()
-        .allowsHitTesting(false)
+        Slider(value: Binding(get: { value }, set: { newValue in
+            value = newValue
+            guard !editing else { return }
+            scheduleCommit()
+        }), in: 0...1, onEditingChanged: { isEditing in
+            editing = isEditing
+            if isEditing { pendingCommit?.cancel() }
+            else { scheduleCommit() }
+        })
+        .controlSize(.small)
+        .frame(height: 16)
+        .accessibilityLabel(Text(label))
+        .accessibilityValue(Text(announcedValue ?? "\(Int(value * 100)) percent"))
     }
 }

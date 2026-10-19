@@ -3,20 +3,13 @@
 #include <CommonCrypto/CommonCryptor.h>
 #include <CommonCrypto/CommonHMAC.h>
 #include <Security/Security.h>
-#include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 
-void oizys_hdcp_random(void *buf, size_t n) {
-    int fd = open("/dev/urandom", O_RDONLY);
-    if (fd >= 0) {
-        ssize_t r = read(fd, buf, n);
-        (void)r;
-        close(fd);
-        return;
-    }
-    memset(buf, 0xa5, n);
+int oizys_hdcp_random(void *buf, size_t n) {
+    if (SecRandomCopyBytes(kSecRandomDefault, n, buf) == errSecSuccess) return 0;
+    oizys_log("secure random generation failed");
+    return -1;
 }
 
 static void aes_ecb(const uint8_t key[16], const uint8_t in[16], uint8_t out[16]) {
@@ -199,13 +192,16 @@ static uint8_t *der_put_int(uint8_t *p, const uint8_t *m, size_t n) {
     return p + n;
 }
 
-int oizys_hdcp_rsa_oaep_encrypt(const uint8_t modulus[128], const uint8_t exponent[3],
-                                const uint8_t km[16], uint8_t out[128]) {
-    uint8_t der[256];
+static SecKeyRef rsa_public_key(const uint8_t *modulus, size_t modulus_len,
+                                const uint8_t *exponent, size_t exponent_len) {
+    if (!modulus || !exponent || modulus_len > 384 || exponent_len > 3) {
+        return NULL;
+    }
+    uint8_t der[512];
     uint8_t *p = der + 4; /* leave room for SEQUENCE header */
     uint8_t *body = p;
-    p = der_put_int(p, modulus, 128);
-    p = der_put_int(p, exponent, 3);
+    p = der_put_int(p, modulus, modulus_len);
+    p = der_put_int(p, exponent, exponent_len);
     size_t body_n = (size_t)(p - body);
     uint8_t *seq = der;
     *seq++ = 0x30;
@@ -214,12 +210,22 @@ int oizys_hdcp_rsa_oaep_encrypt(const uint8_t modulus[128], const uint8_t expone
     size_t der_n = (size_t)(seq - der) + body_n;
 
     CFDataRef key_data = CFDataCreate(kCFAllocatorDefault, der, (CFIndex)der_n);
+    if (!key_data) return NULL;
     CFMutableDictionaryRef attrs = CFDictionaryCreateMutable(
         kCFAllocatorDefault, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+    if (!attrs) {
+        CFRelease(key_data);
+        return NULL;
+    }
     CFDictionarySetValue(attrs, kSecAttrKeyType, kSecAttrKeyTypeRSA);
     CFDictionarySetValue(attrs, kSecAttrKeyClass, kSecAttrKeyClassPublic);
-    int bits = 1024;
+    int bits = (int)(modulus_len * 8);
     CFNumberRef nbits = CFNumberCreate(kCFAllocatorDefault, kCFNumberIntType, &bits);
+    if (!nbits) {
+        CFRelease(key_data);
+        CFRelease(attrs);
+        return NULL;
+    }
     CFDictionarySetValue(attrs, kSecAttrKeySizeInBits, nbits);
 
     CFErrorRef cferr = NULL;
@@ -227,21 +233,64 @@ int oizys_hdcp_rsa_oaep_encrypt(const uint8_t modulus[128], const uint8_t expone
     CFRelease(key_data);
     CFRelease(attrs);
     CFRelease(nbits);
-    if (!key) {
-        if (cferr) {
-            CFRelease(cferr);
-        }
+    if (cferr) CFRelease(cferr);
+    return key;
+}
+
+int oizys_hdcp_verify_receiver_cert(const uint8_t *cert, size_t cert_len,
+                                    const uint8_t issuer_modulus[384]) {
+    /* HDCP 2.2, Table 2.1: 138 signed bytes followed by a 384-byte RSA signature. */
+    if (!cert || !issuer_modulus || cert_len != 522 || (cert[136] >> 4) > 1 ||
+        (cert[136] & 0x0f) != 0 || cert[137] != 0) return -1;
+    int receiver_id_ones = 0;
+    for (size_t i = 0; i < 5; i++) receiver_id_ones += __builtin_popcount(cert[i]);
+    if (receiver_id_ones != 20) return -1;
+
+    const uint8_t exponent = 3; /* HDCP 2.2, Appendix B: DCP LLC public exponent. */
+    SecKeyRef key = rsa_public_key(issuer_modulus, 384, &exponent, 1);
+    if (!key) return -1;
+    CFDataRef signed_fields = CFDataCreate(kCFAllocatorDefault, cert, 138);
+    CFDataRef signature = CFDataCreate(kCFAllocatorDefault, cert + 138, 384);
+    if (!signed_fields || !signature) {
+        if (signed_fields) CFRelease(signed_fields);
+        if (signature) CFRelease(signature);
+        CFRelease(key);
         return -1;
     }
+    CFErrorRef cferr = NULL;
+    Boolean valid = SecKeyVerifySignature(key, kSecKeyAlgorithmRSASignatureMessagePKCS1v15SHA256,
+                                          signed_fields, signature, &cferr);
+    if (cferr) CFRelease(cferr);
+    CFRelease(signed_fields);
+    CFRelease(signature);
+    CFRelease(key);
+    return valid ? 0 : -1;
+}
+
+int oizys_hdcp_verify_ake_cert_payload(const uint8_t *payload, size_t payload_len,
+                                       const uint8_t issuer_modulus[384]) {
+    /* AKE_Send_Cert carries one REPEATER byte and the 522-byte certificate;
+     * DL3 may append transport padding after that signed payload. */
+    if (!payload || payload_len < 523 || payload[0] > 1) return -1;
+    return oizys_hdcp_verify_receiver_cert(payload + 1, 522, issuer_modulus);
+}
+
+int oizys_hdcp_rsa_oaep_encrypt(const uint8_t modulus[128], const uint8_t exponent[3],
+                                const uint8_t km[16], uint8_t out[128]) {
+    SecKeyRef key = rsa_public_key(modulus, 128, exponent, 3);
+    if (!key) return -1;
+    CFErrorRef cferr = NULL;
     CFDataRef plain = CFDataCreate(kCFAllocatorDefault, km, 16);
+    if (!plain) {
+        CFRelease(key);
+        return -1;
+    }
     CFDataRef cipher =
         SecKeyCreateEncryptedData(key, kSecKeyAlgorithmRSAEncryptionOAEPSHA256, plain, &cferr);
     CFRelease(plain);
     CFRelease(key);
+    if (cferr) CFRelease(cferr);
     if (!cipher) {
-        if (cferr) {
-            CFRelease(cferr);
-        }
         return -1;
     }
     CFIndex clen = CFDataGetLength(cipher);

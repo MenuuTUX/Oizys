@@ -58,8 +58,7 @@ static int seconds_argument(int argc, char **argv, int fallback) {
 }
 
 /*
- * JSON string body. The owner and manufacturer strings come off USB descriptors, so they
- * are attacker-adjacent and get escaped rather than trusted.
+ * JSON string body. USB descriptors and settings can contain user-controlled text.
  */
 static void json_puts(FILE *file, const char *value) {
     fputc('"', file);
@@ -97,11 +96,11 @@ static void print_usage(void) {
          "oizys monitors             list all online monitors without creating displays\n"
          "oizys monitor <id> modes | mode <index> | position <x> <y> | mirror <id|off>\n"
          "oizys service status|start|stop|restart|login-enable|login-disable|permissions\n"
-         "oizys ports                every USB port's negotiated speed and power budget\n"
+         "oizys ports [--json]       every USB port's negotiated speed and power budget\n"
          "oizys ddc <action> [args] --display <id>   select a particular monitor\n");
     if (!OIZYS_DIAGNOSTICS) {
         puts("oizys build-info | probe | routes\n"
-             "oizys config list | get <key> | set <key> <value> | reset\n"
+             "oizys config list [--json] | get <key> | set <key> <value> | reset\n"
              "oizys ddc list | caps | dump | get <code> | set <code> <value>\n"
              "oizys serve --takeover     foreground service (Ctrl-C stops it)\n"
              "Production has no developer GUI or test commands.");
@@ -110,7 +109,7 @@ static void print_usage(void) {
     puts("oizys — open-source DisplayLink Ridge driver (C)\n\n"
          "  oizys probe              identify the USB hub (read-only)\n"
          "  oizys routes             report configured heads and native I2C paths (read-only)\n"
-         "  oizys ports              USB tree: negotiated vs declared link speed (read-only)\n"
+         "  oizys ports [--json]     USB tree: negotiated vs declared link speed (read-only)\n"
          "  oizys calibrate show | run <file> | clear | selftest   display colour correction\n"
          "  oizys displays           two 1920x1080 virtual heads until Ctrl-C\n"
          "  oizys diagnose --takeover  authenticate both heads and read physical EDIDs\n"
@@ -122,7 +121,7 @@ static void print_usage(void) {
          "                           --stats: capture cadence/age; --profile: fine codec timing\n"
          "  oizys serve --takeover [--stats]  restart Oizys after faults or reconnects\n"
          "  oizys confirm            you looked at both panels and they were right\n\n"
-         "  oizys config list | get <key> | set <key> <value> | reset | selftest\n"
+         "  oizys config list [--json] | get <key> | set <key> <value> | reset | selftest\n"
          "  oizys ddc list | caps | dump | get <code> | set <code> <value>\n"
          "                           monitor menu over DDC/CI (needs a native display pipe)\n\n"
          "  overall_pass in logs/verify.json is only ever set by `oizys confirm`,\n"
@@ -174,7 +173,7 @@ static int cmd_calibrate(int argc, char **argv) {
         return oizys_calibration_run(argv[1], stdout) == 0 ? 0 : 1;
     }
     if (strcmp(action, "clear") == 0) {
-        int failed = oizys_calibration_store(0, NULL) != 0 || oizys_calibration_store(1, NULL) != 0;
+        int failed = oizys_calibration_clear() != 0;
         puts(failed ? "Could not clear the calibration." : "Calibration cleared; both heads run uncorrected.");
         return failed;
     }
@@ -182,14 +181,41 @@ static int cmd_calibrate(int argc, char **argv) {
     return 2;
 }
 
-static void cmd_ports(void) {
+static int cmd_ports(int json) {
     OizysPort *ports = calloc(OIZYS_MAX_PORTS, sizeof(*ports));
     if (!ports) {
-        return;
+        fputs("could not allocate USB port list\n", stderr);
+        return 1;
     }
     int n = oizys_ports_scan(ports, OIZYS_MAX_PORTS);
-    oizys_ports_print(ports, n, stdout);
+    if (!json) {
+        oizys_ports_print(ports, n, stdout);
+    } else {
+        fputs("{\"version\":1,\"ports\":[", stdout);
+        for (int i = 0; i < n; i++) {
+            const OizysPort *port = &ports[i];
+            if (i) fputc(',', stdout);
+            fprintf(stdout, "{\"depth\":%d,\"name\":", port->depth);
+            json_puts(stdout, port->name);
+            fputs(",\"vendor\":", stdout);
+            json_puts(stdout, port->vendor);
+            fprintf(stdout,
+                    ",\"vid\":%u,\"pid\":%u,\"location_id\":%u,\"usb_version_bcd\":%u,"
+                    "\"speed_code\":%d,\"link_bps\":%llu,\"capable_bps\":%llu,"
+                    "\"sink_ma\":%u,\"port_limit_ma\":%u,\"verdict\":",
+                    port->vid, port->pid, port->location_id, port->bcd_usb, port->speed_code,
+                    (unsigned long long)port->link_bps,
+                    (unsigned long long)oizys_port_capable_bps(port->bcd_usb),
+                    port->sink_ma, port->port_limit_ma);
+            const char *verdict = oizys_port_verdict(port);
+            if (verdict) json_puts(stdout, verdict);
+            else fputs("null", stdout);
+            fputc('}', stdout);
+        }
+        fputs("]}\n", stdout);
+    }
     free(ports);
+    return 0;
 }
 
 static OizysVirtualDisplay *make_head(const char *name, uint32_t serial) {
@@ -422,6 +448,8 @@ static void cmd_displays(void) {
     oizys_displays_snapshot();
     if (make_heads(heads) != 0) {
         fputs("CGVirtualDisplay failed\n", stderr);
+        destroy_heads(heads);
+        (void)oizys_displays_restore();
         exit(1);
     }
     uint32_t ids[OIZYS_HEADS];
@@ -431,19 +459,31 @@ static void cmd_displays(void) {
             printf("  %-12s CGDirectDisplayID %u\n", HEAD_NAME[head], ids[head]);
         }
     }
-    settle_heads(ids);
+    if (settle_heads(ids) != 0) {
+        fputs("could not seat the Oizys heads; check System Settings > Displays\n", stderr);
+        destroy_heads(heads);
+        (void)oizys_displays_restore();
+        exit(1);
+    }
     report_head_modes(ids, OIZYS_HEADS);
     report_sidecar_displays();
 
     signal(SIGINT, SIG_IGN);
-    dispatch_source_t interrupt =
-        dispatch_source_create(DISPATCH_SOURCE_TYPE_SIGNAL, SIGINT, 0, dispatch_get_main_queue());
-    dispatch_source_set_event_handler(interrupt, ^{
+    signal(SIGTERM, SIG_IGN);
+    void (^release_heads)(void) = ^{
       destroy_heads(heads);
+      (void)oizys_displays_restore();
       puts("virtual displays released");
       exit(0);
-    });
+    };
+    dispatch_source_t interrupt =
+        dispatch_source_create(DISPATCH_SOURCE_TYPE_SIGNAL, SIGINT, 0, dispatch_get_main_queue());
+    dispatch_source_set_event_handler(interrupt, release_heads);
     dispatch_resume(interrupt);
+    dispatch_source_t terminate =
+        dispatch_source_create(DISPATCH_SOURCE_TYPE_SIGNAL, SIGTERM, 0, dispatch_get_main_queue());
+    dispatch_source_set_event_handler(terminate, release_heads);
+    dispatch_resume(terminate);
     dispatch_main();
 }
 
@@ -684,7 +724,13 @@ static int cmd_confirm(void) {
     }
     /* The file is written by write_verification just above, so both spans are fixed-width
        and known; "false" -> "true " keeps every offset stable. */
+    char *physical = strstr(text, "\"physical_confirmed\": false");
+    if (!physical) {
+        fputs("verification report has no pending physical confirmation\n", stderr);
+        return 0;
+    }
     memcpy(pass + strlen("\"overall_pass\": "), "true ", 5);
+    memcpy(physical + strlen("\"physical_confirmed\": "), "true ", 5);
     /* Space-padded to the pending note's exact length rather than counted by hand, so
        every later offset in the buffer stays put. */
     static const char kPending[] =
@@ -787,6 +833,13 @@ static struct {
     int supervisor_fd;
 } g_run;
 
+/* How long the capture worker may go without running the control clock before the
+   watchdog stops vouching for it. Far above any real frame (a keyframe is tens of ms, and a
+   USB write that times out at 2 s fails the head on its own), far below the supervisor's
+   15 s heartbeat timeout, so a hang is restarted within about that timeout. */
+#define WORKER_STALL_MS 5000
+static int reported_stall;
+
 static void run_shutdown(const char *reason, int code) {
     if (g_run.shutting_down) {
         return;
@@ -798,6 +851,7 @@ static void run_shutdown(const char *reason, int code) {
         g_run.capture = NULL;
     }
     destroy_heads(g_run.heads);
+    oizys_displays_restore();
     if (g_run.driver) {
         oizys_driver_destroy(g_run.driver);
         g_run.driver = NULL;
@@ -866,6 +920,9 @@ static int cmd_run(int takeover, int profile, int stats, int supervisor_fd) {
             run_shutdown("aborting", 1);
         }
     }
+    /* Authentication and mode setting are done; from here every control reply is drained
+       and discarded by the control clock, so a backlog must not end the session. */
+    oizys_session_set_lossy(g_run.session, 1);
     /* Creating virtual displays re-lays-out the whole desktop, the iPad included. Take the
        arrangement first so it can be put back. */
     oizys_displays_snapshot();
@@ -877,6 +934,7 @@ static int cmd_run(int takeover, int profile, int stats, int supervisor_fd) {
     int driven = head_display_ids(g_run.heads, ids);
     if (settle_heads(ids) != 0) {
         fputs("could not seat the Oizys heads; check System Settings > Displays\n", stderr);
+        run_shutdown("aborting", 1);
     }
     printf("physical endpoints trained; %d virtual display%s (%u, %u)\n", driven,
            driven == 1 ? "" : "s", ids[0], ids[1]);
@@ -962,6 +1020,7 @@ static int cmd_run(int takeover, int profile, int stats, int supervisor_fd) {
     puts(supervisor_fd < 0 ? "Ctrl-C restores DisplayLink Manager. If the panels were right, run:"
                           : "Oizys owns recovery. Ctrl-C stops the service. To confirm the panels, run:");
     puts("  build/Release/oizys confirm");
+    const char head_mask = (char)('0' + (ids[0] ? 1 : 0) + (ids[1] ? 2 : 0));
 
     signal(SIGINT, SIG_IGN);
     signal(SIGTERM, SIG_IGN);
@@ -992,7 +1051,24 @@ static int cmd_run(int takeover, int profile, int stats, int supervisor_fd) {
               run_shutdown(reason, 1);
           }
       }
-      if (g_run.supervisor_fd >= 0 && write(g_run.supervisor_fd, ".", 1) < 0 &&
+      /* The heartbeat has to vouch for the capture worker, not for this queue. If the worker
+         hangs (a framework or USB call that never returns), the control clock stops, the
+         dock drops the link, and nothing on that queue can report it. Withholding the
+         heartbeat lets the supervisor's timeout restart the session instead. */
+      int age = oizys_driver_service_age_ms(g_run.driver);
+      if (age < 0 || age > WORKER_STALL_MS) {
+          if (!reported_stall) {
+              fprintf(stderr, "capture worker has not serviced the dock for %d ms; "
+                              "withholding the supervisor heartbeat\n", age);
+              reported_stall = 1;
+          }
+          return;
+      }
+      if (reported_stall) {
+          fputs("capture worker resumed; supervisor heartbeat restored\n", stderr);
+          reported_stall = 0;
+      }
+      if (g_run.supervisor_fd >= 0 && write(g_run.supervisor_fd, &head_mask, 1) < 0 &&
           errno != EAGAIN && errno != EINTR) {
           run_shutdown("Oizys supervisor disappeared", 1);
       }
@@ -1026,12 +1102,13 @@ static int cmd_run(int takeover, int profile, int stats, int supervisor_fd) {
 static int cmd_config(int argc, char **argv) {
     const char *action = argc > 0 ? argv[0] : "list";
     if (strcmp(action, "list") == 0) {
-        oizys_config_print(stdout);
+        if (has_flag(argc, argv, "--json")) oizys_config_print_json(stdout);
+        else oizys_config_print(stdout);
         return 1;
     }
     if (strcmp(action, "selftest") == 0) {
         int failures = oizys_config_selftest() + oizys_ports_selftest()
-                       + oizys_calibration_selftest() + oizys_ddc_tunnel_selftest();
+                       + oizys_calibration_selftest();
         if (failures) {
             fprintf(stderr, "config self-test: %d check(s) failed\n", failures);
             return 0;
@@ -1254,8 +1331,7 @@ int main(int argc, char **argv) {
         return cmd_calibrate(rest_argc, rest);
     }
     if (strcmp(command, "ports") == 0) {
-        cmd_ports();
-        return 0;
+        return cmd_ports(has_flag(rest_argc, rest, "--json"));
     }
     if (strcmp(command, "probe") == 0) {
         cmd_probe();

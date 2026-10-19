@@ -9,12 +9,10 @@ The production image is the familiar drag-to-Applications layout. The debug imag
 portable binary instead, because that build is deliberately never installed: it owns the dock
 only while it is running and leaves nothing behind.
 
-Images are UDZO (compressed, read-only). They carry the same ad-hoc signature as the build
-they wrap, which Gatekeeper will still quarantine on another machine; shipping to anyone else
-needs Developer ID signing and notarisation.
+Images are UDZO (compressed, read-only). Local builds remain ad-hoc signed; the release
+workflow signs and notarizes the app and disk image before publication.
 """
 import argparse
-import plistlib
 import shutil
 import subprocess
 import sys
@@ -34,13 +32,14 @@ Install
   cannot drive a panel without that permission.
 
 Command line and terminal UI
-  Installing the app also links the `oizys` command. Run it with no arguments
-  for the full-screen terminal UI, or `oizys help` for scriptable commands.
+  The CLI is inside Oizys.app/Contents/MacOS/OizysDriver. A drag install does
+  not add a shell command or login agent. The app can enable login startup.
 
-This build carries an ad-hoc signature. macOS will quarantine it on a machine
-other than the one that built it until it is signed with a Developer ID and
-notarised.
+{signing_note}
 """
+
+LOCAL_SIGNING_NOTE = """This local build is signed ad hoc. Build a Developer ID signed and
+notarized release for use on another Mac."""
 
 DEBUG_README = """Oizys {version} — portable diagnostic build
 
@@ -55,39 +54,45 @@ This binary is deliberately not installable. Run it from wherever you put it:
 It claims the dock only while it runs and leaves nothing behind. Commands that
 take the dock need the vendor software stopped; `--takeover` does that.
 
-Verbose diagnostics are compiled in, including the dock's own firmware trace.
+{diagnostics_note}
 """
 
 
-def variant_payload(variant, staging, version):
+def variant_payload(variant, staging, version, distribution=False):
     """Copy what the image should contain into `staging`; return the volume name."""
-    if variant == "production":
-        app = ROOT / "build" / "apps" / "production" / version / "Oizys.app"
+    if variant.startswith("production"):
+        app = ROOT / "build" / "apps" / variant / version / "Oizys.app"
         if not app.is_dir():
-            raise SystemExit(f"Build it first: OIZYS_VARIANT=production ./dev.sh build")
-        shutil.copytree(app, staging / "Oizys.app", symlinks=True)
+            raise SystemExit(f"Build it first: OIZYS_VARIANT={variant} ./dev.sh build")
+        subprocess.run(["ditto", str(app), str(staging / "Oizys.app")], check=True)
         (staging / "Applications").symlink_to("/Applications")
-        (staging / "README.txt").write_text(README.format(version=version))
-        return f"Oizys {version}"
+        (staging / "README.txt").write_text(README.format(
+            version=version, signing_note="" if distribution else LOCAL_SIGNING_NOTE))
+        return f"Oizys {version}" + (" fallback" if variant == "production-fallback" else "")
 
-    binary = ROOT / "dist" / f"Oizys-debug-{version}-debug-verbose"
+    binary = ROOT / "dist" / f"Oizys-debug-{version}-{variant}"
     if not binary.is_file():
-        raise SystemExit("Build it first: OIZYS_VARIANT=debug-verbose ./dev.sh build")
+        raise SystemExit(f"Build it first: OIZYS_VARIANT={variant} ./dev.sh build")
     target = staging / "Oizys-debug"
     shutil.copy2(binary, target)
     target.chmod(0o755)
-    (staging / "README.txt").write_text(DEBUG_README.format(version=version))
-    return f"Oizys {version} debug"
+    note = ("Verbose diagnostics are compiled in, including the dock's firmware trace."
+            if variant != "debug-minimal" else "Minimal diagnostics are compiled in.")
+    (staging / "README.txt").write_text(DEBUG_README.format(version=version, diagnostics_note=note))
+    return f"Oizys {version} {variant}"
 
 
-def build(variant, output_dir, version):
-    suffix = "" if variant == "production" else "-debug"
-    output = output_dir / f"Oizys{suffix}-{version}.dmg"
+def build(variant, output_dir, version, distribution=False):
+    name = {"production": f"Oizys-{version}",
+            "production-fallback": f"Oizys-{version}-production-fallback",
+            "debug-verbose": f"Oizys-debug-{version}"}.get(
+                variant, f"Oizys-debug-{version}-{variant}")
+    output = output_dir / f"{name}.dmg"
     output.unlink(missing_ok=True)
     with tempfile.TemporaryDirectory(prefix="oizys-dmg-") as temporary:
         staging = Path(temporary) / "payload"
         staging.mkdir()
-        volume = variant_payload(variant, staging, version)
+        volume = variant_payload(variant, staging, version, distribution)
         subprocess.run(
             ["hdiutil", "create", "-volname", volume, "-srcfolder", str(staging),
              "-fs", "HFS+", "-format", "UDZO", "-imagekey", "zlib-level=9",
@@ -106,16 +111,18 @@ def main():
                         help="directory to write the images into")
     parser.add_argument("--version", default=VERSION,
                         help="version to package; defaults to the VERSION file")
+    parser.add_argument("--distribution", action="store_true",
+                        help="omit the local ad-hoc signing notice from a Developer ID release")
     arguments = parser.parse_args()
-    known = ["production", "debug-verbose"]
+    known = ["production", "production-fallback", "debug-minimal", "debug-verbose", "debug-fallback"]
     for variant in arguments.variants:
         if variant not in known:
             parser.error(f"invalid choice: {variant!r} (choose from {', '.join(known)})")
     output_dir = Path(arguments.output)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    for variant in (arguments.variants or known):
-        image = build(variant, output_dir, arguments.version)
+    for variant in (arguments.variants or ("production", "debug-verbose")):
+        image = build(variant, output_dir, arguments.version, arguments.distribution)
         size = image.stat().st_size / (1024 * 1024)
         print(f"{image}  ({size:.1f} MB)")
     return 0

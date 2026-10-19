@@ -71,7 +71,9 @@ no end-to-end latency advantage has been established.
 `Tools/MotionBench.swift` puts the same 960×540 scrolling colored-row window on every
 screen, including the built-in reference. That is what it did when these numbers were
 taken. It has since changed defaults to a full-screen always-on-top surface and gained
-other patterns, so reproducing this table needs `--windowed --pattern scroll`; the numbers
+other patterns. Its current windowed mode scales with screen dimensions and changes the
+row geometry; reproducing the original workload needs the historical source from revision
+`2003ec1`, as used in [the 10 October check](Performance-2026-10-10.md). The numbers
 below are not comparable with a run of the current default. Trials alternate DisplayLink and Oizys, with
 three seconds of motion warmup followed by at least twenty seconds of sampling. The final
 Oizys trials use `serve --takeover --stats`, including its supervisor process. Each trial

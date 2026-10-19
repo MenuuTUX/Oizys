@@ -105,10 +105,12 @@ def build():
 
     # The CLI compiles core sources directly so it never accidentally links the test dylib.
     # The native app embeds that CLI; XCTest uses the separate dynamic library.
+    # The DDC tunnel has no dock transport yet, so retain it only in the test library.
+    production_core = [source for source in core if source.name != "ddc_tunnel.c"]
     targets = {
         "OizysCoreDylib": ("com.apple.product-type.library.dynamic", "libOizysCore.dylib", core,
                            LIBRARY_XCCONFIG),
-        "oizys": ("com.apple.product-type.tool", "oizys", tool + core, None),
+        "oizys": ("com.apple.product-type.tool", "oizys", tool + production_core, None),
         "OizysApp": ("com.apple.product-type.application", "Oizys.app", app + shared, None),
         "OizysTests": ("com.apple.product-type.bundle.unit-test", "OizysTests.xctest", xctests, None),
     }

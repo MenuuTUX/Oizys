@@ -22,7 +22,7 @@ extern char **environ;
 #define WORKER_STATUS_FD 198
 #define STARTUP_SECONDS 45
 #define HEARTBEAT_SECONDS 15
-#define STOP_SECONDS (OIZYS_DIAGNOSTICS ? 10 : 3)
+#define STOP_SECONDS (OIZYS_DIAGNOSTICS ? 10 : 8)
 
 static volatile sig_atomic_t stopping;
 static void request_stop(int sig) { (void)sig; stopping = 1; }
@@ -36,6 +36,36 @@ static double monotonic_seconds(void) {
 static void pause_briefly(void) {
     struct timespec delay = {0, 100000000};
     nanosleep(&delay, NULL);
+}
+
+static int status_path(char *path, size_t capacity) {
+    char directory[1024];
+    size_t length = confstr(_CS_DARWIN_USER_TEMP_DIR, directory, sizeof(directory));
+    if (!length || length > sizeof(directory)) return -1;
+    int written = snprintf(path, capacity, "%soizys-driver.status", directory);
+    return written > 0 && (size_t)written < capacity ? 0 : -1;
+}
+
+/* Replace a complete record at each transition. A reader never sees half a JSON object. */
+static void publish_status(const char *phase, pid_t worker, int head_mask) {
+    char path[1200], temporary[1232], record[160];
+    if (status_path(path, sizeof(path))) return;
+    int length = snprintf(record, sizeof(record),
+                          "{\"version\":1,\"pid\":%d,\"phase\":\"%s\",\"worker_pid\":%d,\"head_mask\":%d}\n",
+                          getpid(), phase, worker, head_mask);
+    if (length <= 0 || (size_t)length >= sizeof(record)) return;
+    if (snprintf(temporary, sizeof(temporary), "%s.XXXXXX", path) >= (int)sizeof(temporary)) return;
+    int fd = mkstemp(temporary);
+    if (fd < 0) return;
+    size_t offset = 0;
+    while (offset < (size_t)length) {
+        ssize_t count = write(fd, record + offset, (size_t)length - offset);
+        if (count > 0) { offset += (size_t)count; continue; }
+        if (count < 0 && errno == EINTR) continue;
+        break;
+    }
+    int closed = close(fd);
+    if (offset != (size_t)length || closed || rename(temporary, path)) unlink(temporary);
 }
 
 static int displaylink_running(void) {
@@ -161,9 +191,13 @@ int oizys_supervise(const char *executable, int profile, int stats) {
     int restore_vendor = OIZYS_ALLOW_DISPLAYLINK && displaylink_running();
     puts("Oizys service started; failures will restart Oizys, not DisplayLink");
     int backoff = 1, waiting = 0, ok = 1, failures = 0, claimed = 0;
+    publish_status("waiting", 0, 0);
     while (!stopping) {
         if (!supported_dock_present()) {
-            if (!waiting) puts("waiting for one supported Ridge dock; Ctrl-C stops Oizys");
+            if (!waiting) {
+                puts("waiting for one supported Ridge dock; Ctrl-C stops Oizys");
+                publish_status("waiting", 0, 0);
+            }
             waiting = 1;
             double deadline = monotonic_seconds() + 1;
             while (!stopping && monotonic_seconds() < deadline) pause_briefly();
@@ -175,16 +209,21 @@ int oizys_supervise(const char *executable, int profile, int stats) {
         pid_t child = start_worker(executable, profile, stats, &status_fd);
         if (child < 0) { ok = 0; break; }
         printf("Oizys worker %d starting\n", child);
+        publish_status("starting", child, 0);
         double began = monotonic_seconds(), deadline = began + STARTUP_SECONDS, ready = 0;
         int reaped = 0;
         double topology_check = began + 1;
         while (!stopping) {
             char status[64];
-            if (read(status_fd, status, sizeof(status)) > 0) {
+            ssize_t received = read(status_fd, status, sizeof(status));
+            if (received > 0) {
                 double now = monotonic_seconds();
                 if (!ready) {
                     ready = now;
                     printf("Oizys worker ready in %.1fs\n", now - began);
+                    int head_mask = status[received - 1] >= '1' && status[received - 1] <= '3'
+                                        ? status[received - 1] - '0' : 0;
+                    publish_status("forwarding", child, head_mask);
                 }
                 deadline = now + HEARTBEAT_SECONDS;
             }
@@ -205,6 +244,7 @@ int oizys_supervise(const char *executable, int profile, int stats) {
             }
             pause_briefly();
         }
+        if (!stopping) publish_status("recovering", 0, 0);
         if (!reaped) stop_worker(child);
         close(status_fd);
         if (stopping) break;
@@ -219,6 +259,7 @@ int oizys_supervise(const char *executable, int profile, int stats) {
         while (!stopping && monotonic_seconds() < retry) pause_briefly();
         if (backoff < 8) backoff *= 2;
     }
+    publish_status("stopping", 0, 0);
     if (restore_vendor && claimed) {
         oizys_start_displaylink();
         puts("Oizys stopped; restored the DisplayLink session that preceded takeover");
@@ -227,6 +268,8 @@ int oizys_supervise(const char *executable, int profile, int stats) {
     }
     sigaction(SIGINT, &previous_int, NULL);
     sigaction(SIGTERM, &previous_term, NULL);
+    char path[1200];
+    if (!status_path(path, sizeof(path))) unlink(path);
     close(lock);
     return ok;
 }

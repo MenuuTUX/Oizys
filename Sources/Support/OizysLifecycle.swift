@@ -4,6 +4,19 @@ import IOKit
 
 // Shared by the CLI and GUI; only this user's Oizys applications are controlled.
 enum OizysLifecycle {
+    struct SupervisorStatus: Decodable {
+        enum Phase: String, Decodable { case waiting, starting, forwarding, recovering, stopping }
+        let version: Int
+        let pid: pid_t
+        let phase: Phase
+        let headMask: Int
+
+        enum CodingKeys: String, CodingKey {
+            case version, pid, phase
+            case headMask = "head_mask"
+        }
+    }
+
     static let label = "org.oizys.Oizys.login"
     static var domain: String { "gui/\(getuid())" }
     static var job: String { "\(domain)/\(label)" }
@@ -114,11 +127,15 @@ enum OizysLifecycle {
         return run("/bin/launchctl", ["bootstrap", domain, agent], quiet: false)
     }
 
-    static func supervisor() -> pid_t? {
+    private static func runtimePath(_ name: String) -> String? {
         var directory = [CChar](repeating: 0, count: 1024)
         let count = confstr(_CS_DARWIN_USER_TEMP_DIR, &directory, directory.count)
         guard count > 0, count <= directory.count else { return nil }
-        let path = String(cString: directory) + "oizys-driver.lock"
+        return String(cString: directory) + name
+    }
+
+    static func supervisor() -> pid_t? {
+        guard let path = runtimePath("oizys-driver.lock") else { return nil }
         let descriptor = open(path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC)
         guard descriptor >= 0 else { return nil }
         defer { close(descriptor) }
@@ -134,6 +151,25 @@ enum OizysLifecycle {
         guard proc_pidpath(pid, &executable, UInt32(executable.count)) > 0 else { return nil }
         let name = URL(fileURLWithPath: String(cString: executable)).lastPathComponent
         return name == "oizys" || name == "OizysDriver" ? pid : nil
+    }
+
+    static func supervisorStatus(for pid: pid_t) -> SupervisorStatus? {
+        guard let path = runtimePath("oizys-driver.status") else { return nil }
+        let descriptor = open(path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC)
+        guard descriptor >= 0 else { return nil }
+        defer { close(descriptor) }
+        var info = stat()
+        guard fstat(descriptor, &info) == 0, info.st_uid == getuid(),
+              (info.st_mode & S_IFMT) == S_IFREG, (info.st_mode & 0o077) == 0 else { return nil }
+        var bytes = [UInt8](repeating: 0, count: 256)
+        let length = read(descriptor, &bytes, bytes.count)
+        guard length > 0, length < bytes.count,
+              let status = try? JSONDecoder().decode(SupervisorStatus.self,
+                                                     from: Data(bytes.prefix(Int(length)))),
+              status.version == 1, status.pid == pid, (0...3).contains(status.headMask) else {
+            return nil
+        }
+        return status
     }
 
     static func stop(includeDebug: Bool = true) -> Int32 {
@@ -173,7 +209,13 @@ enum OizysLifecycle {
         case "status":
             print("Login service: \(agentLoaded ? "loaded" : "not loaded")")
             for app in applications { print("PID \(app.processIdentifier): \(app.bundleURL?.path ?? app.localizedName ?? "Oizys")") }
-            print("Capture supervisor: \(supervisor().map(String.init) ?? "stopped")")
+            let owner = supervisor()
+            print("Capture supervisor: \(owner.map(String.init) ?? "stopped")")
+            if let owner, let status = supervisorStatus(for: owner) {
+                let heads = status.headMask == 3 ? "left and right" :
+                    status.headMask == 1 ? "left" : status.headMask == 2 ? "right" : "none"
+                print("Connection: \(status.phase.rawValue), dock heads \(heads)")
+            }
             print("Screen Recording access for this executable: \(CGPreflightScreenCaptureAccess() ? "granted" : "not granted")")
             print("An undocked production listener waits for USB events without capture or polling.")
             return 0

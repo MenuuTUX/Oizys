@@ -13,7 +13,10 @@ import ctypes
 import io
 import os
 import pathlib
+import subprocess
+import sys
 import tempfile
+import textwrap
 
 import pytest
 
@@ -179,3 +182,60 @@ def test_new_display_and_sidecar_defaults():
                          ("sidecar.device", "")]:
         rc, value = get(key)
         assert rc == 0 and value == default, f"{key} default was {value!r}"
+
+
+def test_running_config_sees_changes_before_first_poll_and_within_one_mtime_second(tmp_path):
+    # A separate process starts with a fresh C cache and watcher. The app normally reads
+    # config before its first control poll, and an atomic editor save can land in between.
+    path = tmp_path / "config.json"
+    script = textwrap.dedent("""
+        import ctypes
+        import json
+        import os
+        import pathlib
+        import sys
+        import time
+
+        path = pathlib.Path(sys.argv[2])
+        stamp = 1_700_000_000_000_000_000
+
+        def write(value, nanoseconds, atomic):
+            target = path.with_suffix(".tmp") if atomic else path
+            target.write_text(json.dumps({"head.left.brightness": value}))
+            os.utime(target, ns=(stamp + nanoseconds, stamp + nanoseconds))
+            if atomic:
+                os.replace(target, path)
+
+        lib = ctypes.CDLL(sys.argv[1])
+        lib.oizys_config_get.argtypes = (ctypes.c_char_p, ctypes.c_char_p, ctypes.c_size_t)
+        lib.oizys_config_get.restype = ctypes.c_int
+        lib.oizys_config_refresh_if_changed.argtypes = ()
+        lib.oizys_config_refresh_if_changed.restype = ctypes.c_int
+
+        def brightness():
+            out = ctypes.create_string_buffer(64)
+            assert lib.oizys_config_get(b"head.left.brightness", out, len(out)) == 0
+            return int(out.value)
+
+        def next_poll():
+            second = int(time.time())
+            while int(time.time()) == second:
+                time.sleep(0.01)
+            return lib.oizys_config_refresh_if_changed()
+
+        write(70, 0, True)
+        assert brightness() == 70
+        write(50, 100_000_000, True)
+        assert next_poll() == 1, "atomic save before first poll was missed"
+        assert brightness() == 50
+
+        inode = path.stat().st_ino
+        write(30, 200_000_000, False)
+        assert path.stat().st_ino == inode
+        assert next_poll() == 1, "same-second mtime change was missed"
+        assert brightness() == 30
+    """)
+    env = dict(os.environ, OIZYS_CONFIG_PATH=str(path))
+    result = subprocess.run([sys.executable, "-c", script, str(core.LIBRARY_PATH), str(path)],
+                            capture_output=True, text=True, env=env)
+    assert result.returncode == 0, result.stdout + result.stderr

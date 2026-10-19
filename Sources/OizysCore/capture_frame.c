@@ -240,7 +240,9 @@ int oizys_output_needs_refresh(OizysCaptureOutput *o) {
     bool pending = o->pending != NULL;
     os_unfair_lock_unlock(&o->lock);
     if (pending) return 0;
-    mach_timebase_info_data_t tb; mach_timebase_info(&tb);
+    /* Asked on every clock tick for every head; the timebase never changes. */
+    static mach_timebase_info_data_t tb;
+    if (!tb.denom) mach_timebase_info(&tb);
     double elapsed = (double)(mach_absolute_time() - o->last_present) * tb.numer / tb.denom;
     return elapsed >= 2.0 * NSEC_PER_SEC / oizys_config()->capture_fps;
 }

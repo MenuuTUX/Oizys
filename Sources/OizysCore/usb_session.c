@@ -26,6 +26,9 @@ struct OizysSession {
     pthread_mutex_t mu;
     pthread_cond_t cv;
     atomic_int closing, failed;
+    /* Set once the session is streaming: see oizys_session_set_lossy. */
+    atomic_int lossy;
+    unsigned long dropped;
     uint8_t inbox[INBOX][IN_BUF];
     size_t inbox_len[INBOX];
     unsigned inbox_r, inbox_w, inbox_n;
@@ -121,10 +124,21 @@ static void *read_control(void *context) {
         IOReturn rc = (*s->iface)->ReadPipeTO(s->iface, s->pipes[OIZYS_EP_CTRL_IN], bytes, &length, 250, 250);
         if (atomic_load(&s->closing)) break;
         if (rc == kIOUSBTransactionTimeout || rc == kIOReturnTimeout) continue;
-        if (rc || length > sizeof(bytes)) { atomic_store(&s->failed, 1); break; }
+        if (rc || length > sizeof(bytes)) {
+            oizys_log("control IN failed: 0x%08x, %u bytes", rc, length);
+            atomic_store(&s->failed, 1); break;
+        }
         if (!length) continue;
         pthread_mutex_lock(&s->mu);
+        if (s->inbox_n == INBOX && atomic_load(&s->lossy)) {
+            /* Streaming: every reply is drained and discarded, so the oldest one is worth
+               nothing and failing the session over it would black both panels. */
+            s->inbox_r = (s->inbox_r + 1) % INBOX; s->inbox_n--;
+            if (s->dropped++ % 256 == 0)
+                oizys_log("control reply queue full; dropped oldest (%lu so far)", s->dropped);
+        }
         if (s->inbox_n == INBOX) {
+            oizys_log("control reply queue full: %u unread replies", s->inbox_n);
             atomic_store(&s->failed, 1); /* Never silently lose an authentication/control reply. */
         } else {
             memcpy(s->inbox[s->inbox_w], bytes, length);
@@ -146,7 +160,7 @@ OizysSession *oizys_session_open(int capture) {
     OizysSession *s = calloc(1, sizeof(*s));
     if (!s) { IOObjectRelease(service); return NULL; }
     pthread_mutex_init(&s->mu, NULL); pthread_cond_init(&s->cv, NULL);
-    atomic_init(&s->closing, 0); atomic_init(&s->failed, 0);
+    atomic_init(&s->closing, 0); atomic_init(&s->failed, 0); atomic_init(&s->lossy, 0);
     s->device = user_client(service, kIOUSBDeviceUserClientTypeID, kIOUSBDeviceInterfaceID650);
     IOObjectRelease(service);
     if (!s->device) goto fail;
@@ -194,17 +208,6 @@ int oizys_session_bulk_out(OizysSession *s, uint8_t ep, const void *data, size_t
 int oizys_session_bulk_out_frame(OizysSession *s, uint8_t ep, const void *data, size_t length) {
     return oizys_session_bulk_out(s, ep, data, length);
 }
-int oizys_session_bulk_outv(OizysSession *s, uint8_t ep, const OizysUSBChunk *chunks, int count) {
-    if (!chunks || count <= 0) return -1;
-    size_t total = 0;
-    for (int i = 0; i < count; i++) {
-        if (chunks[i].length > INT_MAX - total) return -1;
-        int written = oizys_session_bulk_out(s, ep, chunks[i].bytes, chunks[i].length);
-        if (written < 0) return -1;
-        total += (size_t)written;
-    }
-    return (int)total;
-}
 int oizys_session_recv(OizysSession *s, void *data, size_t capacity, size_t *got, double timeout) {
     if (got) *got = 0;
     if (!s || !data || !isfinite(timeout) || timeout < 0 || timeout > 60) return -1;
@@ -239,6 +242,9 @@ int oizys_session_ctrl(OizysSession *s, uint8_t bm, uint8_t request, uint16_t va
     IOReturn rc = (*iface)->ControlRequestTO(iface, 0, &r);
     if (rc || r.wLenDone > length) { oizys_log("USB control %02x/%02x failed: 0x%08x", bm, request, rc); return -1; }
     return (int)r.wLenDone;
+}
+void oizys_session_set_lossy(OizysSession *s, int lossy) {
+    if (s) atomic_store(&s->lossy, lossy ? 1 : 0);
 }
 int oizys_session_get_identity(OizysSession *s, uint8_t *bytes, int capacity) {
     if (!s || !bytes || capacity < 16 || !s->identity_len) return -1;

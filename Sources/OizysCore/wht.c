@@ -331,10 +331,11 @@ size_t oizys_video_colour_strip_planes(uint8_t *out, size_t capacity, uint16_t x
         return 0;
     }
 
+    /* No clearing pass: quantize_block writes all 64 entries of every block and plane, and
+       last[] is assigned for each of them, so a memset here was 12 KB of stores per strip
+       that the loop immediately overwrote. */
     int32_t coefficients[16][3][64];
     uint8_t last[16][3];
-    memset(coefficients, 0, sizeof(coefficients));
-    memset(last, 0, sizeof(last));
     for (unsigned block = 0; block < 16; block++) {
         for (unsigned plane = 0; plane < 3; plane++) {
             int32_t transformed[64];

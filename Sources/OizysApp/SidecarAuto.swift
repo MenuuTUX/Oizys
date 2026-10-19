@@ -45,6 +45,7 @@ final class SidecarAuto: ObservableObject {
     private var quietUntil = Date.distantPast
     private var wasConnected = false
     private var nearby = false
+    private var connectionGeneration = 0
     private var observers: [Any] = []
 
     /// Seconds before each attempt. Spent, it stands down for half an hour rather than
@@ -78,23 +79,23 @@ final class SidecarAuto: ObservableObject {
                      "SidecarDisplayManagerConnectedDevicesChangedNotification"] {
             observers.append(center.addObserver(forName: Notification.Name(name), object: nil,
                                                 queue: .main) { [weak self] _ in
-                self?.evaluate("devices changed")
+                self?.invalidate("devices changed")
             })
         }
         observers.append(DistributedNotificationCenter.default().addObserver(
             forName: Notification.Name("com.apple.screenIsUnlocked"), object: nil,
-            queue: .main) { [weak self] _ in self?.evaluate("screen unlocked") })
+            queue: .main) { [weak self] _ in self?.invalidate("screen unlocked") })
 
         // Docking, undocking and plugging in all push; there is no power timer.
         if let source = IOPSNotificationCreateRunLoopSource({ _ in
-            DispatchQueue.main.async { SidecarAuto.shared.evaluate("power changed") }
+            DispatchQueue.main.async { SidecarAuto.shared.invalidate("power changed") }
         }, nil)?.takeRetainedValue() {
             CFRunLoopAddSource(CFRunLoopGetMain(), source, .defaultMode)
         }
         CGDisplayRegisterReconfigurationCallback({ _, flags, _ in
             guard flags.contains(.addFlag) || flags.contains(.removeFlag)
                     || flags.contains(.enabledFlag) || flags.contains(.disabledFlag) else { return }
-            DispatchQueue.main.async { SidecarAuto.shared.evaluate("displays changed") }
+            DispatchQueue.main.async { SidecarAuto.shared.invalidate("displays changed") }
         }, nil)
 
         wasConnected = SidecarBridge.isConnected()
@@ -102,14 +103,27 @@ final class SidecarAuto: ObservableObject {
     }
 
     /// Called when the panel writes one of the sidecar.* keys.
-    func settingsChanged() { evaluate("settings") }
+    func settingsChanged() {
+        invalidate("settings")
+    }
+
+    private func invalidate(_ why: String) {
+        connectionGeneration += 1
+        cancelRetry()
+        evaluate(why)
+    }
 
     // MARK: - Decision
 
     private func evaluate(_ why: String) {
         let settings = read()
         guard settings.enabled else {
+            connectionGeneration += 1
             cancelRetry()
+            busy = false
+            nearby = false
+            wasConnected = false
+            quietUntil = .distantPast
             status = "Off"
             return
         }
@@ -168,9 +182,15 @@ final class SidecarAuto: ObservableObject {
 
     private func connect(_ target: (name: String, handle: NSObject)) {
         busy = true
+        let generation = connectionGeneration
         status = "Connecting to \(target.name)…"
         let sent = SidecarBridge.connect(target.handle) { [weak self] error in
             guard let self else { return }
+            guard self.connectionGeneration == generation else {
+                self.busy = false
+                self.evaluate("stale connection")
+                return
+            }
             self.busy = false
             if error == nil {
                 self.attempt = 0
@@ -182,7 +202,7 @@ final class SidecarAuto: ObservableObject {
         }
         if !sent {
             busy = false
-            status = "Sidecar refused the request"
+            armRetry(target.name)
         }
     }
 

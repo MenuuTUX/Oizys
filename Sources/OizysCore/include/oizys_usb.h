@@ -75,37 +75,22 @@ int oizys_identity_parse(OizysIdentity *id, const uint8_t *bytes, int n);
 /* Exclusive USB session (IOUSBHost). ObjC implementation. */
 typedef struct OizysSession OizysSession;
 
-typedef struct {
-    const void *bytes;
-    size_t length;
-} OizysUSBChunk;
-
-#define OIZYS_VIDEO_USB_TRANSFER 65536
-
-/* Split a video payload into bulk-OUT transfers of transfer_size bytes.
- * If chunks is NULL, returns the number of slots required.
- * Otherwise fills up to max_chunks and returns the count, or -1 if the
- * payload does not fit. */
-int oizys_video_plan_usb_chunks(const void *bytes, size_t length, size_t transfer_size,
-                                OizysUSBChunk *chunks, int max_chunks);
-
 void oizys_log_open(const char *path);
 void oizys_log(const char *fmt, ...);
 
 OizysSession *oizys_session_open(int capture);
-/* Bulk max packet size on this dock's video and control endpoints. */
-#define OIZYS_BULK_MAX_PACKET 1024
-
 int oizys_session_bulk_out(OizysSession *s, uint8_t ep, const void *data, size_t len);
 /* Send one complete video frame as one IOUSBHost request. Never append a separate
  * zero-length request, including when the frame length is packet-aligned. */
 int oizys_session_bulk_out_frame(OizysSession *s, uint8_t ep, const void *data, size_t len);
-int oizys_session_bulk_outv(OizysSession *s, uint8_t ep, const OizysUSBChunk *chunks,
-                            int chunk_count);
 int oizys_session_recv(OizysSession *s, void *data, size_t cap, size_t *got, double timeout_s);
 int oizys_session_ctrl(OizysSession *s, uint8_t bm, uint8_t req, uint16_t value, uint16_t index,
                        void *data, uint16_t len, double timeout_s);
 int oizys_session_get_identity(OizysSession *s, uint8_t *buf, int cap);
+/* Off (the default), a full control-reply queue fails the session, because authentication
+ * and mode setting must not lose a reply. On, once streaming, the oldest unread reply is
+ * dropped instead: the control clock drains and discards them, so none is load-bearing. */
+void oizys_session_set_lossy(OizysSession *s, int lossy);
 void oizys_session_close(OizysSession *s);
 
 int oizys_stop_displaylink(void);

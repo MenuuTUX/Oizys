@@ -67,6 +67,9 @@ int oizys_config_refresh_if_changed(void);
 /* Every key, its current value and its default, one per line. */
 void oizys_config_print(FILE *out);
 
+/* Versioned machine-readable settings, with values and defaults as canonical strings. */
+void oizys_config_print_json(FILE *out);
+
 /* 0 on success. Writes the current value of `key` into `out`. */
 int oizys_config_get(const char *key, char *out, size_t capacity);
 

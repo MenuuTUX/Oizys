@@ -388,7 +388,7 @@ int oizys_stop_displaylink(void) {
     /* CrashRestartHelper will revive UserAgent unless both jobs are gone. */
     (void)system("launchctl bootout gui/$(id -u)/com.displaylink.CrashRestartHelper 2>/dev/null");
     (void)system("launchctl bootout gui/$(id -u)/com.displaylink.XpcService 2>/dev/null");
-    (void)system("killall DisplayLinkUserAgent DisplayLinkXpcService CrashRestartHelper 2>/dev/null");
+    (void)system("killall DisplayLinkUserAgent DisplayLinkXpcService CrashRestartHelper 'DisplayLink Manager' 2>/dev/null");
     usleep(400000);
     return 0;
 }

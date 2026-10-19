@@ -75,9 +75,12 @@ def package(bundle, driver, debug, identity="-", allow_debugger=False):
         for path in (resources / "Developer.zip", resources / "developer-revision.txt", binaries / "OizysMotionBench"):
             path.unlink(missing_ok=True)
     # Xcode signs the outer app after this phase. Sign nested executables first.
+    distribution = os.environ.get("OIZYS_DISTRIBUTION") == "YES"
     for name in ("OizysDriver", "OizysMotionBench") if debug else ("OizysDriver",):
         command = ["codesign", "--force", "--sign", identity or "-", "--options", "runtime"]
-        if debug or allow_debugger: command += ["--entitlements", str(ROOT / "Configs/Debug.entitlements")]
+        if identity not in ("", "-"): command += ["--timestamp"]
+        if (debug and not distribution) or allow_debugger:
+            command += ["--entitlements", str(ROOT / "Configs/Debug.entitlements")]
         subprocess.run([*command, str(binaries / name)], check=True)
 
 

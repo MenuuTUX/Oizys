@@ -43,8 +43,12 @@ took it there are in [Protocol.md](Documentation/Protocol.md); how they were fou
 <tr><td><strong>Identity</strong></td><td>type-<code>0x40</code> configuration record names <code>RidgeDoc</code></td></tr>
 <tr><td><strong>Heads</strong></td><td>two Dell P2219H, logical selectors <code>1</code> and <code>3</code></td></tr>
 <tr><td><strong>Video</strong></td><td>endpoints <code>0x08</code> and <code>0x0b</code></td></tr>
-<tr><td><strong>Mode</strong></td><td>1920×1080 at 60 Hz, authenticated over HDCP 2.2</td></tr>
+<tr><td><strong>Mode</strong></td><td>1920×1080 at 60 Hz, with HDCP 2.2 session exchange</td></tr>
 </table>
+
+Certificate trust is limited to a valid DCP issuer signature or the explicitly approved
+certificate pin for this local dock. The pin does not establish vendor-wide compatibility
+or a DCP issuer chain. See [certificate trust](Documentation/Architecture.md#protocol).
 
 A run authenticates the dock, sets both heads, creates two virtual displays, and captures
 them with ScreenCaptureKit. The first frame after a mode set is a keyframe covering the
@@ -66,16 +70,20 @@ Tagged builds are published from `.github/workflows/release.yml`.
 | File | What it is |
 | --- | --- |
 | `Oizys-<version>.dmg` | production app; drag to Applications |
-| `Oizys-debug-<version>.dmg` | portable diagnostic; installs nothing, owns the dock only while it runs |
-| ZIP / PKG + `SHA256SUMS.txt` | the same builds, for scripted installs |
+| `Oizys-<version>-production-fallback.dmg` | production app with DisplayLink fallback |
+| `Oizys-debug-<version>.dmg` | portable verbose diagnostic; installs nothing, owns the dock only while it runs |
+| Other debug DMGs and executables | minimal and fallback diagnostic variants |
+| ZIP / PKG + `SHA256SUMS.txt` | production builds for scripted installs and checksums for every artifact |
 
-Launch the production app once; when Screen Recording is missing it opens About with a Grant
+Launch the production app once; when Screen Recording is missing it opens Overview with a Grant
 button for the macOS approval pane. The driver captures the desktop to send it over USB and
 cannot drive a panel without it.
 
-Those bundles are signed ad hoc. macOS will refuse them on a machine other than the one
-that built them without an explicit Gatekeeper override, and they are not notarized, so
-treat a release as something to build from source rather than hand to someone else.
+The release workflow requires Developer ID certificates and Apple notarization before it
+publishes artifacts. It stops if credentials are missing or any submission fails. Local
+`dev.sh` builds remain signed ad hoc. See [the release procedure](Documentation/Releasing.md)
+for the credential names, package checks, and clean Mac validation still required before
+sharing a release.
 
 ## Building and installing
 
@@ -114,11 +122,16 @@ every rebuild. The old approval outlives the bundle it belonged to, so System Se
 Oizys already ticked while every preflight fails — and the login agent starts, refuses, exits,
 and is respawned ten seconds later, forever.
 
-So installing clears Oizys's own approval and starts the app with its About panel open. Press
+So an ad-hoc install clears Oizys's own approval and starts the app with Overview open. Press
 Grant there to open the Screen Recording pane and approve Oizys; an interactive terminal
 install also opens that pane and waits until the box is ticked. Only `org.oizys.*` identifiers
 are touched, nothing is ever granted by script, and the running service still never goes near
 TCC.
+
+An upgrade with the same Developer ID designated requirement and bundle identifier keeps
+Screen Recording approval by default. If the previous service reported granted access and
+the updated service loses it, installation restores the previous app. Changed identities
+and local ad-hoc builds retain the reset behavior above.
 
 ```bash
 python3 Tools/install_app.py <bundle> --keep-permissions   # leave the approval alone
@@ -186,9 +199,9 @@ adds vendor recovery and replaces the same production app if installed. Both use
 same bundle identifier for privacy identity.
 
 Local builds are signed ad hoc; a changed signature may require macOS permission again.
-Developer ID signing and notarization are still required for frictionless distribution to
-other Macs. `OIZYS_SIGN_IDENTITY` selects a signing identity for `dev.sh`; no script
-grants privacy permissions or disables Gatekeeper.
+Tagged releases require Developer ID signing and notarization. `OIZYS_SIGN_IDENTITY`
+selects a signing identity for `dev.sh`; no script grants privacy permissions or disables
+Gatekeeper.
 
 When a debug app lacks Screen Recording access, it clears registered debug Screen
 Recording permissions before requesting its own approval. Production and other apps
@@ -224,8 +237,9 @@ Production ZIP and PKG packaging remain available through
 
 Every variant installs a menu-bar item — one item, including in a diagnostic build, where the
 debug session's controls hang off the same item's right-click menu. Clicking it opens a panel
-with the driver's state, the displays it can see, and switches for starting at login and for
-the connect animation. The panel is placed against the screen the item is drawn on and closes
+with the driver's state, a next action, and direct picture-brightness controls for the two
+dock heads while both are forwarding. The panel is placed against the screen the
+item is drawn on and closes
 as soon as anything else takes focus. Right-clicking gives a plain menu instead, for when a
 panel is the wrong shape for the job.
 
@@ -233,18 +247,21 @@ panel is the wrong shape for the job.
 
 | Section | What is there |
 | --- | --- |
-| Displays | every display, with brightness and mirroring |
-| Power & standby | per-monitor keep-awake and blank-when-idle, the macOS timer, and idle frame rate |
-| Sidecar | the iPad's state and arrangement, connect and disconnect, and the power reality |
-| Colour | match the monitors to each other using an iPhone, over a QR code |
-| USB ports | `oizys ports` in the window, with any downgraded link called out |
-| All settings | every driver setting, editable, showing which differ from their defaults |
-| How it works | a live diagram of the path a pixel takes, drawn from what is attached now |
+| Overview | connection state, repair action, both head states, arrangement map, and USB warnings |
+| Displays | display mode, picture brightness and contrast, per-head keep-awake and blanking, Sidecar, and shared power settings |
+| Arrangement | positions, primary display, mirroring, and display-mode preservation |
+| Colour | guided iPhone comparison, cancellation, stored-correction clear, and undo of the latest calibration |
+| Diagnostics | connection observations, a local report export, and USB link details |
+| Settings | login startup, announcements, menu-bar preferences, searchable driver keys with defaults and individual resets, and Help |
 
 When a display comes online, Oizys draws a short ripple on that display and nothing else: a
 non-activating, click-through overlay that closes itself after under two seconds. It never
-takes focus and never appears twice for one event. The switch for it is in the panel, next to
+takes focus and never appears twice for one event. The switch for it is in Settings, next to
 a Preview button for trying it without unplugging anything.
+
+Display mode and arrangement changes return to the previous setup after 15 seconds unless
+you confirm them in the app. The timeout protects against a mode that leaves the screen
+unusable; it has not been verified against every dock and monitor combination.
 
 ### Brightness on a dock-driven monitor
 
@@ -253,8 +270,9 @@ A head driven over the dock has no such pipe, so its monitor cannot be asked to 
 `oizys ddc list` says so. Implementing DDC/CI as a tunnel through the dock's control session
 is possible, because the dock already speaks I2C to read EDID.
 
-The protocol half of that tunnel is built and tested: `Sources/OizysCore/ddc_tunnel.c` frames
-MCCS messages, computes and validates the checksums, parses replies, rejects an answer about
+The protocol half of that tunnel is retained in the test library, outside the production
+driver. `Sources/OizysCore/ddc_tunnel.c` frames MCCS messages, computes and validates
+checksums, parses replies, rejects an answer about
 the wrong feature, and retries the way the standard requires. What it does not have is the
 dock's opcode for "perform this I2C transaction" — the EDID command carries a DDC selector
 and no address field, so the generic transaction is a different message and its id is not
@@ -293,7 +311,7 @@ effect without a restart.
 
 Two different clocks put a panel to sleep, and they fail differently. macOS has one
 display-sleep timer covering every screen, so if both monitors sleep together at the same
-interval, that is the one to change — Power & standby links to it.
+interval, that is the one to change. Displays → Shared power settings links to it.
 
 A monitor also sleeps on its own when its input stops changing, and every model has its own
 patience. Panels sleeping at *different* times — one after four minutes, one straight away —
@@ -341,7 +359,7 @@ fallout and reverted, and one that moves at any other time is adopted as the new
 
 ### Sidecar
 
-An iPad can be attached from Oizys directly — the Sidecar panel lists what is reachable — and
+An iPad can be attached from Oizys directly. Displays → iPad and Sidecar lists what is reachable, and
 Oizys can attach it on its own when it turns up:
 
 ```bash
@@ -445,9 +463,9 @@ with no separate native output. See [the routing investigation](Documentation/Ro
 
 `oizys ddc list` reports native I2C services matched to a unique online monitor EDID.
 DDC reads and writes over this backend still need validation on a natively connected
-monitor. Ridge USB DDC tunnelling is not implemented. The Swift app currently provides
-connection, recovery status, permission guidance and diagnostics; it does not yet expose
-monitor settings.
+monitor. Ridge USB DDC tunnelling is not implemented. The Swift app exposes software
+brightness and contrast for dock heads, display modes, arrangement, and monitor settings
+where macOS provides a supported control path.
 
 ## Verification
 

@@ -318,6 +318,7 @@ final class OizysApp: NSObject, NSApplicationDelegate {
         do {
             session = try OizysDevelopmentSession()
             try process.run()
+            productMenu.refreshNow()
         }
         catch {
             pipe.fileHandleForReading.readabilityHandler = nil
@@ -491,7 +492,9 @@ final class OizysApp: NSObject, NSApplicationDelegate {
     @objc private func quit() { explicitQuit = true; NSApp.terminate(nil) }
 
     func applicationWillTerminate(_ notification: Notification) {
+        DisplaySettings.revertPending()
         productMenu.shutdown()
+        DisplayTint.clearAll()
         releaseSession()
         // Keep installed production as the main app, unless another debug session owns the dock.
         if !OizysLifecycle.developmentActive,
@@ -562,7 +565,10 @@ struct OizysApplication {
                     fflush(stdout)
                 }
             }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 20) { exit(0) }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 20) {
+                session.stop()
+                exit(0)
+            }
             application.run()
         }
         if CommandLine.arguments.contains("--show-overlay") {
@@ -584,6 +590,10 @@ struct OizysApplication {
             // Rendering needs AppKit initialised but must never show a window or a menu.
             NSApplication.shared.setActivationPolicy(.prohibited)
             exit(MainActor.assumeIsolated { PreviewRender.run(into: CommandLine.arguments[index + 1]) })
+        }
+        if CommandLine.arguments.contains("--check-interface") {
+            NSApplication.shared.setActivationPolicy(.prohibited)
+            exit(MainActor.assumeIsolated { PreviewRender.checkInteractions() })
         }
         let application = NSApplication.shared
         let delegate = OizysApp()

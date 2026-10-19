@@ -1,26 +1,26 @@
 import AppKit
 import SwiftUI
 
-// The visual language comes from Assets/Logo.png: white stipple on black, with concentric
-// ripples running out behind the subject. Everything here is monochrome by construction,
-// so the only colour in the app is a status dot, and it means something.
+// The palette follows the system: semantic colors and materials adapt to Light, Dark,
+// Increase Contrast and desktop tinting automatically. Status keeps one color per
+// meaning, always paired with text, never color alone.
 enum Ink {
-    static let ground = Color(red: 0.039, green: 0.039, blue: 0.043)
-    static let panel = Color(red: 0.067, green: 0.067, blue: 0.075)
-    static let raised = Color(red: 0.098, green: 0.098, blue: 0.11)
-    static let hairline = Color.white.opacity(0.08)
-    static let primary = Color.white.opacity(0.92)
-    static let secondary = Color.white.opacity(0.58)
-    static let faint = Color.white.opacity(0.50)
-    static let live = Color(red: 0.60, green: 0.85, blue: 0.62)
-    static let warn = Color(red: 0.92, green: 0.70, blue: 0.36)
+    static let ground = Color(nsColor: .windowBackgroundColor)
+    static let panel = Color(nsColor: .controlBackgroundColor)
+    static let raised = Color(nsColor: .controlColor)
+    static let hairline = Color(nsColor: .separatorColor)
+    static let primary = Color(nsColor: .labelColor)
+    static let secondary = Color(nsColor: .secondaryLabelColor)
+    static let faint = Color(nsColor: .secondaryLabelColor)
+    static let live = Color(nsColor: .systemGreen)
+    static let warn = Color(nsColor: .systemOrange)
 
-    static let section = Font.system(size: 10, weight: .semibold)
-    static let label = Font.system(size: 12, weight: .regular)
-    static let value = Font.system(size: 12, weight: .regular).monospacedDigit()
+    static let section = Font.caption.weight(.semibold)
+    static let label = Font.body
+    static let value = Font.body.monospacedDigit()
 }
 
-enum Health { case live, idle, waiting
+enum Health: Equatable { case live, idle, waiting
     var tint: Color {
         switch self {
         case .live: return Ink.live
@@ -54,7 +54,7 @@ struct Row<Trailing: View>: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text(label).font(Ink.label).foregroundStyle(Ink.primary)
                 if let detail, !detail.isEmpty {
-                    Text(detail).font(.system(size: 10)).foregroundStyle(Ink.faint).lineLimit(2)
+                    Text(detail).font(.caption).foregroundStyle(Ink.faint).lineLimit(2)
                 }
             }
             Spacer(minLength: 12)
@@ -76,29 +76,37 @@ struct StatusDot: View {
     var body: some View {
         Circle().fill(health.tint).frame(width: 6, height: 6)
             .shadow(color: health.tint.opacity(0.7), radius: 3)
+            .accessibilityHidden(true)
     }
 }
 
+/// A standard button. Native behavior — keyboard focus with a visible ring, press and
+/// hover states, VoiceOver naming from the title — takes precedence over custom chrome.
 struct QuietButton: View {
     let title: String
+    var disabled = false
+    var prominent = false
+    var defaultAction = false
     var action: () -> Void
-    @State private var over = false
     var body: some View {
-        Button(action: action) {
-            Text(title).font(.system(size: 11, weight: .medium)).foregroundStyle(Ink.primary)
-                .padding(.horizontal, 10).padding(.vertical, 5)
-                .background(RoundedRectangle(cornerRadius: 6).fill(over ? Ink.raised : Ink.panel))
-                .overlay(RoundedRectangle(cornerRadius: 6).stroke(Ink.hairline))
+        Group {
+            if prominent {
+                Button(title, action: action).buttonStyle(.borderedProminent)
+            } else {
+                Button(title, action: action).buttonStyle(.bordered)
+            }
         }
-        .buttonStyle(.plain).onHover { over = $0 }
+        .controlSize(.small).disabled(disabled)
+        .keyboardShortcut(defaultAction ? .defaultAction : nil)
     }
 }
 
-/// A choice among a few fixed values. Replaces the system Picker for the same two reasons
-/// as the switch: it carries an accent colour, and it cannot be rendered for review.
+/// A choice among a few fixed values. A native segmented picker: Full Keyboard Access,
+/// visible focus and VoiceOver value announcements come with the system control.
 struct SegmentedChoice<Value: Hashable>: View {
     let options: [(label: String, value: Value)]
     @Binding var selection: Value
+    var label: String = ""
 
     /// A stored value that is not one of the presets still has to be visible and still has to
     /// read as selected. Dropping it would show a control with nothing chosen while the
@@ -110,76 +118,58 @@ struct SegmentedChoice<Value: Hashable>: View {
     }
 
     var body: some View {
-        HStack(spacing: 2) {
+        Picker(label, selection: $selection) {
             ForEach(shown, id: \.value) { option in
-                let chosen = option.value == selection
-                Button { selection = option.value } label: {
-                    Text(option.label)
-                        .font(.system(size: 11, weight: chosen ? .semibold : .regular))
-                        .foregroundStyle(chosen ? Ink.primary : Ink.secondary)
-                        .padding(.horizontal, 9).padding(.vertical, 4)
-                        .background(RoundedRectangle(cornerRadius: 5)
-                            .fill(chosen ? Color.white.opacity(0.14) : .clear))
-                }
-                .buttonStyle(.plain)
+                Text(option.label).tag(option.value)
             }
         }
-        .padding(2)
-        .background(RoundedRectangle(cornerRadius: 7).fill(Ink.panel))
-        .overlay(RoundedRectangle(cornerRadius: 7).stroke(Ink.hairline))
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .accessibilityLabel(label.isEmpty ? "Options" : label)
     }
 }
 
-/// The same chips, wrapped over as many rows as they need. A display can offer a dozen
-/// resolutions, which is several more than one row holds at this width, and a system pop-up
-/// menu is exactly the AppKit-backed control the rest of this panel avoids.
+/// A dozen resolutions do not fit one row, so this is a pop-up menu: the standard
+/// control for choosing one of many values, with keyboard and VoiceOver support.
 struct ChipChoice<Value: Hashable>: View {
     let options: [(label: String, value: Value)]
     @Binding var selection: Value
-    var minimum: CGFloat = 96
+    var label: String = ""
+
+    /// A stored value that is not one of the presets still has to be visible: a pop-up
+    /// showing a blank button while holding a value is a lie about having nothing chosen.
+    var shown: [(label: String, value: Value)] {
+        if options.contains(where: { $0.value == selection }) { return options }
+        return options + [(label: String(describing: selection), value: selection)]
+    }
 
     var body: some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: minimum), spacing: 4)],
-                  alignment: .leading, spacing: 4) {
-            ForEach(options, id: \.value) { option in
-                let chosen = option.value == selection
-                Button { selection = option.value } label: {
-                    Text(option.label)
-                        .font(.system(size: 11, weight: chosen ? .semibold : .regular))
-                        .foregroundStyle(chosen ? Ink.primary : Ink.secondary)
-                        .lineLimit(1)
-                        .frame(maxWidth: .infinity)
-                        .padding(.horizontal, 8).padding(.vertical, 4)
-                        .background(RoundedRectangle(cornerRadius: 5)
-                            .fill(chosen ? Color.white.opacity(0.14) : Ink.panel))
-                        .overlay(RoundedRectangle(cornerRadius: 5).stroke(Ink.hairline))
-                }
-                .buttonStyle(.plain)
+        Picker(label, selection: $selection) {
+            ForEach(shown, id: \.value) { option in
+                Text(option.label).tag(option.value)
             }
         }
+        .pickerStyle(.menu)
+        .controlSize(.small)
+        .labelsHidden()
+        .accessibilityLabel(label.isEmpty ? "Options" : label)
     }
 }
 
-/// A switch drawn rather than borrowed. The system toggle brings its own accent colour into
-/// a strictly monochrome panel, and it is AppKit-backed, so it does not survive being
-/// rendered offscreen for review. This is two shapes and reads the same in both themes.
+/// A native switch: accent-aware, keyboard-operable with a visible focus ring, and
+/// announced by VoiceOver with the row's label. The label lives in the row, so it is
+/// passed in for accessibility.
 struct QuietSwitch: View {
     @Binding var isOn: Bool
+    var disabled = false
+    var label: String = ""
     var body: some View {
-        Button { isOn.toggle() } label: {
-            ZStack(alignment: isOn ? .trailing : .leading) {
-                Capsule()
-                    .fill(isOn ? Color.white.opacity(0.22) : Color.white.opacity(0.06))
-                    .overlay(Capsule().stroke(Ink.hairline))
-                Circle()
-                    .fill(isOn ? Ink.primary : Ink.faint)
-                    .padding(2)
-            }
-            .frame(width: 30, height: 17)
-        }
-        .buttonStyle(.plain)
-        .animation(.easeOut(duration: 0.14), value: isOn)
-        .accessibilityAddTraits(isOn ? [.isSelected] : [])
+        Toggle(label.isEmpty ? "On" : label, isOn: $isOn)
+            .toggleStyle(.switch)
+            .controlSize(.small)
+            .labelsHidden()
+            .accessibilityLabel(label.isEmpty ? "On" : label)
+            .disabled(disabled)
     }
 }
 
@@ -211,33 +201,5 @@ struct Stipple {
             }
         }
         return dots
-    }
-}
-
-/// The header art: ripples fading outward, drifting slowly so the panel is never quite still.
-struct RippleField: View {
-    var intensity: Double = 1
-    private let dots = Stipple.ripple(rings: 22, perRing: 54)
-    var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 12, paused: intensity <= 0)) { timeline in
-            Canvas { context, size in
-                let time = timeline.date.timeIntervalSinceReferenceDate
-                let centre = CGPoint(x: size.width / 2, y: size.height * 0.52)
-                let scale = min(size.width, size.height * 2.4) * 0.72
-                for dot in dots {
-                    let distance = hypot(dot.point.x, dot.point.y)
-                    // One slow wave outward, so the field reads as a ripple, not noise.
-                    let wave = sin(distance * 9 - time * 1.1) * 0.5 + 0.5
-                    let alpha = dot.alpha * (0.35 + wave * 0.65) * intensity
-                    guard alpha > 0.02 else { continue }
-                    let rect = CGRect(x: centre.x + dot.point.x * scale - dot.radius,
-                                      y: centre.y + dot.point.y * scale - dot.radius,
-                                      width: dot.radius * 2, height: dot.radius * 2)
-                    context.fill(Path(ellipseIn: rect), with: .color(.white.opacity(alpha)))
-                }
-            }
-        }
-        .drawingGroup()
-        .allowsHitTesting(false)
     }
 }

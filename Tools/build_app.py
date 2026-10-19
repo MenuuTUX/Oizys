@@ -33,7 +33,7 @@ def portable_debug(bundle, destination, identity):
         temporary = Path(temporary)
         # One stable bundle name inside the executable; the display name carries its version.
         stage = temporary / "Oizys-debug.app"
-        shutil.copytree(bundle, stage)
+        subprocess.run(["ditto", str(bundle), str(stage)], check=True)
         archive = temporary / "payload.zip"
         subprocess.run(["ditto", "-c", "-k", "--keepParent", str(stage), str(archive)], check=True)
         subprocess.run(["xcrun", "clang", "-O2", "-fobjc-arc", "-arch", "arm64", "-mmacosx-version-min=14.0",
@@ -44,14 +44,59 @@ def portable_debug(bundle, destination, identity):
     print(destination)
 
 
-def build(variant, identity="-", version=None, skip=False, coverage=False, output_format=None, restart_debug=False):
+def package_staged(variant, identity, version, output_format, installer_identity=None, installer_keychain=None):
+    debug = VARIANTS[variant][1]
+    bundle = ROOT / "build/apps" / variant / version / ("Oizys-debug.app" if debug else "Oizys.app")
+    if not bundle.is_dir(): raise RuntimeError(f"Build the {variant} app before packaging it")
+    subprocess.run(["codesign", "--verify", "--deep", "--strict", str(bundle)], check=True)
+    print(bundle)
+    destination = ROOT / "dist"
+    destination.mkdir(exist_ok=True)
+    stem = f"{'Oizys-debug' if debug else 'Oizys'}-{version}-{variant}"
+    if debug:
+        if output_format == "portable":
+            executable = destination / stem
+            portable_debug(bundle, executable, identity)
+            return executable
+        return bundle
+    if output_format in ("portable", "both"):
+        archive = destination / (stem + ".zip")
+        subprocess.run(["ditto", "-c", "-k", "--keepParent", str(bundle), str(archive)], check=True)
+        print(archive)
+    if output_format in ("installer", "both"):
+        package = destination / (stem + ".pkg")
+        with tempfile.TemporaryDirectory(prefix="oizys-package-") as temporary:
+            stage = Path(temporary) / "root"; stage.mkdir()
+            subprocess.run(["ditto", str(bundle), str(stage / bundle.name)], check=True)
+            components = Path(temporary) / "components.plist"
+            components.write_bytes(plistlib.dumps([{
+                "RootRelativeBundlePath": bundle.name, "BundleIsRelocatable": False,
+                "BundleHasStrictIdentifier": False, "BundleIsVersionChecked": True,
+                "BundleOverwriteAction": "upgrade",
+            }]))
+            command = ["pkgbuild", "--root", str(stage), "--install-location", "/Applications",
+                       "--component-plist", str(components), "--identifier", "org.oizys.Oizys.installer",
+                       "--version", version]
+            if installer_identity:
+                command += ["--sign", installer_identity]
+                if installer_keychain: command += ["--keychain", installer_keychain]
+            subprocess.run([*command, str(package)], check=True)
+        print(package)
+    if identity == "-": print("Local ad-hoc signature. Public distribution still requires Developer ID signing and notarization.")
+    return bundle
+
+
+def build(variant, identity="-", version=None, skip=False, coverage=False, output_format=None, restart_debug=False,
+          distribution=False, package_only=False, installer_identity=None, installer_keychain=None):
     version = version or (ROOT / "VERSION").read_text().strip()
     if not re.fullmatch(r"\d+(?:\.\d+){0,2}", version):
         raise ValueError("Version must have one to three numeric components")
     configuration, debug, verbose, fallback = VARIANTS[variant]
     output_format = output_format or ("portable" if debug else "app")
-    if debug and output_format != "portable":
-        raise ValueError("Debug distribution is a portable executable only; use --format portable (the default).")
+    if debug and output_format not in ("app", "portable"):
+        raise ValueError("Debug distribution is a portable executable only; use --format portable or stage --format app.")
+    if package_only:
+        return package_staged(variant, identity, version, output_format, installer_identity, installer_keychain)
     if restart_debug:
         stop_debug(ROOT, variant)
     subprocess.run(["python3", str(ROOT / "Tools/make_xcodeproj.py")], check=True)
@@ -64,6 +109,9 @@ def build(variant, identity="-", version=None, skip=False, coverage=False, outpu
                    "-configuration", configuration, "build", f"MARKETING_VERSION={version}",
                    f"CURRENT_PROJECT_VERSION={version}", f"CODE_SIGN_IDENTITY={identity}"]
         if coverage: command += ["CLANG_ENABLE_CODE_COVERAGE=YES"]
+        if distribution:
+            command += ["OIZYS_DISTRIBUTION=YES", "CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO",
+                        "OTHER_CODE_SIGN_FLAGS=--timestamp"]
         subprocess.run(command, cwd=ROOT, check=True)
     policy = json.loads((product / "Contents/Resources/build-info.json").read_text())
     expected = dict(product="Oizys", diagnostics=debug, verbose=verbose, displaylink_fallback=fallback)
@@ -82,36 +130,7 @@ def build(variant, identity="-", version=None, skip=False, coverage=False, outpu
         target = bundle.with_suffix(".app.dSYM")
         if target.exists(): shutil.rmtree(target)
         shutil.copytree(symbols, target)
-    subprocess.run(["codesign", "--verify", "--deep", "--strict", str(bundle)], check=True)
-    print(bundle)
-    destination = ROOT / "dist"
-    destination.mkdir(exist_ok=True)
-    stem = f"{'Oizys-debug' if debug else 'Oizys'}-{version}-{variant}"
-    if debug:
-        executable = destination / stem
-        portable_debug(bundle, executable, identity)
-        return executable
-    if output_format in ("portable", "both"):
-        archive = destination / (stem + ".zip")
-        subprocess.run(["ditto", "-c", "-k", "--keepParent", str(bundle), str(archive)], check=True)
-        print(archive)
-    if output_format in ("installer", "both"):
-        package = destination / (stem + ".pkg")
-        with tempfile.TemporaryDirectory(prefix="oizys-package-") as temporary:
-            stage = Path(temporary) / "root"; stage.mkdir()
-            shutil.copytree(bundle, stage / bundle.name)
-            components = Path(temporary) / "components.plist"
-            components.write_bytes(plistlib.dumps([{
-                "RootRelativeBundlePath": bundle.name, "BundleIsRelocatable": False,
-                "BundleHasStrictIdentifier": False, "BundleIsVersionChecked": True,
-                "BundleOverwriteAction": "upgrade",
-            }]))
-            subprocess.run(["pkgbuild", "--root", str(stage), "--install-location", "/Applications",
-                            "--component-plist", str(components), "--identifier", "org.oizys.Oizys.installer",
-                            "--version", version, str(package)], check=True)
-        print(package)
-    if identity == "-": print("Local ad-hoc signature. Public distribution still requires Developer ID signing and notarization.")
-    return bundle
+    return package_staged(variant, identity, version, output_format, installer_identity, installer_keychain)
 
 
 if __name__ == "__main__":
@@ -123,10 +142,16 @@ if __name__ == "__main__":
     parser.add_argument("--version")
     parser.add_argument("--format", dest="output_format", choices=("app", "portable", "installer", "both"))
     parser.add_argument("--coverage", action="store_true")
+    parser.add_argument("--distribution", action="store_true", help="Sign a release build without debugger entitlements")
+    parser.add_argument("--package-staged", action="store_true", help="Package an already staged app without replacing it")
+    parser.add_argument("--installer-sign", help="Developer ID Installer identity for signed PKG output")
+    parser.add_argument("--installer-keychain", help="Keychain containing the installer signing identity")
     parser.add_argument("--restart-debug", action="store_true",
                         help="Close the previous selected debug session before rebuilding; never stop production")
     args = parser.parse_args()
     try:
-        build(args.variant, args.sign, args.version, args.skip, args.coverage, args.output_format, args.restart_debug)
+        build(args.variant, args.sign, args.version, args.skip, args.coverage, args.output_format,
+              args.restart_debug, args.distribution, args.package_staged, args.installer_sign,
+              args.installer_keychain)
     except (RuntimeError, ValueError, subprocess.SubprocessError) as error:
         parser.exit(1, f"Build failed: {error}\n")

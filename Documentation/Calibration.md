@@ -17,9 +17,11 @@ settings, which is enough to fix the fault people actually notice.
 | Patch presenter, capture page, QR pairing | built — Colour, in the menu bar's window |
 | Applying a correction to a head | built — a per-channel lookup in the encoder |
 
-The whole loop runs: Colour → Start puts a QR code on screen, the phone opens the capture
-page over TLS, Oizys shows eight grey patches per monitor, and the readings are fitted,
-solved and stored. A running driver picks the result up within a second.
+Colour → Start puts a QR code on screen. The capture page sends eight RGB readings per
+monitor, which the driver fits and stores. A running driver picks the result up within a
+second. Automated tests cover the parser, reading validation, local TLS handshake, IP
+certificate validation, token replay, page reload, session shutdown, and certificate renewal.
+The camera and certificate confirmation flow still needs testing on a physical iPhone.
 
 ## Why absolute measurement is off the table
 
@@ -95,46 +97,51 @@ is preferred rather than a fallback.
 
 ## Getting the phone onto the page
 
-Oizys serves the capture page itself and shows a QR code containing its URL. There is one
-real obstacle, and it has one workaround.
+Oizys serves the capture page over HTTPS because `getUserMedia` requires a secure context.
+The certificate is self-signed and includes the selected LAN IP address as a Subject
+Alternative Name. It is renewed when the address changes or its one-year validity is nearly
+over. The Mac shows its SHA-256 fingerprint beside the QR code.
 
-**`getUserMedia` requires a secure context.** Safari grants camera access on HTTPS and on
-localhost, and nowhere else. A page served over plain HTTP at `http://192.168.1.x:8443` will
-be refused the camera with no useful error. So the server has to speak TLS with a
-self-signed certificate, and the phone gets a "connection is not private" warning to tap
-through once. Camera access does work after that.
+A certificate warning alone does not authenticate the Mac. Compare the phone's certificate
+fingerprint before granting camera access. Stop if it differs or Safari cannot display it.
+Whether iPhone Safari exposes enough information for this check remains unverified.
 
-That interstitial is the cost of not installing anything, and it should be named on the
-screen showing the QR code rather than left as a surprise.
-
-The alternatives were considered and are worse. A trusted certificate needs a public domain
-and a real CA, so the calibration flow would depend on the internet. A native app is an
-install. AirPlay carries pixels one way and returns no camera. Tapping through one warning is
-the least bad of these.
+The identity is imported into a private keychain for each session. Importing it into the
+default keychain can block TLS on private-key authorization after an ad hoc rebuild. The
+session keychain trusts the calling app and is deleted on stop or normal app termination.
+This uses public deprecated macOS Keychain APIs, contained in `CalibrationSession.swift`.
 
 ### Rules for the server
 
-It listens on the LAN and accepts image data, so it is built to be boring:
+The listener accepts bounded requests containing numbers:
 
-- Off unless calibration is actually running, and it stops when the sheet closes.
+- Off unless calibration is running; it stops when the Colour panel closes, the app quits,
+  or the ten-minute session deadline expires.
 - Bound to one interface, never `0.0.0.0`.
-- A single-use token in the QR URL, expiring after two minutes. A second request with the
-  same token is refused.
-- Frames are reduced to nine mean values in memory and discarded. Nothing is written to disk,
-  and no image leaves the machine.
-- One route, `POST /reading`, taking numbers. It never serves a file path.
+- A single-use QR token redirects to a separate session token. Reusing the QR token is
+  refused; the session page can reload until the session ends.
+- The phone reduces each frame to three RGB means and sends those values. Images stay on
+  the phone. The solver receives a temporary readings file that is removed after use.
+- Exact token-scoped page and reading routes; no file paths are served.
+- Headers are limited to 8 KiB and bodies to 4 KiB. Readings must be finite, within 0...1,
+  and match the current display and patch. Out-of-order or replayed readings are refused.
 
 ## The flow, end to end
 
-1. Menu bar, Displays, Calibrate. Oizys picks a reference — the dimmest display, or one the
-   user chooses — and starts the server.
-2. A QR code appears on the built-in display, with the certificate warning explained beside it.
-3. The phone opens the page, taps through once, grants the camera.
+1. Open Oizys, choose Colour, and start calibration when both dock displays are forwarding.
+2. Scan the QR code and verify the certificate fingerprint against the Mac.
+3. Open the capture page and grant camera access.
 4. For each display in turn: the page says which one to point at, Oizys shows the ramp, the
    page reports eight readings.
-5. Oizys fits each display, solves each against the reference, and shows the result as a
-   before-and-after split on each panel.
-6. Keep, or discard. Discarding restores identity, which is what shipped.
+5. Oizys chooses the dimmest measured display as the reference, fits each display, and stores
+   corrections for the dock heads. The solver runs outside the UI thread and writes to a
+   temporary directory. Only an active session can atomically save that result, so cancelling
+   while solving leaves the current correction intact.
+6. Review the result on the Mac. Undo last calibration restores the exact previous correction
+   file, or removes the new file when there was no correction before. Undo refuses to overwrite
+   changes made after calibration. Clear stored correction is available without running a new
+   calibration and removes both head corrections together. Undo remains available in the
+   current Colour view until another calibration replaces it or the view closes.
 
 ## What this will not do
 

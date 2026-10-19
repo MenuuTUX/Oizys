@@ -94,6 +94,68 @@ def test_install_can_keep_permissions_and_then_never_calls_tccutil(tmp_path, ins
     assert not any(command[:1] == ["/usr/bin/tccutil"] for command in calls)
 
 
+@pytest.mark.parametrize("same_identity", [True, False])
+def test_signed_upgrade_preserves_permissions_only_for_matching_identity(tmp_path, installation, monkeypatch, same_identity):
+    home, _, calls = installation
+    applications = tmp_path / "Applications"
+    old = bundle(applications / "Oizys.app")
+    source = bundle(tmp_path / "source.app")
+    monkeypatch.setattr(install_app, "developer_id_requirement", lambda path:
+                        "same team and identifier" if path == source or same_identity else "different team")
+    install_app.install(source, applications, login=False, prompt=False)
+    assert any(command[:1] == ["/usr/bin/tccutil"] for command in calls) is not same_identity
+
+
+def test_signed_upgrade_rolls_back_when_previously_granted_access_is_lost(tmp_path, installation, monkeypatch):
+    home, _, _ = installation
+    applications = tmp_path / "Applications"
+    old = bundle(applications / "Oizys.app")
+    (old / "Contents/MacOS/OizysDriver").write_bytes(b"previous driver")
+    source = bundle(tmp_path / "source.app")
+    log = home / "Library/Application Support/Oizys/logs/service.log"
+    log.parent.mkdir(parents=True)
+    log.write_text("Oizys 0.3.0 started at login: screen recording granted, dock 1 attached\n")
+    monkeypatch.setattr(install_app, "developer_id_requirement", lambda _: "same identity")
+    monkeypatch.setattr(install_app, "wait_for_screen_recording", lambda _: False)
+    with pytest.raises(RuntimeError, match="did not retain"):
+        install_app.install(source, applications, prompt=False)
+    assert (old / "Contents/MacOS/OizysDriver").read_bytes() == b"previous driver"
+
+
+@pytest.mark.parametrize("output, expected", [
+    ("Authority=Developer ID Application: Example (TEAM)\ndesignated => identifier org.oizys.Oizys.production and anchor apple generic\n", "identifier org.oizys.Oizys.production and anchor apple generic"),
+    ("Signature=adhoc\ndesignated => cdhash abc\n", None),
+    ("Authority=Developer ID Application: Example\ndesignated => identifier fake\n", None),
+])
+def test_developer_id_requirement_rejects_adhoc_and_unanchored_signatures(monkeypatch, output, expected):
+    monkeypatch.setattr(install_app.subprocess, "run", lambda command, **kwargs:
+                        subprocess.CompletedProcess(command, 0, stdout="", stderr=output))
+    assert install_app.developer_id_requirement(Path("example.app")) == expected
+
+
+def test_permission_check_uses_the_login_apps_observation(tmp_path):
+    log = tmp_path / "service.log"
+    assert install_app.screen_recording_granted(log) is None
+    log.write_text("Oizys 0.4.1 started at login: screen recording NOT granted, dock 1 attached\n")
+    assert install_app.screen_recording_granted(log) is False
+    log.write_text(log.read_text() + "Screen Recording granted to this app; resuming.\n")
+    assert install_app.screen_recording_granted(log) is True
+
+
+def test_keep_permissions_upgrade_restores_old_app_if_new_app_is_denied(tmp_path, installation, monkeypatch):
+    _, link, _ = installation
+    applications = tmp_path / "Applications"
+    old = bundle(applications / "Oizys.app")
+    old_driver = old / "Contents/MacOS/OizysDriver"
+    old_driver.write_bytes(b"previous driver")
+    link.symlink_to(old_driver)
+    monkeypatch.setattr(install_app, "wait_for_screen_recording", lambda _: False)
+    with pytest.raises(RuntimeError, match="restoring the previous app"):
+        install_app.install(bundle(tmp_path / "source.app"), applications, keep_permissions=True)
+    assert old_driver.read_bytes() == b"previous driver"
+    assert link.resolve() == old_driver
+
+
 def test_install_gives_the_login_agent_somewhere_to_report_a_refusal(tmp_path, installation):
     # stderr going to /dev/null is what hid a missing permission behind a silent respawn.
     home, _, _ = installation
@@ -206,3 +268,21 @@ int main(void) {
                     "-I", str(ROOT / "Sources/OizysCore/include"), str(source),
                     "-o", str(binary)], check=True)
     assert subprocess.run([str(binary)]).returncode == 0
+
+
+def test_displaylink_teardown_stops_the_manager_process():
+    source = (ROOT / "Sources/OizysCore/usb_probe.c").read_text()
+    assert "'DisplayLink Manager'" in source
+
+
+def test_worker_restores_displays_before_exiting():
+    source = (ROOT / "Sources/oizys/main.c").read_text()
+    shutdown = source[source.index("static void run_shutdown"):source.index("static int cmd_run")]
+    assert "destroy_heads(g_run.heads);" in shutdown
+    assert "oizys_displays_restore();" in shutdown
+
+
+def test_production_keeps_worker_diagnostics():
+    source = (ROOT / "Sources/OizysApp/Production.swift").read_text()
+    assert "process.standardOutput = FileHandle.standardError" in source
+    assert "process.standardError = FileHandle.standardError" in source

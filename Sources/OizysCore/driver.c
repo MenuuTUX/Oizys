@@ -4,6 +4,7 @@
 #include "oizys_encode.h"
 #include "oizys_profile.h"
 
+#include <CommonCrypto/CommonDigest.h>
 #include <dispatch/dispatch.h>
 #include <limits.h>
 #include <stdatomic.h>
@@ -23,6 +24,55 @@
 #define RIDGE_STRIP_COLUMNS 30
 #define RIDGE_STRIP_ROWS 68
 #define RIDGE_STRIP_COUNT (RIDGE_STRIP_COLUMNS * RIDGE_STRIP_ROWS)
+
+/* Production DCP LLC verification key, HDCP 2.2 IIA Appendix B.
+ * https://www.digital-cp.com/sites/default/files/specifications/HDCP%20Interface%20Independent%20Adaptation%20Specification%20Rev2_2_FINAL.pdf */
+static const uint8_t dcp_modulus[384] = {
+    0xb0, 0xe9, 0xaa, 0x45, 0xf1, 0x29, 0xba, 0x0a, 0x1c, 0xbe, 0x17, 0x57, 0x28, 0xeb, 0x2b, 0x4e,
+    0x8f, 0xd0, 0xc0, 0x6a, 0xad, 0x79, 0x98, 0x0f, 0x8d, 0x43, 0x8d, 0x47, 0x04, 0xb8, 0x2b, 0xf4,
+    0x15, 0x21, 0x56, 0x19, 0x01, 0x40, 0x01, 0x3b, 0xd0, 0x91, 0x90, 0x62, 0x9e, 0x89, 0xc2, 0x27,
+    0x8e, 0xcf, 0xb6, 0xdb, 0xce, 0x3f, 0x72, 0x10, 0x50, 0x93, 0x8c, 0x23, 0x29, 0x83, 0x7b, 0x80,
+    0x64, 0xa7, 0x59, 0xe8, 0x61, 0x67, 0x4c, 0xbc, 0xd8, 0x58, 0xb8, 0xf1, 0xd4, 0xf8, 0x2c, 0x37,
+    0x98, 0x16, 0x26, 0x0e, 0x4e, 0xf9, 0x4e, 0xee, 0x24, 0xde, 0xcc, 0xd1, 0x4b, 0x4b, 0xc5, 0x06,
+    0x7a, 0xfb, 0x49, 0x65, 0xe6, 0xc0, 0x00, 0x83, 0x48, 0x1e, 0x8e, 0x42, 0x2a, 0x53, 0xa0, 0xf5,
+    0x37, 0x29, 0x2b, 0x5a, 0xf9, 0x73, 0xc5, 0x9a, 0xa1, 0xb5, 0xb5, 0x74, 0x7c, 0x06, 0xdc, 0x7b,
+    0x7c, 0xdc, 0x6c, 0x6e, 0x82, 0x6b, 0x49, 0x88, 0xd4, 0x1b, 0x25, 0xe0, 0xee, 0xd1, 0x79, 0xbd,
+    0x39, 0x85, 0xfa, 0x4f, 0x25, 0xec, 0x70, 0x19, 0x23, 0xc1, 0xb9, 0xa6, 0xd9, 0x7e, 0x3e, 0xda,
+    0x48, 0xa9, 0x58, 0xe3, 0x18, 0x14, 0x1e, 0x9f, 0x30, 0x7f, 0x4c, 0xa8, 0xae, 0x53, 0x22, 0x66,
+    0x2b, 0xbe, 0x24, 0xcb, 0x47, 0x66, 0xfc, 0x83, 0xcf, 0x5c, 0x2d, 0x1e, 0x3a, 0xab, 0xab, 0x06,
+    0xbe, 0x05, 0xaa, 0x1a, 0x9b, 0x2d, 0xb7, 0xa6, 0x54, 0xf3, 0x63, 0x2b, 0x97, 0xbf, 0x93, 0xbe,
+    0xc1, 0xaf, 0x21, 0x39, 0x49, 0x0c, 0xe9, 0x31, 0x90, 0xcc, 0xc2, 0xbb, 0x3c, 0x02, 0xc4, 0xe2,
+    0xbd, 0xbd, 0x2f, 0x84, 0x63, 0x9b, 0xd2, 0xdd, 0x78, 0x3e, 0x90, 0xc6, 0xc5, 0xac, 0x16, 0x77,
+    0x2e, 0x69, 0x6c, 0x77, 0xfd, 0xed, 0x8a, 0x4d, 0x6a, 0x8c, 0xa3, 0xa9, 0x25, 0x6c, 0x21, 0xfd,
+    0xb2, 0x94, 0x0c, 0x84, 0xaa, 0x07, 0x29, 0x26, 0x46, 0xf7, 0x9b, 0x3a, 0x19, 0x87, 0xe0, 0x9f,
+    0xeb, 0x30, 0xa8, 0xf5, 0x64, 0xeb, 0x07, 0xf1, 0xe9, 0xdb, 0xf9, 0xaf, 0x2c, 0x8b, 0x69, 0x7e,
+    0x2e, 0x67, 0x39, 0x3f, 0xf3, 0xa6, 0xe5, 0xcd, 0xda, 0x24, 0x9b, 0xa2, 0x78, 0x72, 0xf0, 0xa2,
+    0x27, 0xc3, 0xe0, 0x25, 0xb4, 0xa1, 0x04, 0x6a, 0x59, 0x80, 0x27, 0xb5, 0xda, 0xb4, 0xb4, 0x53,
+    0x97, 0x3b, 0x28, 0x99, 0xac, 0xf4, 0x96, 0x27, 0x0f, 0x7f, 0x30, 0x0c, 0x4a, 0xaf, 0xcb, 0x9e,
+    0xd8, 0x71, 0x28, 0x24, 0x3e, 0xbc, 0x35, 0x15, 0xbe, 0x13, 0xeb, 0xaf, 0x43, 0x01, 0xbd, 0x61,
+    0x24, 0x54, 0x34, 0x9f, 0x73, 0x3e, 0xb5, 0x10, 0x9f, 0xc9, 0xfc, 0x80, 0xe8, 0x4d, 0xe3, 0x32,
+    0x96, 0x8f, 0x88, 0x10, 0x23, 0x25, 0xf3, 0xd3, 0x3e, 0x6e, 0x6d, 0xbb, 0xdc, 0x29, 0x66, 0xeb,
+};
+
+/* Explicitly approved public certificate from the supported local Ridge dock,
+ * collected 2026-10-10. Its signature does not verify with the standard DCP key.
+ * This is a fixed trust pin, never enrollment of a newly observed certificate. */
+static const uint8_t ridge_certificate_sha256[CC_SHA256_DIGEST_LENGTH] = {
+    0xec, 0xd4, 0x97, 0x4c, 0x73, 0x48, 0x7f, 0xa9,
+    0x53, 0xc2, 0xc5, 0x4a, 0x42, 0x98, 0x2c, 0x1c,
+    0xcc, 0x2f, 0xb1, 0xaa, 0xb0, 0x46, 0x84, 0xea,
+    0x9b, 0x74, 0xfc, 0x54, 0xf6, 0x02, 0x87, 0xe8,
+};
+
+int oizys_dl3_verify_ridge_certificate(const uint8_t *payload, size_t payload_len) {
+    if (!payload || payload_len < 523 || payload[0] > 1) return -1;
+    if (oizys_hdcp_verify_ake_cert_payload(payload, payload_len, dcp_modulus) == 0) return 0;
+    uint8_t digest[CC_SHA256_DIGEST_LENGTH];
+    if (!CC_SHA256(payload + 1, 522, digest) ||
+        memcmp(digest, ridge_certificate_sha256, sizeof(digest)) != 0) return -1;
+    oizys_log("receiver certificate matches the approved Ridge pin; DCP issuer signature is unverified");
+    return 0;
+}
 
 struct OizysDriver {
     OizysSession *session;
@@ -70,6 +120,13 @@ struct OizysDriver {
         size_t length;
     } recent_video[OIZYS_DL3_MAX_HEADS][8];
     unsigned recent_next[OIZYS_DL3_MAX_HEADS];
+    /* One wire buffer per head, kept across frames. A fresh 512 KB allocation per frame
+       is mapped and zero-filled by the kernel every time, at up to 120 frames a second. */
+    uint8_t *stream_bytes[OIZYS_DL3_MAX_HEADS];
+    size_t stream_capacity[OIZYS_DL3_MAX_HEADS];
+    /* When the capture worker last ran the control clock. Written on that queue, read from
+       the main-queue watchdog, so a hung worker stops the supervisor heartbeat. */
+    _Atomic uint64_t serviced_ns;
 };
 
 static uint16_t read_u16(const uint8_t *p) {
@@ -283,7 +340,7 @@ static int run_shared_ake(OizysDriver *driver) {
     drain_plain(session, 8, 0.03);
 
     uint8_t rtx[8];
-    oizys_hdcp_random(rtx, sizeof(rtx));
+    if (oizys_hdcp_random(rtx, sizeof(rtx)) < 0) return -1;
     length = oizys_hdcp_ake_init(packet, sizeof(packet), hdcp_seq++, 0, rtx);
     if (write_control(session, packet, length, "shared AKE init") < 0) {
         return -1;
@@ -292,8 +349,12 @@ static int run_shared_ake(OizysDriver *driver) {
     uint8_t message_id = 0, payload[2048];
     size_t payload_len = 0;
     if (receive_hdcp(session, &message_id, payload, sizeof(payload), &payload_len) < 0 ||
-        message_id != 0x03 || payload_len < 137) {
+        message_id != 0x03 || payload_len < 523) {
         oizys_log("invalid shared AKE certificate id=0x%02x len=%zu", message_id, payload_len);
+        return -1;
+    }
+    if (oizys_dl3_verify_ridge_certificate(payload, payload_len) < 0) {
+        oizys_log("shared AKE receiver certificate verification failed");
         return -1;
     }
     int repeater = payload[0] != 0;
@@ -309,7 +370,7 @@ static int run_shared_ake(OizysDriver *driver) {
     }
 
     uint8_t km[16], encrypted_km[128];
-    oizys_hdcp_random(km, sizeof(km));
+    if (oizys_hdcp_random(km, sizeof(km)) < 0) return -1;
     if (oizys_hdcp_rsa_oaep_encrypt(driver->modulus, driver->exponent, km, encrypted_km) != 0) {
         return -1;
     }
@@ -340,7 +401,7 @@ static int run_shared_ake(OizysDriver *driver) {
     (void)receive_hdcp(session, &message_id, payload, sizeof(payload), &payload_len);
 
     uint8_t rn[8];
-    oizys_hdcp_random(rn, sizeof(rn));
+    if (oizys_hdcp_random(rn, sizeof(rn)) < 0) return -1;
     length = oizys_hdcp_lc_init(packet, sizeof(packet), hdcp_seq++, 0, rn);
     if (write_control(session, packet, length, "shared locality check") < 0) {
         return -1;
@@ -358,8 +419,8 @@ static int run_shared_ake(OizysDriver *driver) {
     oizys_log("shared L-prime verified");
 
     uint8_t delivered_nonce[8], encrypted_session_key[16];
-    oizys_hdcp_random(driver->control_key, sizeof(driver->control_key));
-    oizys_hdcp_random(delivered_nonce, sizeof(delivered_nonce));
+    if (oizys_hdcp_random(driver->control_key, sizeof(driver->control_key)) < 0 ||
+        oizys_hdcp_random(delivered_nonce, sizeof(delivered_nonce)) < 0) return -1;
     oizys_hdcp_ske_edkey(km, rtx, rrx, rn, driver->control_key, encrypted_session_key);
     length = oizys_hdcp_ske_send_eks(packet, sizeof(packet), hdcp_seq++, 0,
                                      encrypted_session_key, delivered_nonce);
@@ -482,11 +543,11 @@ static int configure_one_head(OizysDriver *driver, uint8_t head) {
     uint8_t rtx[8], km[16], rn[8], raw_video_key[16], delivered_nonce[8];
     uint8_t encrypted_km[128], encrypted_video_key[16], rrx[8], kd[32], v[32];
     int have_rrx = 0;
-    oizys_hdcp_random(rtx, sizeof(rtx));
-    oizys_hdcp_random(km, sizeof(km));
-    oizys_hdcp_random(rn, sizeof(rn));
-    oizys_hdcp_random(raw_video_key, sizeof(raw_video_key));
-    oizys_hdcp_random(delivered_nonce, sizeof(delivered_nonce));
+    if (oizys_hdcp_random(rtx, sizeof(rtx)) < 0 ||
+        oizys_hdcp_random(km, sizeof(km)) < 0 ||
+        oizys_hdcp_random(rn, sizeof(rn)) < 0 ||
+        oizys_hdcp_random(raw_video_key, sizeof(raw_video_key)) < 0 ||
+        oizys_hdcp_random(delivered_nonce, sizeof(delivered_nonce)) < 0) return -1;
     if (oizys_hdcp_rsa_oaep_encrypt(driver->modulus, driver->exponent, km, encrypted_km) != 0) {
         return -1;
     }
@@ -515,30 +576,30 @@ static int configure_one_head(OizysDriver *driver, uint8_t head) {
             switch (index) {
             case 0:
                 memcpy(plain + 28, rtx, 8);
-                oizys_hdcp_random(plain + 36, 12);
+                if (oizys_hdcp_random(plain + 36, 12) < 0) return -1;
                 break;
             case 1: {
                 static const uint8_t tx_info[5] = {0, 6, 2, 0, 2};
                 memcpy(plain + 28, tx_info, sizeof(tx_info));
-                oizys_hdcp_random(plain + 33, 15);
+                if (oizys_hdcp_random(plain + 33, 15) < 0) return -1;
                 break;
             }
             case 2:
                 memcpy(plain + 28, encrypted_km, 128);
-                oizys_hdcp_random(plain + 156, 4);
+                if (oizys_hdcp_random(plain + 156, 4) < 0) return -1;
                 break;
             case 3:
                 memcpy(plain + 28, rn, 8);
-                oizys_hdcp_random(plain + 36, 12);
+                if (oizys_hdcp_random(plain + 36, 12) < 0) return -1;
                 break;
             case 4:
                 memcpy(plain + 28, encrypted_video_key, 16);
                 memcpy(plain + 44, delivered_nonce, 8);
-                oizys_hdcp_random(plain + 52, 12);
+                if (oizys_hdcp_random(plain + 52, 12) < 0) return -1;
                 break;
             case 5:
                 memcpy(plain + 28, v + 16, 16);
-                oizys_hdcp_random(plain + 44, 4);
+                if (oizys_hdcp_random(plain + 44, 4) < 0) return -1;
                 break;
             }
         } else if (index == 6) {
@@ -546,15 +607,15 @@ static int configure_one_head(OizysDriver *driver, uint8_t head) {
             plain[27] = 0x10;
             put_u32(plain + 32, 1);
             put_u32(plain + 36, (uint32_t)(0x08 | head));
-            oizys_hdcp_random(plain + 40, 8);
+            if (oizys_hdcp_random(plain + 40, 8) < 0) return -1;
         } else if (index == 7) {
-            oizys_hdcp_random(plain + 22, 10);
+            if (oizys_hdcp_random(plain + 22, 10) < 0) return -1;
         } else {
             plain[22] = head;
             plain[24] = 0x06;
             plain[25] = (uint8_t)(head * 4);
             plain[26] = 0x04;
-            oizys_hdcp_random(plain + 27, 5);
+            if (oizys_hdcp_random(plain + 27, 5) < 0) return -1;
         }
         if (send_inner(driver, steps[index].id, plain, steps[index].length,
                        "per-head control") < 0) {
@@ -590,7 +651,7 @@ static int configure_control(OizysDriver *driver) {
     }
     uint8_t plain[32];
     inner_header(plain, sizeof(plain), 0x14, 0, driver->inner_counter);
-    oizys_hdcp_random(plain + 22, 10);
+    if (oizys_hdcp_random(plain + 22, 10) < 0) return -1;
     if (send_inner(driver, 0x14, plain, sizeof(plain), "first encrypted control") < 0) {
         return -1;
     }
@@ -608,7 +669,7 @@ static int configure_control(OizysDriver *driver) {
     for (size_t i = 0; i < sizeof(setup) / sizeof(setup[0]); i++) {
         inner_header(plain, sizeof(plain), setup[i].id, setup[i].sub,
                      driver->inner_counter);
-        oizys_hdcp_random(plain + 22, 10);
+        if (oizys_hdcp_random(plain + 22, 10) < 0) return -1;
         memcpy(plain + 22, setup[i].prefix, setup[i].prefix_len);
         if (send_inner(driver, setup[i].id, plain, sizeof(plain), "control setup") < 0) {
             return -1;
@@ -628,9 +689,9 @@ static int configure_control(OizysDriver *driver) {
             plain[22] = head;
             if (finalize[i][1] == 0x4c) {
                 plain[23] = 1;
-                oizys_hdcp_random(plain + 24, 8);
+                if (oizys_hdcp_random(plain + 24, 8) < 0) return -1;
             } else {
-                oizys_hdcp_random(plain + 23, 9);
+                if (oizys_hdcp_random(plain + 23, 9) < 0) return -1;
             }
             if (send_inner(driver, finalize[i][0], plain, sizeof(plain), "head finalize") < 0) {
                 return -1;
@@ -653,9 +714,9 @@ static int send_edid_message(OizysDriver *driver, uint16_t id, uint16_t sub, uin
     plain[22] = selector;
     if (id == 0x16 && (sub == 0x23 || sub == 0x4b)) {
         plain[23] = state;
-        oizys_hdcp_random(plain + 24, 8);
+        if (oizys_hdcp_random(plain + 24, 8) < 0) return -1;
     } else {
-        oizys_hdcp_random(plain + 23, 9);
+        if (oizys_hdcp_random(plain + 23, 9) < 0) return -1;
     }
     return send_inner(driver, id, plain, sizeof(plain), name);
 }
@@ -1371,7 +1432,7 @@ static int build_video_arm(ByteBuffer *arm, OizysDriver *driver, uint8_t head) {
         memset(body, 0, sizeof(body));
         static const uint8_t marker[6] = {0x04, 0x00, 0x08, 0x04, 0x03, 0x00};
         memcpy(body, marker, sizeof(marker));
-        oizys_hdcp_random(body + 6, 10);
+        if (oizys_hdcp_random(body + 6, 10) < 0) return -1;
         sub = (uint16_t)((i ? 0x18 : 0x08) + head);
         if (append_sealed_arm(arm, driver, head, sub, 0x0a, (uint32_t)i, body,
                               sizeof(body)) < 0) return -1;
@@ -1399,7 +1460,7 @@ static int build_video_arm(ByteBuffer *arm, OizysDriver *driver, uint8_t head) {
     for (int i = 0; i < 2; i++) {
         uint8_t config[1104];
         uint8_t nonce[14];
-        oizys_hdcp_random(nonce, sizeof(nonce));
+        if (oizys_hdcp_random(nonce, sizeof(nonce)) < 0) return -1;
         if (build_decoder_config(config, 1920, 1080, nonce) != sizeof(config)) return -1;
         sub = (uint16_t)((i ? 0x18 : 0x08) + head);
         uint32_t seq = i ? 71 : 2;
@@ -1407,40 +1468,6 @@ static int build_video_arm(ByteBuffer *arm, OizysDriver *driver, uint8_t head) {
                               sizeof(config)) < 0) return -1;
     }
     return arm->length == 2560 ? 0 : -1;
-}
-
-int oizys_video_plan_usb_chunks(const void *bytes, size_t length, size_t transfer_size,
-                                OizysUSBChunk *chunks, int max_chunks) {
-    if (transfer_size == 0) {
-        return -1;
-    }
-    if (length == 0) {
-        return 0;
-    }
-    if (!bytes) {
-        return -1;
-    }
-    size_t needed64 = (length + transfer_size - 1) / transfer_size;
-    if (needed64 > (size_t)INT_MAX) {
-        return -1;
-    }
-    int needed = (int)needed64;
-    if (!chunks) {
-        return needed;
-    }
-    if (max_chunks < needed) {
-        return -1;
-    }
-    const uint8_t *cursor = (const uint8_t *)bytes;
-    size_t remaining = length;
-    for (int i = 0; i < needed; i++) {
-        size_t n = remaining > transfer_size ? transfer_size : remaining;
-        chunks[i].bytes = cursor;
-        chunks[i].length = n;
-        cursor += n;
-        remaining -= n;
-    }
-    return needed;
 }
 
 /*
@@ -1522,7 +1549,7 @@ static int send_solid_frame(OizysDriver *driver, uint8_t head, int with_arm, uin
 static int send_random_tail(OizysDriver *driver, uint16_t id, uint16_t sub, const char *name) {
     uint8_t plain[32];
     inner_header(plain, sizeof(plain), id, sub, driver->inner_counter);
-    oizys_hdcp_random(plain + 22, 10);
+    if (oizys_hdcp_random(plain + 22, 10) < 0) return -1;
     if (send_inner(driver, id, plain, sizeof(plain), name) < 0) {
         return -1;
     }
@@ -1535,7 +1562,7 @@ static int send_marker(OizysDriver *driver, uint8_t head, uint16_t sub, uint8_t 
     inner_header(plain, sizeof(plain), 0x16, sub, driver->inner_counter);
     plain[22] = head;
     plain[23] = state;
-    oizys_hdcp_random(plain + 24, 8);
+    if (oizys_hdcp_random(plain + 24, 8) < 0) return -1;
     return send_inner(driver, 0x16, plain, sizeof(plain), "stream marker");
 }
 
@@ -1543,7 +1570,7 @@ static int send_stream_commit(OizysDriver *driver, uint8_t head) {
     uint8_t plain[32];
     inner_header(plain, sizeof(plain), 0x16, 0x4c, driver->inner_counter);
     plain[22] = head ? 1 : 0;
-    oizys_hdcp_random(plain + 24, 8);
+    if (oizys_hdcp_random(plain + 24, 8) < 0) return -1;
     return send_inner(driver, 0x16, plain, sizeof(plain), "stream commit");
 }
 
@@ -1759,8 +1786,8 @@ static int submit_strip_frame(OizysDriver *driver, uint8_t head, const OizysStri
                               int count, int presentations) {
     OIZYS_PROFILE_BEGIN(submit, OIZYS_ZONE_SUBMIT);
     driver->last_video_ns[head] = monotonic_ns();
-    ByteBuffer stream;
-    if (buffer_init(&stream, 512 * 1024) < 0) {
+    ByteBuffer stream = {driver->stream_bytes[head], 0, driver->stream_capacity[head]};
+    if (!stream.bytes && buffer_init(&stream, 512 * 1024) < 0) {
         OIZYS_PROFILE_END(submit, OIZYS_ZONE_SUBMIT);
         return -1;
     }
@@ -1776,7 +1803,9 @@ static int submit_strip_frame(OizysDriver *driver, uint8_t head, const OizysStri
         rc = submit_video(driver, head, &stream);
         driver->frame_seq[head]++;
     }
-    buffer_free(&stream);
+    /* Keep whatever capacity the frame grew to; the buffer is reused, not freed. */
+    driver->stream_bytes[head] = stream.bytes;
+    driver->stream_capacity[head] = stream.capacity;
     OIZYS_PROFILE_END(submit, OIZYS_ZONE_SUBMIT);
     return rc;
 }
@@ -2090,7 +2119,23 @@ int oizys_driver_service_control(OizysDriver *driver) {
     OIZYS_PROFILE_BEGIN(control, OIZYS_ZONE_CONTROL);
     int rc = service_control(driver);
     OIZYS_PROFILE_END(control, OIZYS_ZONE_CONTROL);
+    if (driver) {
+        atomic_store_explicit(&driver->serviced_ns, monotonic_ns(), memory_order_relaxed);
+    }
     return rc;
+}
+
+int oizys_driver_service_age_ms(const OizysDriver *driver) {
+    if (!driver) {
+        return -1;
+    }
+    uint64_t serviced = atomic_load_explicit(&driver->serviced_ns, memory_order_relaxed);
+    if (!serviced) {
+        return -1;
+    }
+    uint64_t now = monotonic_ns();
+    uint64_t age = now > serviced ? (now - serviced) / 1000000ull : 0;
+    return age > INT_MAX ? INT_MAX : (int)age;
 }
 
 void oizys_driver_destroy(OizysDriver *driver) {
@@ -2099,6 +2144,7 @@ void oizys_driver_destroy(OizysDriver *driver) {
             for (int strip = 0; strip < OIZYS_MAX_STRIPS; strip++) {
                 free(driver->strip_body[head][strip]);
             }
+            free(driver->stream_bytes[head]);
         }
         memset(driver, 0, sizeof(*driver));
         free(driver);

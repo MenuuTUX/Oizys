@@ -10,74 +10,104 @@ struct MenuPopover: View {
     @ObservedObject var model: OizysModel
     var openWindow: () -> Void
     var quit: () -> Void
+    var refresh: () -> Void = {}
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ZStack(alignment: .bottomLeading) {
-                LogoHeader(height: 108, active: model.running)
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("OIZYS").font(.system(size: 17, weight: .light)).tracking(6)
-                        .foregroundStyle(Ink.primary)
-                    HStack(spacing: 6) {
-                        StatusDot(health: model.health)
-                        Text(model.summary).font(.system(size: 11)).foregroundStyle(Ink.secondary)
+        VStack(spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("OIZYS").font(.system(size: 17, weight: .regular)).tracking(6)
+                            .foregroundStyle(Ink.primary)
+                        HStack(spacing: 6) {
+                            StatusDot(health: model.health)
+                            Text(model.summary).font(.callout).foregroundStyle(Ink.secondary)
+                        }
                     }
+                    .padding(.horizontal, 16).padding(.top, 14).padding(.bottom, 10)
+
+                    VStack(alignment: .leading, spacing: 0) {
+                        if model.health != .live {
+                            Text(model.connectionHint)
+                                .font(.callout).foregroundStyle(Ink.secondary)
+                                .padding(.vertical, 6)
+                            if model.supervisorStatus?.phase == .recovering {
+                                RecoveryElapsed(since: model.connectionChangedAt)
+                            }
+                        }
+                        if model.health == .live {
+                            SectionLabel(text: "Picture brightness")
+                            ForEach(model.displays.filter { $0.head != nil }) { display in
+                                if let head = display.head {
+                                    let value = model.headBrightness(head)
+                                    HStack(spacing: 8) {
+                                        Text(head == 0 ? "Left" : "Right").font(.callout)
+                                            .frame(width: 42, alignment: .leading)
+                                        HalftoneSlider(value: Binding(
+                                            get: { (model.headBrightness(head) - 10) / 90 },
+                                            set: { model.setHeadBrightness(head, 10 + $0 * 90,
+                                                                           persist: false) }),
+                                                       onCommit: { model.setHeadBrightness(head, 10 + $0 * 90) },
+                                                       label: "\(display.name) picture brightness",
+                                                       announcedValue: "\(Int(value)) percent")
+                                        Text("\(Int(value))%").font(Ink.value)
+                                            .frame(width: 42, alignment: .trailing)
+                                    }
+                                    .padding(.vertical, 5)
+                                    HStack {
+                                        Spacer()
+                                        QuietButton(title: "Reset \(head == 0 ? "left" : "right") to 100%",
+                                                    disabled: value == 100) { model.setHeadBrightness(head, 100) }
+                                    }
+                                }
+                            }
+                        }
+                        SectionLabel(text: "Displays", trailing: model.displays.isEmpty ? nil : "\(model.displays.count)")
+                        if model.displays.isEmpty {
+                            Text("No displays reported.").font(Ink.label).foregroundStyle(Ink.faint)
+                                .padding(.vertical, 6)
+                        }
+                        ForEach(model.displays) { display in
+                            Row(label: display.name, detail: display.geometry) {
+                                Text(display.kind.rawValue).foregroundStyle(Ink.faint)
+                            }
+                        }
+
+                        SectionLabel(text: "Driver")
+                        Row(label: "Service", detail: model.dockPresent ? nil :
+                            model.dockCount > 1 ? "Disconnect one dock to start." : "Connect the dock to start.") {
+                            HStack(spacing: 6) {
+                                StatusDot(health: model.health)
+                                Text(model.dockPresent && !model.screenRecordingGranted
+                                     ? "Permission needed" : model.running ? "Service active" : "Stopped")
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 16).padding(.bottom, 14)
                 }
-                .padding(.leading, 16).padding(.bottom, 10)
             }
-
-            VStack(alignment: .leading, spacing: 0) {
-                SectionLabel(text: "Displays", trailing: model.displays.isEmpty ? nil : "\(model.displays.count)")
-                if model.displays.isEmpty {
-                    Text("No displays reported.").font(Ink.label).foregroundStyle(Ink.faint)
-                        .padding(.vertical, 6)
+            Divider()
+            VStack(alignment: .leading, spacing: 8) {
+                if !model.lastMessage.isEmpty {
+                    Text(model.lastMessage).font(.caption).foregroundStyle(Ink.faint)
+                        .lineLimit(2)
                 }
-                ForEach(model.displays) { display in
-                    Row(label: display.name, detail: display.geometry) {
-                        Text(display.kind.rawValue).foregroundStyle(Ink.faint)
-                    }
-                }
-
-                SectionLabel(text: "Driver")
-                Row(label: "Status", detail: model.dockPresent ? nil : "Connect the dock to start.") {
-                    HStack(spacing: 6) {
-                        StatusDot(health: model.health)
-                        Text(model.running ? "Running" : "Stopped")
-                    }
-                }
-                Row(label: "Start at login") {
-                    QuietSwitch(isOn: Binding(get: { model.loginEnabled },
-                                              set: { model.setLoginStart($0) }))
-                }
-                Row(label: "Announce new displays", detail: "A short ripple on the screen that just arrived.") {
-                    HStack(spacing: 8) {
-                        QuietButton(title: "Preview") { ConnectOverlay.preview(model: model) }
-                        QuietSwitch(isOn: Binding(get: { ConnectOverlay.enabled },
-                                                  set: { ConnectOverlay.enabled = $0 }))
-                    }
-                }
-
-                MenuBarSection()
-
                 HStack(spacing: 8) {
-                    QuietButton(title: model.running ? "Stop" : "Start") {
-                        model.running ? model.stop() : model.start()
+                    QuietButton(title: model.primaryActionTitle,
+                                disabled: !model.primaryActionEnabled,
+                                prominent: true, defaultAction: true) {
+                        model.performPrimaryAction()
+                        refresh()
                     }
                     QuietButton(title: "Open Oizys…", action: openWindow)
                     Spacer()
                     QuietButton(title: "Quit", action: quit)
                 }
-                .padding(.top, 14)
-
-                if !model.lastMessage.isEmpty {
-                    Text(model.lastMessage).font(.system(size: 10)).foregroundStyle(Ink.faint)
-                        .lineLimit(2).padding(.top, 8)
-                }
             }
-            .padding(.horizontal, 16).padding(.bottom, 14)
+            .padding(.horizontal, 16).padding(.vertical, 12)
         }
         .frame(width: 330)
-        .background(Ink.ground)
+        .background(.regularMaterial)
         .onAppear { model.refresh() }
     }
 }
@@ -87,18 +117,17 @@ private struct MenuBarSection: View {
     @State private var preferenceFailed = false
 
     var body: some View {
-        SectionLabel(text: "Menu bar")
         Row(label: "Screen mirroring module",
             detail: "Show the optional Screen Mirroring shortcut in the menu bar.") {
             QuietSwitch(isOn: Binding(get: { mirroringIcon },
                                       set: { value in
                 preferenceFailed = !MenuBarExtras.setMirroringIconVisible(value)
                 mirroringIcon = MenuBarExtras.mirroringIconVisible
-            }))
+            }), label: "Screen mirroring module")
         }
         if preferenceFailed {
             Text("Could not save the menu-bar preference. Try System Settings.")
-                .font(.system(size: 10)).foregroundStyle(Ink.faint)
+                .font(.caption).foregroundStyle(Ink.faint)
         }
         Row(label: "Screen recording permission",
             detail: MenuBarExtras.screenRecordingGranted
@@ -106,20 +135,25 @@ private struct MenuBarSection: View {
                 : "Required to send the dock desktops to your monitors.") {
             QuietButton(title: "Settings…") { MenuBarExtras.openScreenRecordingSettings() }
         }
+        Row(label: "Menu bar item",
+            detail: "Oizys can run without its menu bar item; reopen it from Spotlight.") {
+            QuietSwitch(isOn: Binding(get: { OizysMenuBar.extraVisible },
+                                      set: { OizysMenuBar.setExtraVisibleRequest($0) }),
+                        label: "Menu bar item")
+        }
         Text("Oizys installs one menu-bar item. macOS shows the purple status item while "
              + "screen capture or Sidecar is active; that one is not Oizys's, and no "
              + "supported API hides it. The shortcut setting above does not remove an "
              + "active session's indicator.")
-            .font(.system(size: 10)).foregroundStyle(Ink.faint).padding(.top, 6)
+            .font(.caption).foregroundStyle(Ink.faint).padding(.top, 6)
     }
 }
 
 // MARK: - Window
 
 enum Panel: String, CaseIterable, Identifiable {
-    case displays = "Displays", power = "Power & standby", sidecar = "Sidecar"
-    case calibrate = "Colour", ports = "USB ports", settings = "All settings"
-    case about = "How it works", info = "About"
+    case overview = "Overview", displays = "Displays", arrangement = "Arrangement"
+    case calibrate = "Colour", diagnostics = "Diagnostics", settings = "Settings"
     var id: String { rawValue }
 }
 
@@ -127,80 +161,55 @@ struct MenuWindow: View {
     @ObservedObject var model: OizysModel
     @State private var panel: Panel
 
-    init(model: OizysModel, initial: Panel = .displays) {
+    init(model: OizysModel, initial: Panel = .overview) {
         self.model = model
         _panel = State(initialValue: initial)
     }
 
     var body: some View {
         HStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 8) {
-                    if let mark = Logo.template(side: 20, floor: 0.34, boost: 2.6) {
-                        Image(nsImage: mark).renderingMode(.template)
-                            .foregroundStyle(Ink.primary).frame(width: 22, height: 22)
+            VStack(spacing: 0) {
+                List(selection: $panel) {
+                    ForEach(Panel.allCases) { entry in
+                        Text(entry.rawValue).tag(entry)
                     }
-                    Text("OIZYS").font(.system(size: 13, weight: .light)).tracking(4.5)
-                        .foregroundStyle(Ink.primary)
                 }
-                .padding(.bottom, 12).padding(.leading, 10)
-                ForEach(Panel.allCases) { entry in
-                    Button { panel = entry } label: {
-                        Text(entry.rawValue).font(Ink.label)
-                            .foregroundStyle(panel == entry ? Ink.primary : Ink.secondary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, 10).padding(.vertical, 6)
-                            .background(RoundedRectangle(cornerRadius: 6)
-                                .fill(panel == entry ? Ink.raised : .clear))
-                    }
-                    .buttonStyle(.plain)
-                }
-                Spacer()
+                .listStyle(.sidebar)
+                .frame(width: 184)
                 HStack(spacing: 6) {
                     StatusDot(health: model.health)
-                    Text(model.summary).font(.system(size: 10)).foregroundStyle(Ink.faint)
+                    Text(model.summary).font(.caption).foregroundStyle(Ink.faint)
                 }
-                .padding(.leading, 10).padding(.bottom, 4)
+                .padding(10)
             }
-            .frame(width: 172).padding(12)
-            .background(Ink.panel)
+            .frame(width: 184)
 
-            Divider().overlay(Ink.hairline)
+            Divider()
 
             ScrollView {
                 PanelBody(model: model, panel: panel)
             }
-            .background(
-                ZStack {
-                    Ink.ground
-                    Grain(opacity: 0.045)
-                    Vignette(strength: 0.42)
-                }
-            )
         }
         .frame(minWidth: 720, minHeight: 480)
-        .background(Ink.ground)
         .onAppear { model.refresh(); model.refreshSlowly() }
     }
 }
 
-/// The content of one section. Extracted from the window so it can be rendered on its own:
-/// ImageRenderer does not lay out a ScrollView's content offscreen, so a review render of the
-/// window alone shows an empty pane and proves nothing.
+/// Render sections separately to review the content below the window's scroll viewport.
 struct PanelBody: View {
     @ObservedObject var model: OizysModel
     let panel: Panel
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             switch panel {
+            case .overview: OverviewPanel(model: model)
             case .displays: DisplaysPanel(model: model)
-            case .power: PowerPanel(model: model)
-            case .sidecar: SidecarPanel(model: model)
+            case .arrangement: ArrangementPanel(model: model)
             case .calibrate: ColourPanel(model: model)
-            case .ports: PortsPanel(model: model)
+            case .diagnostics:
+                ConnectionPanel(model: model)
+                PortsPanel(model: model)
             case .settings: SettingsPanel(model: model)
-            case .about: AboutPanel(model: model)
-            case .info: InfoPanel(model: model)
             }
         }
         .padding(.horizontal, 22).padding(.vertical, 16)
@@ -209,6 +218,122 @@ struct PanelBody: View {
 }
 
 // MARK: - Panels
+
+private struct RecoveryElapsed: View {
+    let since: Date
+    var body: some View {
+        TimelineView(.periodic(from: since, by: 1)) { context in
+            Text("Recovering for \(max(0, Int(context.date.timeIntervalSince(since)))) seconds")
+                .font(.caption).foregroundStyle(Ink.secondary)
+        }
+    }
+}
+
+private struct ConnectionPanel: View {
+    @ObservedObject var model: OizysModel
+    var body: some View {
+        SectionLabel(text: "Connection")
+        HStack(spacing: 8) {
+            StatusDot(health: model.health)
+            Text(model.summary).font(.headline).foregroundStyle(Ink.primary)
+        }
+        Text(model.connectionHint).font(.callout).foregroundStyle(Ink.secondary).padding(.vertical, 6)
+        if model.supervisorStatus?.phase == .recovering {
+            RecoveryElapsed(since: model.connectionChangedAt)
+        }
+        HStack(spacing: 8) {
+            QuietButton(title: model.primaryActionTitle,
+                        disabled: !model.primaryActionEnabled, prominent: true) {
+                model.performPrimaryAction()
+            }
+            if model.running && model.primaryActionTitle != "Stop" {
+                QuietButton(title: "Stop", disabled: model.serviceBusy) { model.stop() }
+            }
+            QuietButton(title: "Check again") { model.refresh(); model.refreshSlowly() }
+            QuietButton(title: "Export report…") { model.exportReport() }
+            Spacer()
+        }.padding(.vertical, 6)
+        if !model.lastMessage.isEmpty {
+            Text(model.lastMessage).font(.callout).foregroundStyle(Ink.secondary).padding(.top, 4)
+        }
+        DisclosureGroup("Recent connection states") {
+            SectionLabel(text: "Recent observations", trailing: "this app session")
+            ForEach(model.connectionEvents) { event in
+                Row(event.text, event.date.formatted(date: .omitted, time: .standard))
+            }
+        }.padding(.top, 10)
+    }
+}
+
+private struct OverviewPanel: View {
+    @ObservedObject var model: OizysModel
+    var body: some View {
+        ConnectionPanel(model: model)
+        SectionLabel(text: "Dock displays")
+        ForEach([0, 1], id: \.self) { head in
+            let display = model.displays.first { $0.head == head }
+            let forwarding = model.screenRecordingGranted && model.running
+                && model.supervisorStatus?.phase == .forwarding
+                && ((model.supervisorStatus?.headMask ?? 0) & (1 << head)) != 0 && display != nil
+            Row(label: head == 0 ? "Left dock display" : "Right dock display",
+                detail: display?.geometry ?? "Not online") {
+                Text(forwarding ? "Forwarding" : "Unavailable")
+            }
+        }
+        SectionLabel(text: "Arrangement")
+        ArrangementMap(displays: model.displays).frame(height: 160)
+        ForEach(model.ports.filter(\.warning)) { port in
+            Text(port.text).font(.callout).foregroundStyle(Ink.warn).padding(.top, 8)
+        }
+    }
+}
+
+private struct ArrangementMap: View {
+    let displays: [OizysDisplay]
+    var body: some View {
+        Canvas { context, size in
+            let rectangles = displays.map {
+                CGRect(origin: $0.origin, size: $0.layoutSize ?? CGSize(width: $0.width, height: $0.height))
+            }
+            let bounds = rectangles.reduce(CGRect.null) { $0.union($1) }
+            guard !bounds.isNull, bounds.width > 0, bounds.height > 0 else { return }
+            let scale = min((size.width - 24) / bounds.width, (size.height - 24) / bounds.height)
+            for (display, rectangle) in zip(displays, rectangles) {
+                let box = CGRect(x: 12 + (rectangle.minX - bounds.minX) * scale,
+                                 y: 12 + (rectangle.minY - bounds.minY) * scale,
+                                 width: rectangle.width * scale, height: rectangle.height * scale)
+                context.fill(Path(roundedRect: box.insetBy(dx: 2, dy: 2), cornerRadius: 4), with: .color(Ink.panel))
+                context.stroke(Path(roundedRect: box.insetBy(dx: 2, dy: 2), cornerRadius: 4), with: .color(Ink.hairline))
+                let label = display.head.map { $0 == 0 ? "Left" : "Right" } ?? display.kind.rawValue
+                context.draw(Text(label).font(.caption).foregroundStyle(Ink.primary), at: CGPoint(x: box.midX, y: box.midY))
+            }
+        }
+        .accessibilityLabel("Display arrangement")
+        .accessibilityValue(displays.map { "\($0.name), x \(Int($0.origin.x)), y \(Int($0.origin.y))" }.joined(separator: "; "))
+    }
+}
+
+private struct ArrangementPanel: View {
+    @ObservedObject var model: OizysModel
+    var body: some View {
+        SectionLabel(text: "Display arrangement")
+        ArrangementMap(displays: model.displays).frame(height: 180)
+        Text("Position and mirroring changes have a 15-second Keep or Revert confirmation.")
+            .font(.callout).foregroundStyle(Ink.secondary).padding(.vertical, 8)
+        ForEach(model.displays) { display in
+            SectionLabel(text: display.name, trailing: display.main ? "main" : nil)
+            PlacementRows(model: model, display: display)
+        }
+        Row(label: "Keep the other screens' resolutions") {
+            QuietSwitch(isOn: Binding(
+                get: { model.setting("display.keep_modes", "true") == "true" },
+                set: { model.set("display.keep_modes", $0 ? "true" : "false") }),
+                        label: "Keep the other screens' resolutions")
+        }
+        QuietButton(title: "Open Displays settings…") { DisplaySettings.openDisplaysSettings() }
+            .padding(.top, 10)
+    }
+}
 
 private struct DisplaysPanel: View {
     @ObservedObject var model: OizysModel
@@ -219,20 +344,8 @@ private struct DisplaysPanel: View {
             DisplayCard(model: model, display: display)
         }
         NightShiftRows()
-
-        SectionLabel(text: "Arrangement")
-        Row(label: "Keep the other screens' resolutions",
-            detail: "macOS stores a resolution per set of screens, and the set with the "
-                    + "heads in it gets a smaller one.") {
-            QuietSwitch(isOn: Binding(
-                get: { model.setting("display.keep_modes", "true") == "true" },
-                set: { model.set("display.keep_modes", $0 ? "true" : "false") }))
-        }
-        Text("Off, macOS decides the resolution of every screen each time the heads appear. "
-             + "Turn it off if you want a different resolution while the dock is attached and "
-             + "you would rather set that up yourself — Oizys adopts a resolution you choose "
-             + "yourself a few seconds after the screens settle, so it will not fight you.")
-            .font(.system(size: 10)).foregroundStyle(Ink.faint).padding(.top, 4)
+        DisclosureGroup("iPad and Sidecar") { SidecarPanel(model: model) }.padding(.top, 14)
+        DisclosureGroup("Shared power settings") { PowerPanel(model: model) }.padding(.top, 14)
 
         SectionLabel(text: "What macOS keeps to itself")
         Text("HDR, Presets, True Tone and the display colour profile have no route out of "
@@ -240,7 +353,7 @@ private struct DisplaysPanel: View {
              + "driven over the dock has no framebuffer for. Everything else the Displays "
              + "pane does is above. Oizys has its own answer to the colour profile: the "
              + "Colour panel measures a head and stores a per-channel correction for it.")
-            .font(.system(size: 10)).foregroundStyle(Ink.faint)
+            .font(.caption).foregroundStyle(Ink.faint)
         HStack(spacing: 8) {
             QuietButton(title: "Open Displays settings…") {
                 DisplaySettings.openDisplaysSettings()
@@ -288,10 +401,10 @@ private struct DisplayCard: View {
         if let head = display.head {
             HeadBrightnessRow(model: model, head: head)
             HeadContrastRow(model: model, head: head)
+            HeadPowerRows(model: model, head: head)
         } else if display.kind != .sidecar {
             BrightnessRow(model: model, display: display)
         }
-        PlacementRows(model: model, display: display)
     }
 }
 
@@ -302,8 +415,12 @@ private struct ModeRows: View {
     let display: OizysDisplay
 
     var body: some View {
-        let modes = DisplaySettings.modes(display.id)
-        let now = DisplaySettings.current(display.id)
+        let modes = model.isPreview
+            ? [DisplaySettings.Mode(index: 0, width: display.width, height: display.height,
+                                    pixelWidth: display.width, pixelHeight: display.height,
+                                    refresh: display.refresh)]
+            : DisplaySettings.modes(display.id)
+        let now = model.isPreview ? modes.first : DisplaySettings.current(display.id)
         if modes.isEmpty {
             Row(label: "Resolution", detail: "This display did not report a mode list.") {
                 Text("—")
@@ -311,22 +428,31 @@ private struct ModeRows: View {
         } else {
             // One entry per size; the rate control below picks among that size's rates.
             let sizes = sizeOptions(modes)
+            let selectedSize = now.flatMap { current in
+                sizes.first { $0.width == current.width && $0.height == current.height
+                    && $0.hiDPI == current.hiDPI }
+            }
+            let options = sizes.map { ($0.label, $0.index) }
+                + (selectedSize == nil ? [("\(display.width) × \(display.height)", -1)] : [])
             VStack(alignment: .leading, spacing: 6) {
                 Text("RESOLUTION").font(Ink.section).tracking(1.1).foregroundStyle(Ink.faint)
-                ChipChoice(options: sizes.map { ($0.label, $0.index) },
-                           selection: Binding(get: { now?.index ?? -1 },
-                                              set: { apply(modes, $0) }))
+                ChipChoice(options: options,
+                           selection: Binding(get: { selectedSize?.index ?? -1 },
+                                              set: { apply(modes, $0) }),
+                           label: "Resolution")
             }
             .padding(.vertical, 8)
             .overlay(alignment: .bottom) { Rectangle().fill(Ink.hairline).frame(height: 1) }
 
-            if let now, case let rates = DisplaySettings.rates(display.id, like: now),
+            if let now, case let rates = modes.filter({
+                $0.width == now.width && $0.height == now.height && $0.hiDPI == now.hiDPI
+            }),
                rates.count > 1 {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("REFRESH RATE").font(Ink.section).tracking(1.1).foregroundStyle(Ink.faint)
                     ChipChoice(options: rates.map { ($0.rate, $0.index) },
                                selection: Binding(get: { now.index }, set: { apply(modes, $0) }),
-                               minimum: 64)
+                               label: "Refresh rate")
                 }
                 .padding(.vertical, 8)
                 .overlay(alignment: .bottom) { Rectangle().fill(Ink.hairline).frame(height: 1) }
@@ -343,8 +469,8 @@ private struct ModeRows: View {
 
     private func apply(_ modes: [DisplaySettings.Mode], _ index: Int) {
         guard let mode = modes.first(where: { $0.index == index }) else { return }
-        DisplaySettings.apply(display.id, mode)
-        model.refresh()
+        if DisplaySettings.apply(display.id, mode) { model.refresh() }
+        else { model.lastMessage = "Could not change this display mode." }
     }
 }
 
@@ -374,10 +500,10 @@ private struct PlacementRows: View {
                         + (run.count > 1 ? ". Moves both heads: the driver seats them as a pair."
                                          : ".")) {
                 HStack(spacing: 4) {
-                    ForEach(DisplaySettings.Side.allCases, id: \.self) { side in
+                        ForEach(DisplaySettings.Side.allCases, id: \.self) { side in
                         QuietButton(title: side.rawValue) {
-                            DisplaySettings.placeRun(run, side, of: anchor.id)
-                            model.refresh()
+                            if DisplaySettings.placeRun(run, side, of: anchor.id) { model.refresh() }
+                            else { model.lastMessage = "Could not move the display." }
                         }
                     }
                 }
@@ -393,14 +519,15 @@ private struct PlacementRows: View {
         HStack(spacing: 8) {
             if !display.main {
                 QuietButton(title: "Make main") {
-                    DisplaySettings.makeMain(display.id)
-                    model.refresh()
+                    if DisplaySettings.makeMain(display.id) { model.refresh() }
+                    else { model.lastMessage = "Could not make this display primary." }
                 }
             }
             if display.head == nil, !display.main, let anchor, anchor.head == nil {
                 QuietButton(title: display.mirrored ? "Unmirror" : "Mirror \(anchor.name)") {
-                    DisplaySettings.mirror(display.id, of: display.mirrored ? nil : anchor.id)
-                    model.refresh()
+                    if DisplaySettings.mirror(display.id, of: display.mirrored ? nil : anchor.id) {
+                        model.refresh()
+                    } else { model.lastMessage = "Could not change mirroring." }
                 }
             }
             Spacer()
@@ -428,13 +555,18 @@ private struct NightShiftRows: View {
                                               + "is applied by the window server, above the "
                                               + "pixels Oizys reads.") {
                 QuietSwitch(isOn: Binding(get: { on },
-                                          set: { on = $0; NightShift.setEnabled($0) }))
+                                          set: { on = $0; NightShift.setEnabled($0) }),
+                                    label: "Night Shift")
             }
             Row(label: "Warmth") {
                 HStack(spacing: 10) {
                     HalftoneSlider(value: Binding(get: { Double(strength) },
-                                                  set: { strength = Float($0)
-                                                         NightShift.setStrength(Float($0)) }))
+                                                  set: { strength = Float($0) }),
+                                   onCommit: { level in
+                                       if !NightShift.setStrength(Float(level)) {
+                                           strength = NightShift.strength
+                                       }
+                                   }, label: "Night Shift warmth")
                         .frame(width: 150)
                     Text("\(Int(strength * 100))%").frame(width: 38, alignment: .trailing)
                 }
@@ -448,15 +580,19 @@ private struct HeadBrightnessRow: View {
     let head: Int
     var body: some View {
         let value = model.headBrightness(head)
-        Row(label: "Brightness",
+        Row(label: "Picture brightness",
             detail: "A gain applied while encoding, because Oizys owns every pixel this "
                     + "panel receives. It dims the picture, not the backlight.") {
             HStack(spacing: 10) {
-                HalftoneSlider(value: Binding(
-                    get: { (value - 10) / 90 },
-                    set: { model.setHeadBrightness(head, 10 + $0 * 90) }))
+                    HalftoneSlider(value: Binding(
+                        get: { (value - 10) / 90 },
+                        set: { model.setHeadBrightness(head, 10 + $0 * 90, persist: false) }),
+                                   onCommit: { model.setHeadBrightness(head, 10 + $0 * 90) },
+                                   label: head == 0 ? "Left head brightness" : "Right head brightness",
+                                   announcedValue: "\(Int(value)) percent")
                     .frame(width: 150)
                 Text("\(Int(value))%").frame(width: 38, alignment: .trailing)
+                QuietButton(title: "Reset", disabled: value == 100) { model.setHeadBrightness(head, 100) }
             }
         }
     }
@@ -471,9 +607,12 @@ private struct HeadContrastRow: View {
             detail: value > 100 ? "Above 100 clips the brightest pixels, as on a monitor."
                                 : "Pivots on mid-grey, so it goes both ways.") {
             HStack(spacing: 10) {
-                HalftoneSlider(value: Binding(
-                    get: { (value - 50) / 100 },
-                    set: { model.setHeadContrast(head, 50 + $0 * 100) }))
+                    HalftoneSlider(value: Binding(
+                        get: { (value - 50) / 100 },
+                        set: { model.setHeadContrast(head, 50 + $0 * 100, persist: false) }),
+                                   onCommit: { model.setHeadContrast(head, 50 + $0 * 100) },
+                                   label: head == 0 ? "Left head contrast" : "Right head contrast",
+                                   announcedValue: "\(Int(value)) percent")
                     .frame(width: 150)
                 Text("\(Int(value))%").frame(width: 38, alignment: .trailing)
             }
@@ -485,19 +624,26 @@ private struct BrightnessRow: View {
     @ObservedObject var model: OizysModel
     let display: OizysDisplay
     var body: some View {
-        Row(label: "Brightness", detail: model.brightness[display.id] == nil
+        let failed = model.brightnessError.contains(display.id)
+        Row(label: "Brightness", detail: failed
             ? "This monitor did not answer a DDC brightness request." : nil) {
             if let value = model.brightness[display.id] {
                 let top = model.brightnessMaximum[display.id] ?? 100
                 HStack(spacing: 10) {
                     HalftoneSlider(value: Binding(
                         get: { top > 0 ? value / top : 0 },
-                        set: { model.setBrightness(display.id, $0 * top) }))
+                        set: { model.setBrightness(display.id, $0 * top, persist: false) }),
+                                   onCommit: { model.setBrightness(display.id, $0 * top) },
+                                   label: "\(display.name) brightness",
+                                   announcedValue: "\(Int(value)) of \(Int(top))")
                         .frame(width: 150)
                     Text("\(Int(value))").frame(width: 38, alignment: .trailing)
                 }
             } else {
-                QuietButton(title: "Read") { model.readBrightness(display.id) }
+                QuietButton(title: failed ? "Retry" : "Read",
+                            disabled: model.brightnessBusy.contains(display.id)) {
+                    model.readBrightness(display.id)
+                }
             }
         }
     }
@@ -506,35 +652,7 @@ private struct BrightnessRow: View {
 private struct PowerPanel: View {
     @ObservedObject var model: OizysModel
 
-    private var heads: [OizysDisplay] {
-        model.displays.filter { $0.head != nil }.sorted { ($0.head ?? 0) < ($1.head ?? 0) }
-    }
-
     var body: some View {
-        SectionLabel(text: "Why a panel sleeps")
-        Text("Two different clocks, and they fail differently.\n\n"
-             + "macOS has one display-sleep timer covering every screen. If both monitors sleep "
-             + "together at the same interval, that is this timer, and it is the only one of "
-             + "the two that lives in System Settings.\n\n"
-             + "A monitor also sleeps on its own once its input stops changing, and every model "
-             + "has its own patience. Monitors sleeping at different times — one after four "
-             + "minutes, one straight away — is this, not macOS. An idle desktop puts zero bytes "
-             + "on the video endpoint by design, so a panel can decide nothing is arriving. "
-             + "Keep awake below is the fix, and it is per monitor because the problem is.")
-            .font(Ink.label).foregroundStyle(Ink.secondary)
-
-        ForEach(heads) { head in
-            let index = head.head ?? 0
-            SectionLabel(text: head.name, trailing: index == 0 ? "left" : "right")
-            HeadPowerRows(model: model, head: index)
-        }
-        if heads.isEmpty {
-            SectionLabel(text: "Oizys heads")
-            Text("No Oizys head is attached, so there is nothing per-monitor to set. Connect the "
-                 + "dock and these appear.")
-                .font(Ink.label).foregroundStyle(Ink.faint).padding(.vertical, 6)
-        }
-
         SectionLabel(text: "System")
         Row(label: "macOS display sleep",
             detail: "One timer for every screen; macOS exposes no per-monitor setting.") {
@@ -550,22 +668,29 @@ private struct PowerPanel: View {
                     + "nothing to send at any rate. The first change restores full speed.") {
             QuietSwitch(isOn: Binding(
                 get: { model.setting("power.saving", "true") == "true" },
-                set: { model.set("power.saving", $0 ? "true" : "false") }))
+                set: { model.set("power.saving", $0 ? "true" : "false") }),
+                          label: "Lower the frame rate when idle")
         }
         if model.setting("power.saving", "true") == "true" {
             Row(label: "Idle frame rate") {
                 SegmentedChoice(options: [("5", "5"), ("10", "10"), ("15", "15"), ("30", "30")],
                                 selection: Binding(get: { model.setting("power.idle_fps", "10") },
-                                                   set: { model.set("power.idle_fps", $0) }))
+                                                   set: { model.set("power.idle_fps", $0) }),
+                                label: "Idle frame rate")
             }
             Row(label: "Idle after") {
                 SegmentedChoice(options: [("10s", "10"), ("20s", "20"), ("60s", "60"), ("5m", "300")],
                                 selection: Binding(get: { model.setting("power.idle_after_s", "20") },
-                                                   set: { model.set("power.idle_after_s", $0) }))
+                                                   set: { model.set("power.idle_after_s", $0) }),
+                                label: "Idle after")
             }
         }
         Text("Everything here is re-read by a running driver within a second. Nothing needs a restart.")
-            .font(.system(size: 10)).foregroundStyle(Ink.faint).padding(.top, 8)
+            .font(.caption).foregroundStyle(Ink.faint).padding(.top, 8)
+        DisclosureGroup("Why a monitor sleeps") {
+            Text("macOS has one display-sleep timer for all screens. Each monitor can also sleep when its input stops changing. Use the per-display Keep awake control for a monitor that sleeps too soon, or Blank when idle to darken one monitor without removing its desktop.")
+                .font(.callout).foregroundStyle(Ink.secondary).padding(.top, 6)
+        }.padding(.top, 10)
     }
 }
 
@@ -578,27 +703,29 @@ private struct HeadPowerRows: View {
     var body: some View {
         let keepalive = model.headSetting(head, "keepalive_s", "0")
         let standby = model.headSetting(head, "standby_min", "0")
-        Row(label: "Keep awake",
+        Row(label: "Keep this display awake",
             detail: keepalive == "0"
                 ? "Off. This panel may sleep on its own once the desktop stops changing."
                 : "Repaints the cached image on this interval, so the panel never sees a still input.") {
             SegmentedChoice(options: [("Off", "0"), ("30s", "30"), ("60s", "60"), ("2m", "120")],
                             selection: Binding(get: { keepalive },
-                                               set: { model.setHeadSetting(head, "keepalive_s", $0) }))
+                                               set: { model.setHeadSetting(head, "keepalive_s", $0) }),
+                            label: "\(head == 0 ? "Left" : "Right") display keep awake")
         }
-        Row(label: "Blank when idle",
+        Row(label: "Let it blank when idle",
             detail: standby == "0"
                 ? "Off. This panel stays lit for as long as macOS keeps the desktop awake."
                 : "Goes black after this long with nothing changing. The display stays in place, "
                   + "so no window moves and the next frame brings it straight back.") {
             SegmentedChoice(options: [("Never", "0"), ("4m", "4"), ("10m", "10"), ("30m", "30")],
                             selection: Binding(get: { standby },
-                                               set: { model.setHeadSetting(head, "standby_min", $0) }))
+                                               set: { model.setHeadSetting(head, "standby_min", $0) }),
+                            label: "\(head == 0 ? "Left" : "Right") display blank when idle")
         }
         if keepalive != "0" && standby != "0" {
             Text("Blanking wins: this panel is repainted while it is in use and goes black after "
                  + standby + " minutes still.")
-                .font(.system(size: 10)).foregroundStyle(Ink.warn).padding(.top, 4)
+                .font(.caption).foregroundStyle(Ink.warn).padding(.top, 4)
         }
     }
 }
@@ -613,7 +740,6 @@ private struct SidecarPanel: View {
 
     private func setSidecar(_ key: String, _ value: String) {
         model.set("sidecar.\(key)", value)
-        SidecarAuto.shared.settingsChanged()
     }
 
     var body: some View {
@@ -630,7 +756,10 @@ private struct SidecarPanel: View {
                 HStack(spacing: 10) {
                     HalftoneSlider(value: Binding(
                         get: { (model.sidecarTint("brightness") - 10) / 90 },
-                        set: { model.setSidecarTint("brightness", 10 + $0 * 90) }))
+                        set: { model.setSidecarTint("brightness", 10 + $0 * 90, persist: false) }),
+                                   onCommit: { model.setSidecarTint("brightness", 10 + $0 * 90) },
+                                   label: "Sidecar brightness",
+                                   announcedValue: "\(Int(model.sidecarTint("brightness"))) percent")
                         .frame(width: 150)
                     Text("\(Int(model.sidecarTint("brightness")))%").frame(width: 38, alignment: .trailing)
                 }
@@ -639,7 +768,10 @@ private struct SidecarPanel: View {
                 HStack(spacing: 10) {
                     HalftoneSlider(value: Binding(
                         get: { (model.sidecarTint("contrast") - 50) / 100 },
-                        set: { model.setSidecarTint("contrast", 50 + $0 * 100) }))
+                        set: { model.setSidecarTint("contrast", 50 + $0 * 100, persist: false) }),
+                                   onCommit: { model.setSidecarTint("contrast", 50 + $0 * 100) },
+                                   label: "Sidecar contrast",
+                                   announcedValue: "\(Int(model.sidecarTint("contrast"))) percent")
                         .frame(width: 150)
                     Text("\(Int(model.sidecarTint("contrast")))%").frame(width: 38, alignment: .trailing)
                 }
@@ -648,8 +780,10 @@ private struct SidecarPanel: View {
         if let attached {
             Row(label: "Arrangement", detail: "at \(Int(attached.origin.x)),\(Int(attached.origin.y))") {
                 QuietButton(title: attached.mirrored ? "Unmirror" : "Mirror main") {
-                    model.run(["monitor", String(attached.id), "mirror",
-                               attached.mirrored ? "off" : String(CGMainDisplayID())])
+                    if DisplaySettings.mirror(attached.id,
+                                              of: attached.mirrored ? nil : CGMainDisplayID()) {
+                        model.refresh()
+                    } else { model.lastMessage = "Could not change Sidecar mirroring." }
                 }
             }
         }
@@ -661,9 +795,22 @@ private struct SidecarPanel: View {
             }
             ForEach(devices.indices, id: \.self) { index in
                 Row(label: devices[index].name) {
-                    QuietButton(title: attached == nil ? "Connect" : "Disconnect") {
-                        if attached == nil { SidecarBridge.connect(devices[index].handle) }
-                        else { SidecarBridge.disconnect(devices[index].handle) }
+                    QuietButton(title: attached == nil ? "Connect" : "Disconnect") { [model] in
+                        let sent: Bool
+                        if attached == nil {
+                            sent = SidecarBridge.connect(devices[index].handle) { [weak model] error in
+                                model?.lastMessage = error.map { "Sidecar connect failed: \($0.localizedDescription)" }
+                                    ?? "Sidecar connected."
+                                model?.refresh()
+                            }
+                        } else {
+                            sent = SidecarBridge.disconnect(devices[index].handle) { [weak model] error in
+                                model?.lastMessage = error.map { "Sidecar disconnect failed: \($0.localizedDescription)" }
+                                    ?? "Sidecar disconnected."
+                                model?.refresh()
+                            }
+                        }
+                        if !sent { model.lastMessage = "Sidecar is unavailable on this Mac." }
                     }
                 }
             }
@@ -675,7 +822,8 @@ private struct SidecarPanel: View {
                 detail: "Nothing polls for it. macOS tells Oizys when the iPad comes into "
                         + "range, and that is the only moment this looks at anything.") {
                 QuietSwitch(isOn: Binding(get: { autoConnect },
-                                          set: { setSidecar("auto_connect", $0 ? "true" : "false") }))
+                                          set: { setSidecar("auto_connect", $0 ? "true" : "false") }),
+                                    label: "Attach the iPad when it turns up")
             }
             if autoConnect {
                 Row(label: "Only at a desk",
@@ -684,7 +832,8 @@ private struct SidecarPanel: View {
                             + "there is worse than doing nothing.") {
                     QuietSwitch(isOn: Binding(
                         get: { model.setting("sidecar.require_desk", "true") == "true" },
-                        set: { setSidecar("require_desk", $0 ? "true" : "false") }))
+                        set: { setSidecar("require_desk", $0 ? "true" : "false") }),
+                                      label: "Only at a desk")
                 }
                 Row(label: "Which iPad",
                     detail: model.setting("sidecar.device", "").isEmpty
@@ -693,18 +842,19 @@ private struct SidecarPanel: View {
                     SegmentedChoice(options: [("Any", "")] + devices.map { ($0.name, $0.name) },
                                     selection: Binding(
                                         get: { model.setting("sidecar.device", "") },
-                                        set: { setSidecar("device", $0) }))
+                                        set: { setSidecar("device", $0) }),
+                                    label: "Which iPad")
                 }
                 Text("Disconnecting the iPad by hand is respected: Oizys leaves it alone for "
                      + "five minutes rather than taking the display straight back.")
-                    .font(.system(size: 10)).foregroundStyle(Ink.faint).padding(.top, 4)
+                    .font(.caption).foregroundStyle(Ink.faint).padding(.top, 4)
             }
 
             Text("macOS ships no public interface for connecting Sidecar, so this drives a private "
                  + "Apple framework. It can stop working after any macOS update, and if it does, "
                  + "this section says so rather than offering a button that does nothing. "
                  + "Everything above works through the ordinary display APIs and is unaffected.")
-                .font(.system(size: 10)).foregroundStyle(Ink.faint).padding(.top, 10)
+                .font(.caption).foregroundStyle(Ink.faint).padding(.top, 10)
         } else {
             Text("Connecting Sidecar is not available on this version of macOS. Use the Displays "
                  + "menu in Control Center; once the iPad is attached, every control above works "
@@ -733,18 +883,19 @@ private struct ColourPanel: View {
     @StateObject private var session = CalibrationSession()
 
     var body: some View {
-        SectionLabel(text: "Matching the monitors")
-        Text("An iPhone camera is not a colorimeter: iOS Safari exposes no manual exposure and "
-             + "no white-balance lock, so nothing it reports is absolute. What survives its "
-             + "pipeline is the ratio between two patches shot under the same settings, which "
-             + "is enough to make the monitors match each other — the fault people actually see.")
+        SectionLabel(text: "Match the monitors")
+            .onDisappear { session.stop() }
+        Text("Compare grey patches with an iPhone camera to make the monitors look more alike. This is a relative match, not a measured colour profile.")
             .font(Ink.label).foregroundStyle(Ink.secondary)
 
         switch session.phase {
         case .idle:
             Row(label: "Phone calibration",
-                detail: "Shows a QR code, then eight grey patches per monitor. About a minute.") {
-                QuietButton(title: "Start") { session.start() }
+                detail: model.health == .live ? "Scan a QR code, then measure eight grey patches per monitor."
+                    : "Connect both dock displays and grant Screen Recording before starting.") {
+                QuietButton(title: "Start", disabled: model.health != .live || model.configPath.isEmpty || model.isPreview) {
+                    session.start(configPath: model.configPath)
+                }
             }
         case .waitingForPhone:
             if let qr = session.qr {
@@ -755,12 +906,14 @@ private struct ColourPanel: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Scan this with the iPhone camera.")
                             .font(Ink.label).foregroundStyle(Ink.primary)
-                        Text("Safari will warn that the connection is not private. That is "
-                             + "expected: the camera is only offered over HTTPS, so Oizys serves "
-                             + "the page with its own certificate. Tap through it once, then "
-                             + "allow the camera.")
-                            .font(.system(size: 11)).foregroundStyle(Ink.faint)
-                        Text(session.address).font(.system(size: 10, design: .monospaced))
+                        Text("Before allowing camera access, compare Safari's certificate "
+                             + "SHA-256 fingerprint with this Mac. Stop if it differs or "
+                             + "Safari cannot show it.")
+                            .font(.callout).foregroundStyle(Ink.secondary)
+                        Text(session.certificateFingerprint)
+                            .font(.system(.caption2, design: .monospaced))
+                            .foregroundStyle(Ink.secondary).textSelection(.enabled)
+                        Text(session.address).font(.system(.caption, design: .monospaced))
                             .foregroundStyle(Ink.faint).textSelection(.enabled)
                         QuietButton(title: "Cancel") { session.stop() }
                     }
@@ -775,33 +928,49 @@ private struct ColourPanel: View {
                     Text("\(patch + 1)/\(total)")
                 }
             }
+            Text("Certificate SHA-256: \(session.certificateFingerprint)")
+                .font(.system(.caption2, design: .monospaced))
+                .foregroundStyle(Ink.secondary).textSelection(.enabled)
             HStack { QuietButton(title: "Stop") { session.stop() }; Spacer() }.padding(.top, 8)
         case .solving:
-            Row("Solving", "…")
+            Row(label: "Solving", detail: "The correction is saved only if this session remains active.") {
+                QuietButton(title: "Cancel") { session.stop() }
+            }
         case let .done(text):
             SectionLabel(text: "Result")
-            Text(text).font(.system(size: 11, design: .monospaced))
+            Text(text).font(.system(.callout, design: .monospaced))
                 .foregroundStyle(Ink.secondary).textSelection(.enabled)
             HStack(spacing: 8) {
-                QuietButton(title: "Run again") { session.start() }
-                QuietButton(title: "Clear") { model.run(["calibrate", "clear"]) }
+                QuietButton(title: "Run again", disabled: model.health != .live || model.configPath.isEmpty || model.isPreview) {
+                    session.start(configPath: model.configPath)
+                }
                 Spacer()
             }.padding(.top, 10)
         case let .failed(text):
-            Text(text).font(.system(size: 11)).foregroundStyle(Ink.warn).padding(.vertical, 6)
-            HStack { QuietButton(title: "Try again") { session.start() }; Spacer() }
+            Text(text).font(.callout).foregroundStyle(Ink.warn).padding(.vertical, 6)
+            HStack {
+                QuietButton(title: "Try again", disabled: model.health != .live || model.configPath.isEmpty || model.isPreview) {
+                    session.start(configPath: model.configPath)
+                }
+                Spacer()
+            }
         }
 
-        SectionLabel(text: "What this cannot do")
-        Text("No absolute colour and no accuracy figure: there is no reference in the loop, so "
-             + "there is no scale to be accurate against. It matches panels to each other, "
-             + "always by darkening — a panel cannot be driven above its own white — so the "
-             + "dimmest monitor becomes the reference.")
-            .font(.system(size: 11)).foregroundStyle(Ink.faint)
-        HStack { QuietButton(title: "Show stored correction") { model.run(["calibrate", "show"]) }; Spacer() }
+        DisclosureGroup("Measurement limits") {
+            Text("Safari does not provide exposure or white-balance lock. Camera readings are relative, so this cannot certify colour accuracy. Matching only darkens the picture; the dimmest monitor becomes the reference.")
+                .font(.callout).foregroundStyle(Ink.secondary).padding(.top, 6)
+        }.padding(.top, 14)
+        HStack(spacing: 8) {
+            QuietButton(title: "Show stored correction") { model.run(["calibrate", "show"]) }
+            QuietButton(title: "Clear stored correction", disabled: session.isActive) { model.run(["calibrate", "clear"]) }
+            if session.canUndo {
+                QuietButton(title: "Undo last calibration", disabled: session.isActive) { session.undo() }
+            }
+            Spacer()
+        }
             .padding(.top, 10)
         if !model.lastMessage.isEmpty {
-            Text(model.lastMessage).font(.system(size: 10, design: .monospaced))
+            Text(model.lastMessage).font(.system(.caption, design: .monospaced))
                 .foregroundStyle(Ink.faint).padding(.top, 6)
         }
     }
@@ -811,14 +980,11 @@ private struct PortsPanel: View {
     @ObservedObject var model: OizysModel
     var body: some View {
         SectionLabel(text: "USB ports", trailing: "read-only")
-        // A fixed-width table must not reflow: wrapping a column header onto its own line
-        // destroys the alignment that carries the meaning. The driver prints it narrow
-        // enough to fit here, and anything unexpectedly long is clipped rather than wrapped.
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: 8) {
             ForEach(model.ports) { row in
-                Text(row.text).font(.system(size: 10, design: .monospaced))
+                Text(row.text).font(.system(.caption, design: .monospaced))
                     .foregroundStyle(row.warning ? Ink.warn : Ink.secondary)
-                    .lineLimit(1).fixedSize(horizontal: false, vertical: true)
+                    .fixedSize(horizontal: false, vertical: true)
                     .textSelection(.enabled)
             }
         }
@@ -826,6 +992,9 @@ private struct PortsPanel: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(RoundedRectangle(cornerRadius: 8).fill(Ink.panel))
         .overlay(RoundedRectangle(cornerRadius: 8).stroke(Ink.hairline))
+        Text("Actual is the negotiated link rate. Capable is the USB revision's maximum. "
+             + "A powered dock's downstream power budget is not exposed to macOS.")
+            .font(.caption).foregroundStyle(Ink.faint).padding(.top, 6)
         HStack { QuietButton(title: "Scan again") { model.refreshSlowly() }; Spacer() }.padding(.top, 10)
     }
 }
@@ -834,29 +1003,65 @@ private struct SettingsPanel: View {
     @ObservedObject var model: OizysModel
     @State private var editing: String?
     @State private var draft = ""
+    @State private var search = ""
+    @FocusState private var searchFocused: Bool
+    private var filtered: [Setting] {
+        let query = search.trimmingCharacters(in: .whitespacesAndNewlines)
+        return model.settings.filter { query.isEmpty || $0.id.localizedCaseInsensitiveContains(query) }
+    }
     var body: some View {
-        SectionLabel(text: "Driver settings", trailing: "applied live")
-        ForEach(model.settings) { setting in
+        SectionLabel(text: "App settings")
+        Row(label: "Start at login") {
+            QuietSwitch(isOn: Binding(get: { model.loginEnabled }, set: { model.setLoginStart($0) }),
+                        disabled: model.serviceBusy, label: "Start at login")
+        }
+        Row(label: "Announce new displays", detail: "A short ripple on the screen that just arrived.") {
+            HStack(spacing: 8) {
+                QuietButton(title: "Preview") { ConnectOverlay.preview(model: model) }
+                QuietSwitch(isOn: Binding(get: { ConnectOverlay.enabled }, set: { ConnectOverlay.enabled = $0 }),
+                            label: "Announce new displays")
+            }
+        }
+        MenuBarSection()
+        SectionLabel(text: "Advanced driver settings", trailing: "applied live")
+        HStack(spacing: 8) {
+            TextField("Search driver settings", text: $search)
+                .textFieldStyle(.roundedBorder).accessibilityLabel("Search driver settings")
+                .focused($searchFocused)
+            Button("Find") { searchFocused = true }
+                .buttonStyle(.bordered).controlSize(.small).keyboardShortcut("f", modifiers: .command)
+                .accessibilityLabel("Find driver setting")
+        }.padding(.vertical, 6)
+        if filtered.isEmpty {
+            Text(model.settings.isEmpty ? "Driver settings have not been read yet." : "No matching settings.")
+                .font(.callout).foregroundStyle(Ink.secondary).padding(.vertical, 6)
+        }
+        ForEach(filtered) { setting in
             Row(label: setting.id,
-                detail: setting.changed ? "default \(setting.fallback)" : nil) {
+                detail: "Default: \(setting.fallback.isEmpty ? "empty" : setting.fallback)") {
                 if editing == setting.id {
                     HStack(spacing: 6) {
-                        TextField("", text: $draft)
+                        TextField("Value", text: $draft)
+                            .accessibilityLabel("\(setting.id) value")
                             .textFieldStyle(.roundedBorder).frame(width: 96).controlSize(.small)
-                            .onSubmit { model.set(setting.id, draft); editing = nil }
-                        QuietButton(title: "Set") { model.set(setting.id, draft); editing = nil }
+                            .onSubmit { save(setting) }
+                        QuietButton(title: "Set") { save(setting) }
+                        QuietButton(title: "Cancel") { editing = nil }
                     }
                 } else {
                     Button { editing = setting.id; draft = setting.value } label: {
                         Text(setting.value).foregroundStyle(setting.changed ? Ink.primary : Ink.secondary)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.link)
+                    .accessibilityLabel("Edit \(setting.id), current value \(setting.value)")
                 }
+                QuietButton(title: "Reset", disabled: !setting.changed) { model.resetSetting(setting.id) }
+                    .accessibilityLabel("Reset \(setting.id) to default")
             }
         }
         HStack(spacing: 8) {
-            QuietButton(title: "Reset all to defaults") { model.run(["config", "reset"]); model.refreshSlowly() }
-            QuietButton(title: "Restart driver") { model.restart() }
+            QuietButton(title: "Reset all to defaults") { model.run(["config", "reset"]) }
+            QuietButton(title: "Restart driver", disabled: model.serviceBusy) { model.restart() }
             Spacer()
         }
         .padding(.top, 14)
@@ -864,7 +1069,18 @@ private struct SettingsPanel: View {
              + "without a restart. Values outside a setting's safe range are clamped rather than rejected. "
              + "control.poll_ms is load-bearing: polling the dock harder than its default reads "
              + "back as a false disconnect.")
-            .font(.system(size: 10)).foregroundStyle(Ink.faint).padding(.top, 8)
+            .font(.caption).foregroundStyle(Ink.faint).padding(.top, 8)
+        if !model.lastMessage.isEmpty {
+            Text(model.lastMessage).font(.callout).foregroundStyle(Ink.secondary).padding(.top, 8)
+        }
+        DisclosureGroup("About and permission details") { InfoPanel(model: model) }.padding(.top, 14)
+        DisclosureGroup("Help: how Oizys works") { AboutPanel(model: model) }.padding(.top, 14)
+    }
+
+    private func save(_ setting: Setting) {
+        model.run(["config", "set", setting.id, draft]) { success in
+            if success { editing = nil }
+        }
     }
 }
 
@@ -921,11 +1137,10 @@ private struct InfoPanel: View {
                 }
             }
         }
-        Text("macOS ties this permission to a code signature, so a rebuilt copy of Oizys arrives "
-             + "as a stranger and has to ask again — even where System Settings still shows the "
-             + "old entry ticked. Installing clears Oizys's own entry for that reason. Nothing "
-             + "asks on its own: this button is the only thing in the app that does.")
-            .font(.system(size: 10)).foregroundStyle(Ink.faint).padding(.top, 6)
+        Text("Local development builds may need Screen Recording approved again after a rebuild. "
+             + "If the dock remains blocked while an old Oizys entry is enabled, check the current "
+             + "app in System Settings. Oizys requests access only when you press Grant.")
+            .font(.caption).foregroundStyle(Ink.faint).padding(.top, 6)
 
         SectionLabel(text: "This build")
         Row("Version", text("CFBundleShortVersionString"))
@@ -971,7 +1186,7 @@ private struct AboutPanel: View {
         Text("Each frame rides three consecutive presentations so it reaches every buffer the "
              + "dock rotates through. A still desktop is silent, which is why a panel can decide "
              + "nothing is arriving and sleep — see Standby.")
-            .font(.system(size: 10)).foregroundStyle(Ink.faint).padding(.top, 8)
+            .font(.caption).foregroundStyle(Ink.faint).padding(.top, 8)
     }
 }
 

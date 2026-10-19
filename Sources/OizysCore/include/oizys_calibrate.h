@@ -99,6 +99,8 @@ int oizys_calibration_load(int head, OizysCalibration *out);
 
 /* Persist a head's correction. Passing NULL clears it. Returns 0 on success. */
 int oizys_calibration_store(int head, const OizysCalibration *calibration);
+/* Remove both heads' corrections in one file operation. */
+int oizys_calibration_clear(void);
 
 /*
  * Fit every display in a readings file, solve each against the reference, and store the

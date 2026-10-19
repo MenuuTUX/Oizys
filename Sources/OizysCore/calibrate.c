@@ -244,6 +244,10 @@ int oizys_calibration_store(int head, const OizysCalibration *calibration) {
     return 0;
 }
 
+int oizys_calibration_clear(void) {
+    return oizys_settings_reset(oizys_calibration_path());
+}
+
 /* -- solving a captured session -------------------------------------------------------- */
 
 /*
