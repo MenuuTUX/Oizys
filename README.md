@@ -342,6 +342,12 @@ terminal, a spinner) capture runs at `power.light_fps`, 30 by default, and large
 as scrolling, dragging or video runs at `capture.fps`. Set `power.light_fps` to `capture.fps`
 or higher to turn that off.
 
+Large motion that lasts more than 8 seconds is treated as video and captured at
+`power.video_fps`, 30 by default, which halves the work for a 60 fps source. A scroll or a
+window drag ends well before that and keeps the full rate, and so does any head that is
+still scrolling while another plays video. Set `power.video_fps` to `capture.fps` or higher
+to keep video at full rate.
+
 ### When the main display gets smaller
 
 macOS stores a resolution against each *set* of attached screens, not against each screen.

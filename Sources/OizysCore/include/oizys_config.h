@@ -32,6 +32,7 @@ typedef struct {
     int head_standby_min[2];  /* blank an idle head after this long; 0 never blanks */
     int power_saving;         /* drop to power.idle_fps once every head is idle */
     int power_idle_fps;
+    int power_video_fps;      /* rate once large motion has lasted a few seconds (video) */
     int power_light_fps;      /* rate while only a small part of the screen changes */
     int power_idle_after_s;
     int control_poll_ms;

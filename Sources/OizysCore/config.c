@@ -82,6 +82,10 @@ static const Field FIELDS[] = {
      * streaming terminal, a spinner) 30 looks the same as 60 and costs half. Large motion
      * keeps capture.fps. A value at or above capture.fps turns this off. */
     F("power.light_fps", FIELD_INT, power_light_fps, "30", 1, 240),
+    /* Sustained large motion, i.e. video: after 8 s of it, a 60 fps source looks the same at
+     * 30 and costs half. A scroll or drag is over long before that. At or above capture.fps
+     * this is off. */
+    F("power.video_fps", FIELD_INT, power_video_fps, "30", 1, 240),
     F("power.idle_fps", FIELD_INT, power_idle_fps, "10", 1, 240),
     F("power.idle_after_s", FIELD_INT, power_idle_after_s, "20", 1, 600),
     /* Dims the signal Oizys encodes for a head. A DisplayLink output has no I2C path to the
@@ -630,7 +634,7 @@ int oizys_config_selftest(void) {
     /* Power saving is on by default, and the idle rate is below any sane capture rate. */
     CHECK(config.power_saving == 1);
     CHECK(config.power_idle_fps == 10 && config.power_idle_after_s == 20);
-    CHECK(config.power_light_fps == 30);
+    CHECK(config.power_light_fps == 30 && config.power_video_fps == 30);
 
     /* Brightness is a percentage that becomes a Q8 gain, and it can only ever darken. */
     CHECK(config.head_brightness[0] == 100 && config.head_brightness[1] == 100);

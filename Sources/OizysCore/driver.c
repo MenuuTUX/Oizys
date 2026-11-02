@@ -95,6 +95,8 @@ struct OizysDriver {
     uint64_t last_change_ns[OIZYS_DL3_MAX_HEADS];
     /* Smoothed share of strips changed per presented frame, in tenths of a percent. */
     int damage_pm[OIZYS_DL3_MAX_HEADS];
+    /* When damage_pm last rose into large-motion territory and has stayed there; 0 if not. */
+    uint64_t heavy_since_ns[OIZYS_DL3_MAX_HEADS];
     int gain_q8[OIZYS_DL3_MAX_HEADS];
     int contrast_q8[OIZYS_DL3_MAX_HEADS];
     int warmth[OIZYS_DL3_MAX_HEADS];
@@ -854,6 +856,7 @@ OizysDriver *oizys_driver_engage(OizysSession *session, uint16_t product_id) {
         driver->blanked[i] = 0;
         driver->last_change_ns[i] = 0;
         driver->damage_pm[i] = 0;
+        driver->heavy_since_ns[i] = 0;
     }
     if (run_shared_ake(driver) < 0 || configure_control(driver) < 0) {
         oizys_log("driver engagement failed");
@@ -2002,7 +2005,7 @@ int oizys_driver_capture_fps_target(const OizysDriver *driver) {
     }
     uint64_t now = monotonic_ns();
     uint64_t threshold = (uint64_t)config->power_idle_after_s * 1000000000ull;
-    int busy = 0, heavy = 0;
+    int busy = 0, fresh = 0, sustained = 0;
     for (int head = 0; head < OIZYS_DL3_MAX_HEADS; head++) {
         if (!driver->active[head]) {
             continue;
@@ -2012,12 +2015,21 @@ int oizys_driver_capture_fps_target(const OizysDriver *driver) {
             busy = 1;
             /* 15% of the strips: past that it is scrolling, dragging or video, where
                smoothness is what the user sees. Below it the rate is not. */
-            heavy |= driver->damage_pm[head] >= 150;
+            if (driver->damage_pm[head] >= 150) {
+                /* Large motion that has lasted 8 s is video, not a scroll or a drag. */
+                uint64_t since = driver->heavy_since_ns[head];
+                if (since && now - since >= 8000000000ull) sustained = 1;
+                else fresh = 1;
+            }
         }
     }
     if (busy) {
-        int light = config->power_light_fps;
-        return heavy || light >= config->capture_fps ? config->capture_fps : light;
+        /* One capture rate serves every head, so any head still scrolling keeps it high. */
+        if (fresh) {
+            return config->capture_fps;
+        }
+        int rate = sustained ? config->power_video_fps : config->power_light_fps;
+        return rate < config->capture_fps ? rate : config->capture_fps;
     }
     int idle = config->power_idle_fps;
     return idle < config->capture_fps ? idle : config->capture_fps;
@@ -2067,6 +2079,16 @@ static int present_bgra_mosaic(OizysDriver *driver, uint8_t head, const uint8_t 
     /* Four-frame moving average: quick to see a scroll start, slow enough to ignore a blink. */
     driver->damage_pm[head] = (driver->damage_pm[head] * 3 +
         count * 1000 / (int)(driver->damage[head].rows * driver->damage[head].cols)) / 4;
+    /* A pause breaks "sustained": resuming after a gap starts the clock again. */
+    if (driver->last_change_ns[head] && monotonic_ns() - driver->last_change_ns[head] > 1000000000ull) {
+        driver->heavy_since_ns[head] = 0;
+    }
+    /* Enter large motion at 15%, leave it below 10%, so video that dips does not reset. */
+    if (driver->damage_pm[head] >= 150) {
+        if (!driver->heavy_since_ns[head]) driver->heavy_since_ns[head] = monotonic_ns();
+    } else if (driver->damage_pm[head] < 100) {
+        driver->heavy_since_ns[head] = 0;
+    }
     if (refresh_strip_bodies(driver, head, bgra, stride, width, height, owed, count) < 0 ||
         submit_strip_frame(driver, head, owed, count, presentations) < 0) {
         return -1;

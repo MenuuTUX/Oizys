@@ -20,6 +20,12 @@ static void *exercise(void *raw) {
     if (oizys_driver_capture_fps_target(driver) != 30) return (void *)7;
     driver->damage_pm[0] = 400;
     if (oizys_driver_capture_fps_target(driver) != 60) return (void *)8;
+    /* Large motion that has only just started stays at full rate; once it has lasted long
+       enough to be video it drops to the video rate. */
+    driver->heavy_since_ns[0] = monotonic_ns();
+    if (oizys_driver_capture_fps_target(driver) != 60) return (void *)9;
+    driver->heavy_since_ns[0] = monotonic_ns() - 9000000000ull;
+    if (oizys_driver_capture_fps_target(driver) != 30) return (void *)10;
     free(surface);
     return 0;
 }
@@ -46,6 +52,7 @@ int main(void) {
     config.capture_fps = 60;
     config.power_idle_fps = 10;
     config.power_light_fps = 30;
+    config.power_video_fps = 30;
     config.power_idle_after_s = 1;
     pthread_t thread;
     if (pthread_create(&thread, NULL, exercise, driver) != 0) return 4;
