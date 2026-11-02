@@ -1,0 +1,84 @@
+name: Build every commit
+
+# A prerelease per push to main, so there is always a current installable build. These are
+# ad-hoc signed and not notarized: the signed releases in release.yml need Apple credentials
+# and are still cut from a v* tag. Tags here use build-*, which release.yml does not match.
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['**.md', 'Documentation/**', 'Assets/**']
+  workflow_dispatch:
+
+concurrency:
+  group: build-main
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    # Apple Silicon only: Base.xcconfig pins arm64 and the encoder uses NEON.
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      # Patch number is the commit count, so versions rise with every commit and fit the
+      # three numeric components build_app.py accepts.
+      - name: Resolve version
+        id: version
+        run: |
+          base="$(cut -d. -f1,2 VERSION)"
+          version="$base.$(git rev-list --count HEAD)"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=build-$version" >> "$GITHUB_OUTPUT"
+
+      - name: Build and package
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          python3 Tools/make_xcodeproj.py
+          mkdir -p dist
+          python3 Tools/build_app.py --variant production --version "$VERSION" --sign - --format both
+          python3 Tools/make_dmg.py production --version "$VERSION" --output dist
+          pkgutil --payload-files "dist/Oizys-$VERSION-production.pkg" | grep -q 'Oizys.app/Contents/MacOS/OizysDriver'
+          hdiutil verify "dist/Oizys-$VERSION.dmg"
+          (cd dist && shasum -a 256 Oizys-* > SHA256SUMS.txt)
+          ls -la dist
+
+      - name: Publish prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "$TAG already exists; nothing to do"; exit 0
+          fi
+          subject="$(git log -1 --format=%s)"
+          gh release create "$TAG" dist/* \
+            --prerelease \
+            --target "$GITHUB_SHA" \
+            --title "Oizys $VERSION (commit build)" \
+            --notes "$subject
+
+          Commit $GITHUB_SHA. Ad-hoc signed, not notarized, and not tested against a dock:
+          no GitHub runner has one attached. macOS will refuse the first launch; install the
+          PKG, then right-click Oizys.app and choose Open, and grant Screen Recording again.
+          For a notarized build use the latest release without the prerelease label."
+
+      # Keep the ten newest commit builds. Only build-* prereleases are touched.
+      - name: Prune old commit builds
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release list --limit 200 --json tagName,isPrerelease \
+            --jq '[.[] | select(.isPrerelease and (.tagName | startswith("build-")))] | .[10:] | .[].tagName' |
+          while read -r old; do
+            [[ -n "$old" ]] && gh release delete "$old" --cleanup-tag --yes
+          done
