@@ -185,6 +185,11 @@ void oizys_video_set_gain(int gain_q8);
 void oizys_video_set_contrast(int contrast_q8);
 int oizys_video_contrast(void);
 
+/* Warmth 0..100 percent, composed into the same per-channel table: green and blue are scaled
+ * down, red is untouched. 0 is the panel as sent. Set it per head like contrast. */
+void oizys_video_set_warmth(int percent);
+int oizys_video_warmth(void);
+
 /* Per-channel correction as three 256-entry tables, in R, G, B order, applied to pixels
  * before the colour transform. NULL removes it. The caller owns the storage and must keep it
  * alive and unchanged while frames are being encoded. */

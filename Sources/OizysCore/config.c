@@ -90,6 +90,10 @@ static const Field FIELDS[] = {
      * mid-grey and has to go both ways to mean anything. Above 100 clips highlights. */
     F("head.left.contrast", FIELD_INT, head_contrast[0], "100", 50, 150),
     F("head.right.contrast", FIELD_INT, head_contrast[1], "100", 50, 150),
+    /* Night-light warmth, applied in the encoder because a dock head ignores the window
+     * server's Night Shift and gamma. 0 is off. */
+    F("head.left.warmth", FIELD_INT, head_warmth[0], "0", 0, 100),
+    F("head.right.warmth", FIELD_INT, head_warmth[1], "0", 0, 100),
     /* Load-bearing. Polling the dock harder than this reads back as a false disconnect. */
     F("control.poll_ms", FIELD_INT, control_poll_ms, "13", 8, 50),
     F("control.heartbeat_s", FIELD_INT, control_heartbeat_s, "3", 1, 10),
@@ -467,6 +471,10 @@ int oizys_config_head_contrast_q8(int head) {
     return oizys_config()->head_contrast[head] * 256 / 100;
 }
 
+int oizys_config_head_warmth(int head) {
+    return head < 0 || head > 1 ? 0 : oizys_config()->head_warmth[head];
+}
+
 int oizys_config_head_active(int head) {
     if (head < 0 || head > 1) {
         return 0;
@@ -637,6 +645,12 @@ int oizys_config_selftest(void) {
     CHECK(config.head_contrast[0] == 150);
     CHECK(apply(&config, find_field("head.right.contrast"), "1") == 0);
     CHECK(config.head_contrast[1] == 50);
+
+    CHECK(config.head_warmth[0] == 0 && config.head_warmth[1] == 0);
+    CHECK(apply(&config, find_field("head.left.warmth"), "40") == 0);
+    CHECK(config.head_warmth[0] == 40);
+    CHECK(apply(&config, find_field("head.right.warmth"), "900") == 0);
+    CHECK(config.head_warmth[1] == 100);
 
     /* Garbage is refused, and the field keeps what it had. */
     CHECK(apply(&config, find_field("head.width"), "wide") == -2);

@@ -611,6 +611,20 @@ final class OizysModel: ObservableObject {
         if persist { run(["config", "set", key, String(clamped)]) }
     }
 
+    /// Night-light warmth for a dock head, 0 off to 100 about full Night Shift. Applied in the
+    /// encoder, because the window server's Night Shift never reaches a head's pixels.
+    func headWarmth(_ head: Int) -> Double {
+        let key = head == 0 ? "head.left.warmth" : "head.right.warmth"
+        return Double(settings.first { $0.id == key }?.value ?? "0") ?? 0
+    }
+
+    func setHeadWarmth(_ head: Int, _ percent: Double, persist: Bool = true) {
+        let key = head == 0 ? "head.left.warmth" : "head.right.warmth"
+        let clamped = Int(min(100, max(0, percent.rounded())))
+        editSetting(key, String(clamped))
+        if persist { run(["config", "set", key, String(clamped)]) }
+    }
+
     // MARK: - DDC
 
     /// Brightness over DDC/CI reaches a monitor on a real display pipe only. A head driven

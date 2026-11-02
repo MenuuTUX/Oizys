@@ -2,15 +2,10 @@
 #include "oizys.h"
 #include <CoreGraphics/CoreGraphics.h>
 #include <errno.h>
-#include <limits.h>
-#include <mach-o/dyld.h>
-#include <spawn.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/wait.h>
 #include <unistd.h>
 
-extern char **environ;
 extern int oizys_service_command(const char *action);
 
 static int number(const char *text, long low, long high, long *value) {
@@ -99,111 +94,8 @@ static int monitor(int argc, char **argv) {
     return result ? 1 : 0;
 }
 
-static int read_line(const char *prompt, char *buffer, size_t size) {
-    fputs(prompt, stdout); fflush(stdout);
-    if (!fgets(buffer, (int)size, stdin)) return 0;
-    char *newline = strchr(buffer, '\n');
-    if (newline) *newline = '\0';
-    else {
-        int c;
-        while ((c = getchar()) != '\n' && c != EOF) {}
-        buffer[0] = '\0';
-        fputs("Input too long.\n", stderr); return 0;
-    }
-    return 1;
-}
-
-/* argv is passed directly: terminal input is never interpreted by a shell. */
-static void invoke(const char *const arguments[]) {
-    char executable[PATH_MAX];
-    uint32_t size = sizeof(executable);
-    if (_NSGetExecutablePath(executable, &size)) return;
-    pid_t child;
-    int error = posix_spawn(&child, executable, NULL, NULL, (char *const *)arguments, environ);
-    if (error) { fprintf(stderr, "Could not run command: %s\n", strerror(error)); return; }
-    int status;
-    while (waitpid(child, &status, 0) < 0 && errno == EINTR) {}
-}
-
-static void monitor_menu(void) {
-    char id[32], choice[16], a[64], b[64];
-    monitors();
-    if (!read_line("Display ID (blank to return): ", id, sizeof(id)) || !id[0]) return;
-    while (1) {
-        printf("\nDisplay %s\n1 Modes  2 Set mode  3 Position  4 Mirror / unmirror\n"
-               "5 Brightness  6 Contrast  7 Volume  8 Input source  9 Power\n"
-               "c DDC capabilities  d Read VCP  e Write VCP  q Back\n", id);
-        if (!read_line("> ", choice, sizeof(choice)) || !strcmp(choice, "q")) return;
-        if (!strcmp(choice, "1")) {
-            invoke((const char *const[]){"oizys", "monitor", id, "modes", NULL});
-        } else if (!strcmp(choice, "2")) {
-            invoke((const char *const[]){"oizys", "monitor", id, "modes", NULL});
-            if (read_line("Mode index: ", a, sizeof(a)))
-                invoke((const char *const[]){"oizys", "monitor", id, "mode", a, NULL});
-        } else if (!strcmp(choice, "3")) {
-            if (read_line("X in desktop points: ", a, sizeof(a)) && read_line("Y: ", b, sizeof(b)))
-                invoke((const char *const[]){"oizys", "monitor", id, "position", a, b, NULL});
-        } else if (!strcmp(choice, "4")) {
-            if (read_line("Mirror display ID, or off: ", a, sizeof(a)))
-                invoke((const char *const[]){"oizys", "monitor", id, "mirror", a, NULL});
-        } else if (!strcmp(choice, "c")) {
-            invoke((const char *const[]){"oizys", "ddc", "caps", "--display", id, NULL});
-        } else {
-            const char *code = !strcmp(choice, "5") ? "0x10" : !strcmp(choice, "6") ? "0x12" :
-                               !strcmp(choice, "7") ? "0x62" : !strcmp(choice, "8") ? "0x60" :
-                               !strcmp(choice, "9") ? "0xd6" : NULL;
-            if (!code && strcmp(choice, "d") && strcmp(choice, "e")) continue;
-            if (!code) {
-                if (!read_line("VCP code (e.g. 0x10): ", a, sizeof(a))) return;
-                code = a;
-            }
-            invoke((const char *const[]){"oizys", "ddc", "get", (char *)code, "--display", id, NULL});
-            if (!strcmp(choice, "d")) continue;
-            if (read_line("New raw value (blank cancels; use the monitor's reported range): ", b, sizeof(b)) && b[0])
-                invoke((const char *const[]){"oizys", "ddc", "set", (char *)code, b, "--display", id, NULL});
-        }
-    }
-}
-
-static int legacy_menu(void) {
-    if (!isatty(STDIN_FILENO) || !isatty(STDOUT_FILENO)) {
-        fputs("The TUI needs an interactive terminal. Use `oizys help` for scriptable commands.\n", stderr); return 2;
-    }
-    char choice[16], key[128], value[128];
-    while (1) {
-        if (getenv("TERM") && strcmp(getenv("TERM"), "dumb")) fputs("\033[2J\033[H", stdout);
-        puts("Oizys · Monitor control\n");
-        monitors();
-        puts("\n1 Monitor controls    2 All driver settings    3 Change a setting\n"
-             "4 Service status      5 Start / resume         6 Stop for this login\n"
-             "7 Restart / apply     8 Enable login startup   9 Disable login startup\n"
-             "p Screen Recording permission   r Reset settings   q Quit\n"
-             "Display settings apply immediately. Driver settings apply on restart.\n"
-             "DDC requires a supported native monitor connection; dock heads may not expose DDC.");
-        if (!read_line("> ", choice, sizeof(choice)) || !strcmp(choice, "q")) return 0;
-        if (!strcmp(choice, "1")) monitor_menu();
-        else if (!strcmp(choice, "2")) oizys_config_print(stdout);
-        else if (!strcmp(choice, "3")) {
-            oizys_config_print(stdout);
-            if (read_line("Key: ", key, sizeof(key)) && read_line("Value: ", value, sizeof(value)))
-                invoke((const char *const[]){"oizys", "config", "set", key, value, NULL});
-        } else if (!strcmp(choice, "4")) oizys_service_command("status");
-        else if (!strcmp(choice, "5")) oizys_service_command("start");
-        else if (!strcmp(choice, "6")) oizys_service_command("stop");
-        else if (!strcmp(choice, "7")) oizys_service_command("restart");
-        else if (!strcmp(choice, "8")) oizys_service_command("login-enable");
-        else if (!strcmp(choice, "9")) oizys_service_command("login-disable");
-        else if (!strcmp(choice, "p")) oizys_service_command("permissions");
-        else if (!strcmp(choice, "r") && read_line("Type reset to restore driver defaults: ", value, sizeof(value)) && !strcmp(value, "reset"))
-            invoke((const char *const[]){"oizys", "config", "reset", NULL});
-        oizys_config_reload();
-        if (!read_line("\nPress Return to continue…", value, sizeof(value))) return 0;
-    }
-}
-
 int oizys_terminal_command(int argc, char **argv) {
     if ((argc == 1 && isatty(STDIN_FILENO)) || (argc > 1 && !strcmp(argv[1], "tui"))) {
-        if (argc > 2 && !strcmp(argv[2], "--menu")) return legacy_menu();
         return oizys_tui();
     }
     if (argc < 2) return -1;

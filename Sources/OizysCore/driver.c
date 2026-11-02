@@ -95,6 +95,7 @@ struct OizysDriver {
     uint64_t last_change_ns[OIZYS_DL3_MAX_HEADS];
     int gain_q8[OIZYS_DL3_MAX_HEADS];
     int contrast_q8[OIZYS_DL3_MAX_HEADS];
+    int warmth[OIZYS_DL3_MAX_HEADS];
     /* Every cached strip body was encoded at the settings in force when it was made. When
        those change, the bodies are stale even though the pixels they came from did not
        move -- so the hash cache has to be bypassed for one pass. */
@@ -847,6 +848,7 @@ OizysDriver *oizys_driver_engage(OizysSession *session, uint16_t product_id) {
         oizys_damage_init(&driver->damage[i], 1920, 1080);
         driver->gain_q8[i] = 256;
         driver->contrast_q8[i] = 256;
+        driver->warmth[i] = 0;
         driver->blanked[i] = 0;
         driver->last_change_ns[i] = 0;
     }
@@ -1871,14 +1873,18 @@ static void install_head_lut(OizysDriver *driver, uint8_t head) {
 static int apply_head_correction(OizysDriver *driver, uint8_t head) {
     int gain = oizys_config_head_gain_q8(head);
     int contrast = oizys_config_head_contrast_q8(head);
-    if (driver->gain_q8[head] != gain || driver->contrast_q8[head] != contrast) {
+    int warmth = oizys_config_head_warmth(head);
+    if (driver->gain_q8[head] != gain || driver->contrast_q8[head] != contrast ||
+        driver->warmth[head] != warmth) {
         driver->gain_q8[head] = gain;
         driver->contrast_q8[head] = contrast;
+        driver->warmth[head] = warmth;
         driver->recode[head] = 1;
-        oizys_log("head %u gain %d/256, contrast %d/256", head, gain, contrast);
+        oizys_log("head %u gain %d/256, contrast %d/256, warmth %d%%", head, gain, contrast, warmth);
     }
     oizys_video_set_gain(gain);
     oizys_video_set_contrast(contrast);
+    oizys_video_set_warmth(warmth);
     install_head_lut(driver, head);   /* may raise recode on its own */
     if (!driver->recode[head]) {
         return 0;

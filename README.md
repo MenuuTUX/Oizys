@@ -385,8 +385,7 @@ ordinary display APIs and is unaffected.
 Running `oizys` with no arguments opens a full-screen terminal UI on the alternate screen,
 so it leaves the scrollback alone. The left column carries the logo, the live service state
 and every attached display; the right column is a menu over an output pane. Below 92
-columns the logo column drops and the menu takes the full width. The older numbered menu
-is still there as `oizys tui --menu`.
+columns the logo column drops and the menu takes the full width.
 
 | Key | Action |
 | --- | --- |

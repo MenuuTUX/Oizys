@@ -195,6 +195,7 @@
 		BE64DCC9992D21937DD471DF = {isa = PBXFileReference; lastKnownFileType = text; name = "Monitor-Startup-Handoff-2026-08-31.md"; path = "Documentation/Monitor-Startup-Handoff-2026-08-31.md"; sourceTree = SOURCE_ROOT; };
 		8CDA9285FD41E3077587483A = {isa = PBXFileReference; lastKnownFileType = text; name = "OriginalBrief.md"; path = "Documentation/OriginalBrief.md"; sourceTree = SOURCE_ROOT; };
 		CF05053E159299B83ACD7B00 = {isa = PBXFileReference; lastKnownFileType = text; name = "Performance-2026-08-30.md"; path = "Documentation/Performance-2026-08-30.md"; sourceTree = SOURCE_ROOT; };
+		AE69E04E0886E123C2C4E3F8 = {isa = PBXFileReference; lastKnownFileType = text; name = "Performance-2026-10-10.md"; path = "Documentation/Performance-2026-10-10.md"; sourceTree = SOURCE_ROOT; };
 		C3F2E6B328AE26E1B7CBE310 = {isa = PBXFileReference; lastKnownFileType = text; name = "Ports.md"; path = "Documentation/Ports.md"; sourceTree = SOURCE_ROOT; };
 		CDF44F4B71C71946F9343A35 = {isa = PBXFileReference; lastKnownFileType = text; name = "Product-Audit-and-Redesign-2026-09-26.md"; path = "Documentation/Product-Audit-and-Redesign-2026-09-26.md"; sourceTree = SOURCE_ROOT; };
 		B348D2F3794A333F06CCCDA3 = {isa = PBXFileReference; lastKnownFileType = text; name = "Protocol.md"; path = "Documentation/Protocol.md"; sourceTree = SOURCE_ROOT; };
@@ -202,20 +203,24 @@
 		EA87C733CE8C41B98948CC91 = {isa = PBXFileReference; lastKnownFileType = text; name = "Routing.md"; path = "Documentation/Routing.md"; sourceTree = SOURCE_ROOT; };
 		F276D2CABF3D0FCCCC182759 = {isa = PBXFileReference; lastKnownFileType = text; name = "Testing.md"; path = "Documentation/Testing.md"; sourceTree = SOURCE_ROOT; };
 		225DB77BA9C39FB96D5E66FD = {isa = PBXFileReference; lastKnownFileType = text; name = "Xcode.md"; path = "Documentation/Xcode.md"; sourceTree = SOURCE_ROOT; };
+		5F83DD9DF8FD59A947FCCC79 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "app_model_test.swift"; path = "Tests/Support/app_model_test.swift"; sourceTree = SOURCE_ROOT; };
 		95F400267BCE4521576DA2CB = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = "asan_runner.c"; path = "Tests/Support/asan_runner.c"; sourceTree = SOURCE_ROOT; };
 		7C78068A666B77BC3382E475 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "calibration_session_test.swift"; path = "Tests/Support/calibration_session_test.swift"; sourceTree = SOURCE_ROOT; };
 		26AE79822092186F35ABFC2F = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = "capture_test.c"; path = "Tests/Support/capture_test.c"; sourceTree = SOURCE_ROOT; };
 		AB3E4A7CE5B83C3DEDDC341E = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = "ddc_native_test.c"; path = "Tests/Support/ddc_native_test.c"; sourceTree = SOURCE_ROOT; };
 		8E8B6084D129FE3519110A7C = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "debug_permissions_test.swift"; path = "Tests/Support/debug_permissions_test.swift"; sourceTree = SOURCE_ROOT; };
 		CE41F210AE5F724F4205BB75 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "diagnostic_report_test.swift"; path = "Tests/Support/diagnostic_report_test.swift"; sourceTree = SOURCE_ROOT; };
+		E0D84F564436C95D91994CDE = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "display_tint_test.swift"; path = "Tests/Support/display_tint_test.swift"; sourceTree = SOURCE_ROOT; };
 		184DED0D71603D17A3A489F3 = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = "driver_idle_test.c"; path = "Tests/Support/driver_idle_test.c"; sourceTree = SOURCE_ROOT; };
 		44685A03681CFA13FC03BD72 = {isa = PBXFileReference; lastKnownFileType = text; name = "native_coverage.py"; path = "Tests/Support/native_coverage.py"; sourceTree = SOURCE_ROOT; };
 		023EA7B4A03F34571AA15F61 = {isa = PBXFileReference; lastKnownFileType = text; name = "oizyscore.py"; path = "Tests/Support/oizyscore.py"; sourceTree = SOURCE_ROOT; };
 		320EC1CA2CCE79B2D6C43B54 = {isa = PBXFileReference; lastKnownFileType = text; name = "reference.py"; path = "Tests/Support/reference.py"; sourceTree = SOURCE_ROOT; };
 		31983FD25ADD4A3FACECDF46 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "sidecar_auto_test.swift"; path = "Tests/Support/sidecar_auto_test.swift"; sourceTree = SOURCE_ROOT; };
+		CDF9431F5283B2B9442FC073 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "slider_test.swift"; path = "Tests/Support/slider_test.swift"; sourceTree = SOURCE_ROOT; };
 		C7948E4A3AC7F3005DFFE893 = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = "supervisor_test.c"; path = "Tests/Support/supervisor_test.c"; sourceTree = SOURCE_ROOT; };
 		6673C227F9C7BB35A6ABD767 = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = "usb_frame_test.c"; path = "Tests/Support/usb_frame_test.c"; sourceTree = SOURCE_ROOT; };
 		BEE555D432F9BAFE40F1BED0 = {isa = PBXFileReference; lastKnownFileType = text; name = "conftest.py"; path = "Tests/conftest.py"; sourceTree = SOURCE_ROOT; };
+		B0003501111FD82F51868CDD = {isa = PBXFileReference; lastKnownFileType = text; name = "test_app_model.py"; path = "Tests/test_app_model.py"; sourceTree = SOURCE_ROOT; };
 		1FD45C9E303FB101D3EBD6A6 = {isa = PBXFileReference; lastKnownFileType = text; name = "test_build_tools.py"; path = "Tests/test_build_tools.py"; sourceTree = SOURCE_ROOT; };
 		C092A610AFCD74EC5828C456 = {isa = PBXFileReference; lastKnownFileType = text; name = "test_calibration.py"; path = "Tests/test_calibration.py"; sourceTree = SOURCE_ROOT; };
 		3821BC3E67BB3B33F836DC28 = {isa = PBXFileReference; lastKnownFileType = text; name = "test_calibration_session.py"; path = "Tests/test_calibration_session.py"; sourceTree = SOURCE_ROOT; };
@@ -508,6 +513,7 @@
 				BE64DCC9992D21937DD471DF /* Monitor-Startup-Handoff-2026-08-31.md */,
 				8CDA9285FD41E3077587483A /* OriginalBrief.md */,
 				CF05053E159299B83ACD7B00 /* Performance-2026-08-30.md */,
+				AE69E04E0886E123C2C4E3F8 /* Performance-2026-10-10.md */,
 				C3F2E6B328AE26E1B7CBE310 /* Ports.md */,
 				CDF44F4B71C71946F9343A35 /* Product-Audit-and-Redesign-2026-09-26.md */,
 				B348D2F3794A333F06CCCDA3 /* Protocol.md */,
@@ -515,20 +521,24 @@
 				EA87C733CE8C41B98948CC91 /* Routing.md */,
 				F276D2CABF3D0FCCCC182759 /* Testing.md */,
 				225DB77BA9C39FB96D5E66FD /* Xcode.md */,
+				5F83DD9DF8FD59A947FCCC79 /* app_model_test.swift */,
 				95F400267BCE4521576DA2CB /* asan_runner.c */,
 				7C78068A666B77BC3382E475 /* calibration_session_test.swift */,
 				26AE79822092186F35ABFC2F /* capture_test.c */,
 				AB3E4A7CE5B83C3DEDDC341E /* ddc_native_test.c */,
 				8E8B6084D129FE3519110A7C /* debug_permissions_test.swift */,
 				CE41F210AE5F724F4205BB75 /* diagnostic_report_test.swift */,
+				E0D84F564436C95D91994CDE /* display_tint_test.swift */,
 				184DED0D71603D17A3A489F3 /* driver_idle_test.c */,
 				44685A03681CFA13FC03BD72 /* native_coverage.py */,
 				023EA7B4A03F34571AA15F61 /* oizyscore.py */,
 				320EC1CA2CCE79B2D6C43B54 /* reference.py */,
 				31983FD25ADD4A3FACECDF46 /* sidecar_auto_test.swift */,
+				CDF9431F5283B2B9442FC073 /* slider_test.swift */,
 				C7948E4A3AC7F3005DFFE893 /* supervisor_test.c */,
 				6673C227F9C7BB35A6ABD767 /* usb_frame_test.c */,
 				BEE555D432F9BAFE40F1BED0 /* conftest.py */,
+				B0003501111FD82F51868CDD /* test_app_model.py */,
 				1FD45C9E303FB101D3EBD6A6 /* test_build_tools.py */,
 				C092A610AFCD74EC5828C456 /* test_calibration.py */,
 				3821BC3E67BB3B33F836DC28 /* test_calibration_session.py */,

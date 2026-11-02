@@ -401,8 +401,9 @@ private struct DisplayCard: View {
         if let head = display.head {
             HeadBrightnessRow(model: model, head: head)
             HeadContrastRow(model: model, head: head)
+            HeadWarmthRow(model: model, head: head)
             HeadPowerRows(model: model, head: head)
-        } else if display.kind != .sidecar {
+        } else if display.kind == .external {
             BrightnessRow(model: model, display: display)
         }
     }
@@ -620,6 +621,27 @@ private struct HeadContrastRow: View {
     }
 }
 
+private struct HeadWarmthRow: View {
+    @ObservedObject var model: OizysModel
+    let head: Int
+    var body: some View {
+        let value = model.headWarmth(head)
+        Row(label: "Night light",
+            detail: "Warms this panel. Night Shift cannot reach a dock head, so this does it in the picture.") {
+            HStack(spacing: 10) {
+                HalftoneSlider(value: Binding(
+                    get: { value / 100 },
+                    set: { model.setHeadWarmth(head, $0 * 100, persist: false) }),
+                               onCommit: { model.setHeadWarmth(head, $0 * 100) },
+                               label: head == 0 ? "Left head night light" : "Right head night light",
+                               announcedValue: "\(Int(value)) percent")
+                    .frame(width: 150)
+                Text("\(Int(value))%").frame(width: 38, alignment: .trailing)
+            }
+        }
+    }
+}
+
 private struct BrightnessRow: View {
     @ObservedObject var model: OizysModel
     let display: OizysDisplay
@@ -645,6 +667,10 @@ private struct BrightnessRow: View {
                     model.readBrightness(display.id)
                 }
             }
+        }
+        .onAppear {
+            // Read once on its own: a slider that waits for a button looks like no control.
+            if model.brightness[display.id] == nil && !failed { model.readBrightness(display.id) }
         }
     }
 }

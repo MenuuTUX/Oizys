@@ -324,3 +324,43 @@ def test_the_tone_composes_with_a_calibration_table():
     expected[:, :, :3] = table[expected[:, :, :3]]
     assert through_encoder == encode(expected, 256)
     del keep
+
+
+# --- warmth -----------------------------------------------------------------------------
+#
+# Night-light warmth is the third term in the same table. A dock head ignores the window
+# server's Night Shift, so the only place to warm it is the pixels Oizys encodes.
+
+
+@pytest.fixture(autouse=True)
+def no_warmth_after_each():
+    yield
+    core.lib.oizys_video_set_warmth(0)
+    assert core.lib.oizys_video_warmth() == 0
+
+
+def encode_warm(pixels, percent):
+    core.lib.oizys_video_set_warmth(percent)
+    return encode(pixels, 256)
+
+
+def test_warmth_clamps_to_percent():
+    core.lib.oizys_video_set_warmth(-5)
+    assert core.lib.oizys_video_warmth() == 0
+    core.lib.oizys_video_set_warmth(500)
+    assert core.lib.oizys_video_warmth() == 100
+
+
+def test_zero_warmth_is_byte_identical_and_warming_changes_the_strip():
+    pixels = surface(13)
+    baseline = encode(pixels, 256)
+    assert encode_warm(pixels, 0) == baseline
+    assert encode_warm(pixels, 60) != baseline
+
+
+def test_warmth_leaves_pure_red_alone():
+    # Only green and blue are pulled down, so a pixel with neither must not change.
+    red = np.zeros((STRIP_H, STRIP_W, 4), dtype=np.uint8)
+    red[:, :, 2] = 255
+    red[:, :, 3] = 255
+    assert encode_warm(red, 100) == encode_warm(red, 0)

@@ -442,6 +442,9 @@ static inline void store_scaled(int32_t *out, int16x8_t value) {
  */
 static int g_gain_q8 = 256;
 static int g_contrast_q8 = 256;
+/* Night-light style warmth, 0..100 percent. Only green and blue are pulled down, so it is
+   a tint rather than a brightness change. */
+static int g_warmth_pct = 0;
 
 /*
  * Per-channel correction, as three 256-entry tables.
@@ -486,15 +489,17 @@ static uint8_t tone_map(int level) {
 }
 
 static void rebuild_active_lut(void) {
-    if (g_gain_q8 == 256 && g_contrast_q8 == 256) {
+    if (g_gain_q8 == 256 && g_contrast_q8 == 256 && g_warmth_pct == 0) {
         /* Unity has to stay byte-for-byte free, so no table is installed for it. */
         g_active_lut = g_channel_lut;
         return;
     }
+    /* Red, green, blue. At 100% green keeps ~82% and blue ~52%, about full Night Shift. */
+    const int warm_q8[3] = {256, 256 - g_warmth_pct * 46 / 100, 256 - g_warmth_pct * 123 / 100};
     for (int channel = 0; channel < 3; channel++) {
         for (int level = 0; level < 256; level++) {
-            g_tone_lut[channel][level] =
-                tone_map(g_channel_lut ? g_channel_lut[channel][level] : level);
+            int toned = tone_map(g_channel_lut ? g_channel_lut[channel][level] : level);
+            g_tone_lut[channel][level] = (uint8_t)((toned * warm_q8[channel] + 128) >> 8);
         }
     }
     g_active_lut = (const uint8_t (*)[256])g_tone_lut;
@@ -527,6 +532,15 @@ void oizys_video_set_contrast(int contrast_q8) {
 
 int oizys_video_contrast(void) {
     return g_contrast_q8;
+}
+
+void oizys_video_set_warmth(int percent) {
+    g_warmth_pct = percent < 0 ? 0 : percent > 100 ? 100 : percent;
+    rebuild_active_lut();
+}
+
+int oizys_video_warmth(void) {
+    return g_warmth_pct;
 }
 
 /*

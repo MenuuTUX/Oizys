@@ -26,6 +26,7 @@ typedef struct {
     int capture_queue_depth;
     int capture_dump_frames;
     int head_brightness[2];   /* percent, per head; dims the signal, not a backlight */
+    int head_warmth[2];       /* percent, per head; 0 off, 100 about full Night Shift */
     int head_contrast[2];     /* percent, per head; pivots on mid-grey, so it goes both ways */
     int head_keepalive_s[2];  /* repaint an idle head this often; 0 lets the panel sleep */
     int head_standby_min[2];  /* blank an idle head after this long; 0 never blanks */
@@ -92,6 +93,8 @@ int oizys_config_head_gain_q8(int head);
 
 /* This head's contrast in Q8, 256 = unity, for oizys_video_set_contrast. */
 int oizys_config_head_contrast_q8(int head);
+/* This head's warmth, percent 0..100, for oizys_video_set_warmth. */
+int oizys_config_head_warmth(int head);
 
 /* Seconds between idle repaints for this head, 0 when it should be left to sleep. */
 int oizys_config_head_keepalive_s(int head);
