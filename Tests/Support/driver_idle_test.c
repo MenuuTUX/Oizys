@@ -1,4 +1,4 @@
-/* Regression for content-aware idle detection. The unchanged-frame path must not
+/* Regression for content-aware idle detection and the light/full rate choice. The unchanged-frame path must not
  * refresh last_change_ns, otherwise capture never reaches its low-rate target. */
 #define OIZYS_LOG_IMPLEMENTATION
 #include "../../Sources/OizysCore/driver.c"
@@ -14,6 +14,12 @@ static void *exercise(void *raw) {
     if (present_bgra_mosaic(driver, 0, surface, 1920 * 4, 1920, 1080, NULL, 0) != 0) return (void *)4;
     if (driver->last_change_ns[0] != 1) return (void *)5;
     if (oizys_driver_capture_fps_target(driver) != 10) return (void *)6;
+    /* A head that is changing a little runs at the light rate; a big change, at full rate. */
+    driver->last_change_ns[0] = monotonic_ns();
+    driver->damage_pm[0] = 20;
+    if (oizys_driver_capture_fps_target(driver) != 30) return (void *)7;
+    driver->damage_pm[0] = 400;
+    if (oizys_driver_capture_fps_target(driver) != 60) return (void *)8;
     free(surface);
     return 0;
 }
@@ -39,6 +45,7 @@ int main(void) {
     config.power_saving = 1;
     config.capture_fps = 60;
     config.power_idle_fps = 10;
+    config.power_light_fps = 30;
     config.power_idle_after_s = 1;
     pthread_t thread;
     if (pthread_create(&thread, NULL, exercise, driver) != 0) return 4;

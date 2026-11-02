@@ -337,6 +337,11 @@ still for `power.idle_after_s`. Capture, encoding and USB all scale with frame r
 still desktop has nothing to send at any rate, so this costs nothing and the first change
 restores full speed. On by default.
 
+It also follows content. While under 15% of the strips are changing (typing, a streaming
+terminal, a spinner) capture runs at `power.light_fps`, 30 by default, and large motion such
+as scrolling, dragging or video runs at `capture.fps`. Set `power.light_fps` to `capture.fps`
+or higher to turn that off.
+
 ### When the main display gets smaller
 
 macOS stores a resolution against each *set* of attached screens, not against each screen.

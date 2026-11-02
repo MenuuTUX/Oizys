@@ -93,6 +93,8 @@ struct OizysDriver {
     uint64_t next_heartbeat;
     uint64_t last_video_ns[OIZYS_DL3_MAX_HEADS];
     uint64_t last_change_ns[OIZYS_DL3_MAX_HEADS];
+    /* Smoothed share of strips changed per presented frame, in tenths of a percent. */
+    int damage_pm[OIZYS_DL3_MAX_HEADS];
     int gain_q8[OIZYS_DL3_MAX_HEADS];
     int contrast_q8[OIZYS_DL3_MAX_HEADS];
     int warmth[OIZYS_DL3_MAX_HEADS];
@@ -851,6 +853,7 @@ OizysDriver *oizys_driver_engage(OizysSession *session, uint16_t product_id) {
         driver->warmth[i] = 0;
         driver->blanked[i] = 0;
         driver->last_change_ns[i] = 0;
+        driver->damage_pm[i] = 0;
     }
     if (run_shared_ake(driver) < 0 || configure_control(driver) < 0) {
         oizys_log("driver engagement failed");
@@ -1999,14 +2002,22 @@ int oizys_driver_capture_fps_target(const OizysDriver *driver) {
     }
     uint64_t now = monotonic_ns();
     uint64_t threshold = (uint64_t)config->power_idle_after_s * 1000000000ull;
+    int busy = 0, heavy = 0;
     for (int head = 0; head < OIZYS_DL3_MAX_HEADS; head++) {
         if (!driver->active[head]) {
             continue;
         }
         /* A head that has never had a frame is starting up, not idle. */
         if (!driver->last_change_ns[head] || now - driver->last_change_ns[head] < threshold) {
-            return config->capture_fps;
+            busy = 1;
+            /* 15% of the strips: past that it is scrolling, dragging or video, where
+               smoothness is what the user sees. Below it the rate is not. */
+            heavy |= driver->damage_pm[head] >= 150;
         }
+    }
+    if (busy) {
+        int light = config->power_light_fps;
+        return heavy || light >= config->capture_fps ? config->capture_fps : light;
     }
     int idle = config->power_idle_fps;
     return idle < config->capture_fps ? idle : config->capture_fps;
@@ -2053,6 +2064,9 @@ static int present_bgra_mosaic(OizysDriver *driver, uint8_t head, const uint8_t 
         return 0;
     }
     int keyframe = driver->damage[head].keyframe_owed;
+    /* Four-frame moving average: quick to see a scroll start, slow enough to ignore a blink. */
+    driver->damage_pm[head] = (driver->damage_pm[head] * 3 +
+        count * 1000 / (int)(driver->damage[head].rows * driver->damage[head].cols)) / 4;
     if (refresh_strip_bodies(driver, head, bgra, stride, width, height, owed, count) < 0 ||
         submit_strip_frame(driver, head, owed, count, presentations) < 0) {
         return -1;
