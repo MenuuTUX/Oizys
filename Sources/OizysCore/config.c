@@ -701,10 +701,10 @@ int oizys_config_selftest(void) {
     /* A device name is whatever its owner typed, spaces and apostrophes included, and it
      * round-trips unchanged. Longer than the field truncates rather than failing: a name
      * that matches on its first 63 characters is still the right iPad. */
-    CHECK(apply(&config, find_field("sidecar.device"), "shib's iPad Pro") == 0);
-    CHECK(strcmp(config.sidecar_device, "shib's iPad Pro") == 0);
+    CHECK(apply(&config, find_field("sidecar.device"), "Studio iPad Pro") == 0);
+    CHECK(strcmp(config.sidecar_device, "Studio iPad Pro") == 0);
     render(&config, find_field("sidecar.device"), text, sizeof(text));
-    CHECK(strcmp(text, "shib's iPad Pro") == 0);
+    CHECK(strcmp(text, "Studio iPad Pro") == 0);
     CHECK(apply(&config, find_field("sidecar.device"), "") == 0);
     CHECK(config.sidecar_device[0] == '\0');
 

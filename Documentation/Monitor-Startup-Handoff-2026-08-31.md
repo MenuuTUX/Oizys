@@ -18,8 +18,8 @@ The user reported slowly pulsing white power LEDs, no backlight, and black scree
 
 | Item | Value |
 | --- | --- |
-| Repository | `/Users/shib/Developer/Oizys` |
-| Old workspace | `/Users/shib/Developer/MView`, no longer the active source tree |
+| Repository | `~/Developer/Oizys` |
+| Old workspace | `~/Developer/MView`, no longer the active source tree |
 | Machine | M3 MacBook Air, macOS 26.7 |
 | Dock | ACASIS DS-0602, DisplayLink DL-6950 / Ridge |
 | USB | `17e9:6000`, location `0x00200000`, 5 Gbit/s |
@@ -95,7 +95,7 @@ The current `driver.c`, `dl3.c`, and `usb_session.c` match HEAD after normalizin
 
 All persistent evidence is under:
 
-`/Users/shib/Developer/Oizys/logs/reconnect-20260831/`
+`~/Developer/Oizys/logs/reconnect-20260831/`
 
 Start with its `README.md`. It is chronological; later observations supersede earlier “pending” entries. Relevant files include:
 

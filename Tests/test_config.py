@@ -163,7 +163,7 @@ def test_free_text_keeps_a_name_with_spaces_whole():
     # A device name is whatever its owner typed. It has to survive the write, the reload
     # and the listing intact: the menu bar reads a name back out of oizys_config_print,
     # and a value clipped at the first space picks a different iPad or none at all.
-    name = "shib's iPad Pro"
+    name = "Studio iPad Pro"
     assert set_("sidecar.device", name) == 0
     core.lib.oizys_config_reload()
     rc, value = get("sidecar.device")

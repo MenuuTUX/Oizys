@@ -375,7 +375,7 @@ Oizys can attach it on its own when it turns up:
 
 ```bash
 oizys config set sidecar.auto_connect true
-oizys config set sidecar.device "shib's iPad Pro"   # empty means whichever is offered first
+oizys config set sidecar.device "Studio iPad Pro"   # empty means whichever is offered first
 oizys config set sidecar.require_desk false         # connect anywhere, not only at a desk
 ```
 

@@ -1,6 +1,6 @@
 # Oizys — finish the open DisplayLink driver on this Mac
 
-You are a coding agent with a shell on **this** Mac. The DisplayLink USB dock is plugged in. Two Dell monitors are attached to it. Your job is to make **both physical Dells show a real macOS desktop** using the open-source tree in `/Users/shib/Developer/Oizys`, then **prove** it from measurements — not from log lines that say “bring-up finished”.
+You are a coding agent with a shell on **this** Mac. The DisplayLink USB dock is plugged in. Two Dell monitors are attached to it. Your job is to make **both physical Dells show a real macOS desktop** using the open-source tree in `~/Developer/Oizys`, then **prove** it from measurements — not from log lines that say “bring-up finished”.
 
 Previous agents claimed success after USB ACKs. The user then looked at the panels: **right Dell solid black, left Dell “No HDMI”**. USB ACK ≠ picture. Do not repeat that.
 
@@ -89,7 +89,7 @@ You have no guaranteed camera. **Do not use Mac virtual-display screenshots as p
 ### A. Gold capture (DLM running, both panels known-good)
 
 ```bash
-cd /Users/shib/Developer/Oizys
+cd ~/Developer/Oizys
 swift run oizys start-dlm
 sleep 3
 system_profiler SPDisplaysDataType > logs/gold-displays.txt
@@ -158,7 +158,7 @@ Timeouts: first `DeviceCapture` open often fails once; retry. SET_INTERFACE ifac
 ## Commands
 
 ```bash
-cd /Users/shib/Developer/Oizys
+cd ~/Developer/Oizys
 swift test
 swift run oizys probe
 swift run oizys run --takeover    # Ctrl-C restores DLM
